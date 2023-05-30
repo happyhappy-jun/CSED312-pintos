@@ -8,8 +8,6 @@ on:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    env:
-      SHA6: ${GITHUB_SHA::6}
 
     steps:
       - name: Checkout repository
