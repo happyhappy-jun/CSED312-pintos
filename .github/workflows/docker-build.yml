@@ -8,6 +8,8 @@ on:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    env:
+      SHA6: ${GITHUB_SHA::6}
 
     steps:
       - name: Checkout repository
@@ -32,5 +34,5 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            happyhappyjun/pintos:${{ github.sha:6 }}
+            happyhappyjun/pintos:$SHA6
             happyhappyjun/pintos::latest
