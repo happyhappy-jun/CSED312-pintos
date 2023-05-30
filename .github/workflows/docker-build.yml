@@ -33,4 +33,4 @@ jobs:
           push: true
           tags: |
             happyhappyjun/pintos:${{ github.sha }}
-            happyhappyjun/pintos::latest
+            happyhappyjun/pintos:latest
