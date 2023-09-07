@@ -19,7 +19,7 @@ jobs:
       run: docker pull loeper/stanford-cs212-pintos:latest
 
     - name: Run Pintos test
-      run: docker run -it --workdir /pintos/src/threads --entrypoint '/bin/bash' -v ${{ github.workspace }}/pintos:/pintos loeper/stanford-cs212-pintos:latest -c "make clean && make && make check"
+      run: docker run --workdir /pintos/src/threads --entrypoint '/bin/bash' -v ${{ github.workspace }}/pintos:/pintos loeper/stanford-cs212-pintos:latest -c "make clean && make && make check"
 
     - name: Get test results
       run: echo "RESULTS=$(cat ./pintos/src/threads/build/results)" >> $GITHUB_ENV
