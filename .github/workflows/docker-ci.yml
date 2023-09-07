@@ -55,7 +55,7 @@ jobs:
       uses: peter-evans/create-or-update-comment@v3
       with:
         issue-number: ${{ github.event.pull_request.number }}
-        body: ${{ $TEST_RESULT }}
+        body: $env.TEST_RESULT
         reactions: rocket
 
     - name: Update comment
@@ -63,5 +63,5 @@ jobs:
       uses: peter-evans/create-or-update-comment@v3
       with:
         comment-id: ${{ steps.fc.outputs.comment-id }}
-        body: ${{ $TEST_RESULT}}
+        body: $env.TEST_RESULT
         reactions: hooray
