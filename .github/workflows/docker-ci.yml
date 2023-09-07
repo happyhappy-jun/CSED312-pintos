@@ -1,7 +1,15 @@
 name: Pintos CI
 
 on:
-  push
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  pull-requests: write
+  contents: write
 
 jobs:
   test:
