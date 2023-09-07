@@ -128,14 +128,9 @@ main (void)
 #endif
 
   printf ("Boot complete.\n");
-
-  // FIXED: changed referencing PKUOS
-  if (*argv != NULL) {
-    /* Run actions specified on kernel command line. */
-    run_actions (argv);
-  } else {
-    // TODO: no command line passed to kernel. Run interactively 
-  }
+  
+  /* Run actions specified on kernel command line. */
+  run_actions (argv);
 
   /* Finish up. */
   shutdown ();

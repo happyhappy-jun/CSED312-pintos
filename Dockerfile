@@ -1,5 +1,5 @@
 FROM ubuntu:18.04
-LABEL maintainer=zhongyinmin@pku.edu.cn
+LABEL maintainer=junyoon@postech.ac.kr
 
 # home directory
 ENV HOME /home/happyhappy
