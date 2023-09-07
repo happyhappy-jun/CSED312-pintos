@@ -15,9 +15,6 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v2
 
-    - name: Pull Docker Image
-      run: docker pull
-
     - name: Run Pintos test
       uses: addnab/docker-run-action@v3
       with:
