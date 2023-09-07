@@ -19,11 +19,16 @@ jobs:
       run: docker pull loeper/stanford-cs212-pintos:latest
 
     - name: Run Pintos test
+      continue-on-error: true
       run: |
-        docker run --workdir /pintos/src/threads --entrypoint '/bin/bash' -v ${{ github.workspace }}/pintos:/pintos loeper/stanford-cs212-pintos:latest -c "ls && echo $PWD && make clean && make && make check"
+        docker run --name pintos --workdir /pintos/src/threads \
+          --entrypoint '/bin/bash' -v ${{ github.workspace }}:/pintos \
+          loeper/stanford-cs212-pintos:latest -c "make && make check --ignore-errors"
 
     - name: Get test results
-      run: echo "RESULTS=$(cat ./pintos/src/threads/build/results)" >> $GITHUB_ENV
+      run: |
+        docker cp  pintos:/pintos/src/threads/build/results $PWD
+        echo "RESULTS=$(cat $PWD/results)" >> $GITHUB_ENV
 
     - name: Comment PR
       if: github.event_name == 'pull_request'
