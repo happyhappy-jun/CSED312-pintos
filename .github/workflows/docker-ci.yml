@@ -22,6 +22,8 @@ jobs:
         options: -v ${{ github.workspace }}/pintos:/pintos --workdir /pintos/src/threads
         entrypoint: "/bin/bash"
         run: |
+          echo $PWD
+          ls
           make
           make check
 
