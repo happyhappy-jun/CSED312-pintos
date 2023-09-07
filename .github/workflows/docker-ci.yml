@@ -15,17 +15,15 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v2
 
+    - name: Pull Docker Image
+      run: docker pull loeper/stanford-cs212-pintos:latest
+
     - name: Run Pintos test
-      uses: addnab/docker-run-action@v3
-      with:
-        image: loeper/stanford-cs212-pintos:latest
-        options: -v ${{ github.workspace }}/pintos:/pintos --workdir /pintos/src/threads
-        entrypoint: "/bin/bash"
-        run: |
-          echo $PWD
-          ls
-          make
-          make check
+      run: |
+        docker run --workdir /pintos/src/threads \
+          --entrypoint '/bin/bash' 
+          -v ${{ github.workspace }}/pintos:/pintos loeper/stanford-cs212-pintos:latest \
+          -c "ls && echo $PWD && make clean && make && make check"
 
     - name: Get test results
       run: echo "RESULTS=$(cat ./pintos/src/threads/build/results)" >> $GITHUB_ENV
