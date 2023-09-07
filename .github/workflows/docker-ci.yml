@@ -34,10 +34,7 @@ jobs:
         docker cp  pintos:/pintos/src/threads/build/results $PWD
         {
           echo 'TEST_RESULT<<EOF'
-          echo "테스트 결과"
-          echo "```"
           cat $PWD/results
-          echo "```"
           echo EOF
         } >> "$GITHUB_ENV"
         
@@ -48,7 +45,7 @@ jobs:
       with:
         issue-number: ${{ github.event.pull_request.number }}
         comment-author: 'github-actions[bot]'
-        body-includes: "테스트 결과"
+        body-includes: "PASS"
 
     - name: Create comment
       if: steps.fc.outputs.comment-id == ''
