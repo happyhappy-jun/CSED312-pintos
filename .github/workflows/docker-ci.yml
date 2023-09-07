@@ -28,7 +28,11 @@ jobs:
     - name: Get test results
       run: |
         docker cp  pintos:/pintos/src/threads/build/results $PWD
-        echo "RESULTS=$(cat $PWD/results)" >> $GITHUB_ENV
+        {
+          echo 'RESULTS<<EOF'
+          cat $PWD/results
+          echo EOF
+        } >> $GITHUB_ENV
 
     - name: Comment PR
       if: github.event_name == 'pull_request'
