@@ -7,6 +7,10 @@ on:
   pull_request:
     types: [opened, synchronize]
 
+permissions:
+  pull-requests: write
+  contents: write
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -19,18 +23,38 @@ jobs:
       run: docker pull loeper/stanford-cs212-pintos:latest
 
     - name: Run Pintos test
-      run: docker run --workdir /pintos/src/threads --entrypoint '/bin/bash' -v ${{ github.workspace }}/pintos:/pintos loeper/stanford-cs212-pintos:latest -c "make clean && make && make check"
+      continue-on-error: true
+      run: |
+        docker run --name pintos --workdir /pintos/src/threads \
+          --entrypoint '/bin/bash' -v ${{ github.workspace }}:/pintos \
+          loeper/stanford-cs212-pintos:latest -c "make && make check --ignore-errors"
 
     - name: Get test results
-      run: echo "RESULTS=$(cat ./pintos/src/threads/build/results)" >> $GITHUB_ENV
+      run: |
+        docker cp  pintos:/pintos/src/threads/build/results $PWD
+        {
+          echo 'TEST_RESULT<<EOF'
+          cat $PWD/results
+          echo EOF
+        } >> "$GITHUB_ENV"
+        
+    - name: Process Test Results
+      run: |
+        chmod +x ${{ github.workspace }}/helper/test-results-conversion.sh
+        ${{ github.workspace }}/helper/test-results-conversion.sh
 
-    - name: Comment PR
-      if: github.event_name == 'pull_request'
-      uses: peter-evans/create-or-update-comment@v1
+    - name: Find Comment
+      uses: peter-evans/find-comment@v2
+      id: fc
       with:
         issue-number: ${{ github.event.pull_request.number }}
-        body: |
-          ```
-          ${{ env.RESULTS }}
-          ```
+        comment-author: 'github-actions[bot]'
+        body-includes: "Test Results"
+
+    - name: Create or update comment
+      uses: peter-evans/create-or-update-comment@v3
+      with:
+        comment-id: ${{ steps.fc.outputs.comment-id }}
+        issue-number: ${{ github.event.pull_request.number }}
+        body-path: "test_results.md"
         edit-mode: replace
