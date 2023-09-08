@@ -52,13 +52,15 @@ jobs:
       uses: peter-evans/create-or-update-comment@v3
       with:
         issue-number: ${{ github.event.pull_request.number }}
-        body: ${{ env.TEST_RESULT }}
+        body:
         reactions: rocket
 
-    - name: Update comment
-      if: steps.fc.outputs.comment-id != ''
+    - name: Create or update comment
       uses: peter-evans/create-or-update-comment@v3
       with:
         comment-id: ${{ steps.fc.outputs.comment-id }}
-        body:  ${{ env.TEST_RESULT }}
-        reactions: hooray
+        issue-number: ${{ github.event.pull_request.number }}
+        body: |
+          Test output
+          ${{ env.TEST_RESULT }}
+        edit-mode: replace
