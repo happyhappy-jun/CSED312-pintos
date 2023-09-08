@@ -44,6 +44,7 @@ jobs:
         ${{ github.workspace }}/helper/test-results-conversion.sh
 
     - name: Find Comment
+      if: github.event_name == 'pull_request'
       uses: peter-evans/find-comment@v2
       id: fc
       with:
@@ -52,6 +53,7 @@ jobs:
         body-includes: "Test Results"
 
     - name: Create or update comment
+      if: github.event_name == 'pull_request'
       uses: peter-evans/create-or-update-comment@v3
       with:
         comment-id: ${{ steps.fc.outputs.comment-id }}
