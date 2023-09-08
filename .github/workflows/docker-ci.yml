@@ -39,7 +39,7 @@ jobs:
         } >> "$GITHUB_ENV"
         
     - name: Process Test Results
-      run: .github/scripts/process_test_results.sh
+      run: ${{ github.workspace }}/helper/test-results-conversion.sh
 
     - name: Find Comment
       uses: peter-evans/find-comment@v2
