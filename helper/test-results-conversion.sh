@@ -13,16 +13,7 @@ output="test_results.md"
 # Empty the output file
 > $output
 
-echo "## Test Results" >> $output
-echo "" >> $output
-
-echo "### Summary" >> $output
-echo "Total Tests: $total_count" >> $output
-echo "Passed: $pass_count" >> $output
-echo "Failed: $fail_count" >> $output
-
-coverage=$(( (pass_count * 100) / total_count ))
-echo "Coverage: $coverage%" >> $output
+echo "### Test Results" >> $output
 echo "" >> $output
 
 # Markdown table headers
@@ -47,3 +38,12 @@ do
     fi
 done < "$input"
 
+echo "" >> $output
+echo "### Summary" >> $output
+echo "" >> $output
+echo "Total Tests: $total_count" >> $output
+echo "Passed: $pass_count" >> $output
+echo "Failed: $fail_count" >> $output
+
+coverage=$(( (pass_count * 100) / total_count ))
+echo "Coverage: $coverage%" >> $output
