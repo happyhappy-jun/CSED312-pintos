@@ -38,6 +38,8 @@ jobs:
           echo EOF
         } >> "$GITHUB_ENV"
         
+    - name: Process Test Results
+      run: .github/scripts/process_test_results.sh
 
     - name: Find Comment
       uses: peter-evans/find-comment@v2
@@ -45,14 +47,12 @@ jobs:
       with:
         issue-number: ${{ github.event.pull_request.number }}
         comment-author: 'github-actions[bot]'
-        body-includes: "Test output"
+        body-includes: "Test Results"
 
     - name: Create or update comment
       uses: peter-evans/create-or-update-comment@v3
       with:
         comment-id: ${{ steps.fc.outputs.comment-id }}
         issue-number: ${{ github.event.pull_request.number }}
-        body: |
-          Test output
-          ${{ env.TEST_RESULT }}
+        body-path: "test_results.md"
         edit-mode: replace
