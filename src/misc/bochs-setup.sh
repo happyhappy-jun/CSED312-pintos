@@ -1,6 +1,6 @@
 FILE=bochs-2.6.11.tar.gz
 if [ ! -f "$FILE" ]; then
-  wget http://sourceforge.net/projects/bochs/files/bochs/2.6.8/bochs-2.6.11.tar.gz
+  wget http://sourceforge.net/projects/bochs/files/bochs/2.6.11/bochs-2.6.11.tar.gz
 fi
 tar -xzvf bochs-2.6.11.tar.gz
 cd bochs-2.6.11
