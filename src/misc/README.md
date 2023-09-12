@@ -12,4 +12,4 @@ sh bochs-setup.sh
 
 ## 설명
 `bochs.rb` 의 L64에 `--enable-gdb-stub` 옵션을 추가하였고, 
-기존에 있던 `--enable-debugger` 옵션과 충돌나서 그 친구는 삭제 
+기존에 있던 `--enable-debugger` 옵션과 충돌나서 그 친구는 삭제
