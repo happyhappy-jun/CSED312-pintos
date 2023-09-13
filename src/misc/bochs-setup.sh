@@ -9,8 +9,35 @@ cat ../bochs-2.6.11-jitter-plus-segv.patch | patch -p1
 cat ../bochs-2.6.11-banner-stderr.patch | patch -p1
 cat ../bochs-2.6.11-link-tinfo.patch | patch -p1
 
-cd ..
-tar czvf bochs-2.6.11.tar.gz bochs-2.6.11
-cp bochs-2.6.11.tar.gz /tmp/bochs-2.6.11.tar.gz
+./configure --prefix=/usr/local \
+  --disable-docbook \
+  --enable-a20-pin \
+  --enable-alignment-check \
+  --enable-all-optimizations \
+  --enable-avx \
+  --enable-evex \
+  --enable-cdrom \
+  --enable-clgd54xx \
+  --enable-cpu-level=6 \
+  --enable-disasm \
+  --enable-fpu \
+  --enable-iodebug \
+  --enable-large-ramfile \
+  --enable-logging \
+  --enable-long-phy-address \
+  --enable-pci \
+  --enable-plugins \
+  --enable-readline \
+  --enable-show-ips \
+  --enable-usb \
+  --enable-vmx=2 \
+  --enable-x86-64 \
+  --with-nogui \
+  --with-sdl2 \
+  --with-term \
+  --with-x11 \
+  --enable-gdb-stub
 
-brew install --build-from-source bochs.rb
+make
+make install
+cd ..
