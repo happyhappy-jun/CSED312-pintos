@@ -70,18 +70,18 @@
 <polygon fill="#000000" stroke="#000000" points="535.2069,-108.5001 545.2068,-105 535.2068,-101.5001 535.2069,-108.5001"/>
 <text text-anchor="middle" x="498.3" y="-111.8" font-family="Helvetica,Arial,sans-serif" font-size="14.00" fill="#000000">thread_exit()</text>
 </g>
-<!-- THREAD_BLOCKING -->
+<!-- THREAD_BLOCKED -->
 <g id="node7" class="node">
-<title>THREAD_BLOCKING</title>
-<polygon fill="none" stroke="#000000" points="363.3,-36 212.3,-36 212.3,0 363.3,0 363.3,-36"/>
-<text text-anchor="middle" x="287.8" y="-14.3" font-family="Helvetica,Arial,sans-serif" font-size="14.00" fill="#000000">THREAD_BLOCKING</text>
+<title>THREAD_BLOCKED</title>
+<polygon fill="none" stroke="#000000" points="358.3,-36 213.3,-36 213.3,0 358.3,0 358.3,-36"/>
+<text text-anchor="middle" x="285.8" y="-14.3" font-family="Helvetica,Arial,sans-serif" font-size="14.00" fill="#000000">THREAD_BLOCKED</text>
 </g>
-<!-- THREAD_RUNNING&#45;&gt;THREAD_BLOCKING -->
+<!-- THREAD_RUNNING&#45;&gt;THREAD_BLOCKED -->
 <g id="edge7" class="edge">
-<title>THREAD_RUNNING&#45;&gt;THREAD_BLOCKING</title>
-<path fill="none" stroke="#000000" d="M360.7375,-86.9735C347.2918,-74.2586 329.1051,-57.0603 314.2561,-43.0183"/>
-<polygon fill="#000000" stroke="#000000" points="316.5086,-40.3312 306.838,-36.0034 311.699,-45.4173 316.5086,-40.3312"/>
-<text text-anchor="middle" x="382.3" y="-57.8" font-family="Helvetica,Arial,sans-serif" font-size="14.00" fill="#000000">thread_block()</text>
+<title>THREAD_RUNNING&#45;&gt;THREAD_BLOCKED</title>
+<path fill="none" stroke="#000000" d="M360.3231,-86.9735C346.5851,-74.2586 328.0031,-57.0603 312.8312,-43.0183"/>
+<polygon fill="#000000" stroke="#000000" points="314.9684,-40.2272 305.2519,-36.0034 310.2136,-45.3646 314.9684,-40.2272"/>
+<text text-anchor="middle" x="381.3" y="-57.8" font-family="Helvetica,Arial,sans-serif" font-size="14.00" fill="#000000">thread_block()</text>
 </g>
 <!-- THREAD_DYING&#45;&gt;exit -->
 <g id="edge9" class="edge">
@@ -89,12 +89,12 @@
 <path fill="none" stroke="#000000" d="M668.675,-105C676.9917,-105 685.3084,-105 693.6252,-105"/>
 <polygon fill="#000000" stroke="#000000" points="693.7698,-108.5001 703.7697,-105 693.7697,-101.5001 693.7698,-108.5001"/>
 </g>
-<!-- THREAD_BLOCKING&#45;&gt;THREAD_READY -->
+<!-- THREAD_BLOCKED&#45;&gt;THREAD_READY -->
 <g id="edge8" class="edge">
-<title>THREAD_BLOCKING&#45;&gt;THREAD_READY</title>
-<path fill="none" stroke="#000000" d="M249.3101,-36.0034C220.3929,-49.5291 180.609,-68.1377 149.6442,-82.6213"/>
-<polygon fill="#000000" stroke="#000000" points="147.9145,-79.5663 140.3393,-86.9735 150.8803,-85.907 147.9145,-79.5663"/>
-<text text-anchor="middle" x="198.3101" y="-55.8034" font-family="Helvetica,Arial,sans-serif" font-size="14.00" fill="#000000">thread_unblock()</text>
+<title>THREAD_BLOCKED&#45;&gt;THREAD_READY</title>
+<path fill="none" stroke="#000000" d="M247.7239,-36.0034C219.1177,-49.5291 179.7616,-68.1377 149.1297,-82.6213"/>
+<polygon fill="#000000" stroke="#000000" points="147.4692,-79.5348 139.9249,-86.9735 150.4614,-85.8631 147.4692,-79.5348"/>
+<text text-anchor="middle" x="196.7239" y="-55.8034" font-family="Helvetica,Arial,sans-serif" font-size="14.00" fill="#000000">thread_unblock()</text>
 </g>
 </g>
 </svg>
