@@ -9,9 +9,8 @@
 #include "tests/main.h"
 
 void
-test_main (void) 
-{
-  char *p = get_bad_boundary () - 1;
+test_main(void) {
+  char *p = get_bad_boundary() - 1;
   *p = 'a';
   exec(p);
 
@@ -24,5 +23,5 @@ test_main (void)
      modify get_bad_boundary to make things work again. */
 
   // msg("boundary address: 0x%x", p);
-  fail ("should have killed process");
+  fail("should have killed process");
 }

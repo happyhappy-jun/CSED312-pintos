@@ -5,9 +5,8 @@
 #include "tests/main.h"
 
 void
-test_main (void) 
-{
-  msg ("Congratulations - you have successfully dereferenced NULL: %d", 
-        *(volatile int *) NULL);
-  fail ("should have exited with -1");
+test_main(void) {
+  msg("Congratulations - you have successfully dereferenced NULL: %d",
+      *(volatile int *) NULL);
+  fail("should have exited with -1");
 }
