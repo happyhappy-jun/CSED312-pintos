@@ -20,8 +20,8 @@ bool compare_sema_priority(const struct list_elem *a, const struct list_elem *b,
   struct semaphore_elem *sema_a = list_entry(a, struct semaphore_elem, elem);
   struct semaphore_elem *sema_b = list_entry(b, struct semaphore_elem, elem);
 
-  struct thread *thread_a = list_entry(list_begin(&sa->semaphore.waiters);, struct thread, elem);
-  struct thread *thread_b = list_entry(list_begin(&sb->semaphore.waiters);, struct thread, elem);
+  struct thread *thread_a = list_entry(list_begin(&sema_a->semaphore.waiters), struct thread, elem);
+  struct thread *thread_b = list_entry(list_begin(&sema_b->semaphore.waiters), struct thread, elem);
 
-    return thread_a->priority > thread_b->priority)
+  return thread_a->priority > thread_b->priority;
 }
