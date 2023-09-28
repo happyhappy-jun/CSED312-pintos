@@ -190,6 +190,8 @@ tid_t thread_create(const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock(t);
+  if(is_preemptive())
+    thread_yield();
 
   return tid;
 }
@@ -226,6 +228,15 @@ void thread_unblock(struct thread *t) {
   list_insert_ordered(&ready_list, &t->elem, compare_thread_priority, NULL);
   t->status = THREAD_READY;
   intr_set_level(old_level);
+}
+
+bool is_preemptive() {
+  struct thread *current_thread = thread_current();
+  struct thread *next_thread = list_entry(list_front(&ready_list), struct thread, elem);
+
+  if (!list_empty(&ready_list) && current_thread->priority < next_thread->priority)
+    return true;
+  return false;
 }
 
 /* Returns the name of the running thread. */
@@ -279,10 +290,12 @@ void thread_exit(void) {
 /* Yields the CPU.  The current thread is not put to sleep and
    may be scheduled again immediately at the scheduler's whim. */
 void thread_yield(void) {
-  struct thread *cur = thread_current();
+
   enum intr_level old_level;
 
   ASSERT(!intr_context());
+
+  struct thread *cur = thread_current();
 
   old_level = intr_disable();
   if (cur != idle_thread)
@@ -310,6 +323,8 @@ void thread_foreach(thread_action_func *func, void *aux) {
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void thread_set_priority(int new_priority) {
   thread_current()->priority = new_priority;
+  if(is_preemptive())
+    thread_yield();
 }
 
 /* Returns the current thread's priority. */
@@ -349,8 +364,7 @@ int thread_get_recent_cpu(void) {
    blocks.  After that, the idle thread never appears in the
    ready list.  It is returned by next_thread_to_run() as a
    special case when the ready list is empty. */
-static void
-idle(void *idle_started_ UNUSED) {
+static void idle(void *idle_started_ UNUSED) {
   struct semaphore *idle_started = idle_started_;
   idle_thread = thread_current();
   sema_up(idle_started);
