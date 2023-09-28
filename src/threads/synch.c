@@ -64,7 +64,8 @@ void sema_down(struct semaphore *sema) {
 
   old_level = intr_disable();
   while (sema->value == 0) {
-    list_push_back(&sema->waiters, &thread_current()->elem);
+    list_insert_ordered(&sema->waiters, &thread_current()->elem,
+                        compare_thread_priority, NULL);
     thread_block();
   }
   sema->value--;
@@ -227,7 +228,6 @@ bool lock_held_by_current_thread(const struct lock *lock) {
   return lock->holder == thread_current();
 }
 
-
 /* Initializes condition variable COND.  A condition variable
    allows one piece of code to signal a condition and cooperating
    code to receive the signal and act upon it. */
@@ -266,7 +266,7 @@ void cond_wait(struct condition *cond, struct lock *lock) {
   ASSERT(lock_held_by_current_thread(lock));
 
   sema_init(&waiter.semaphore, 0);
-  list_push_back(&cond->waiters, &waiter.elem);
+  list_insert_ordered(&cond->waiters, &waiter.elem, compare_sema_priority, NULL);
   lock_release(lock);
   sema_down(&waiter.semaphore);
   lock_acquire(lock);
@@ -286,6 +286,7 @@ void cond_signal(struct condition *cond, struct lock *lock UNUSED) {
   ASSERT(lock_held_by_current_thread(lock));
 
   if (!list_empty(&cond->waiters))
+    list_sort(&cond->waiters, compare_sema_priority, NULL);
     sema_up(&list_entry(list_pop_front(&cond->waiters),
                         struct semaphore_elem, elem)
                  ->semaphore);
