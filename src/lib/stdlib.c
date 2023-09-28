@@ -1,13 +1,12 @@
 #include <ctype.h>
 #include <debug.h>
 #include <random.h>
-#include <stdlib.h>
 #include <stdbool.h>
+#include <stdlib.h>
 
 /* Converts a string representation of a signed decimal integer
    in S into an `int', which is returned. */
-int
-atoi(const char *s) {
+int atoi(const char *s) {
   bool negative;
   int value;
 
@@ -51,9 +50,8 @@ compare_thunk(const void *a, const void *b, void *aux) {
    i.e. less than zero if A < B, zero if A == B, greater than
    zero if A > B.  Runs in O(n lg n) time and O(1) space in
    CNT. */
-void
-qsort(void *array, size_t cnt, size_t size,
-      int (*compare)(const void *, const void *)) {
+void qsort(void *array, size_t cnt, size_t size,
+           int (*compare)(const void *, const void *)) {
   sort(array, cnt, size, compare_thunk, &compare);
 }
 
@@ -119,10 +117,9 @@ heapify(unsigned char *array, size_t i, size_t cnt, size_t size,
    respectively, it must return a strcmp()-type result, i.e. less
    than zero if A < B, zero if A == B, greater than zero if A >
    B.  Runs in O(n lg n) time and O(1) space in CNT. */
-void
-sort(void *array, size_t cnt, size_t size,
-     int (*compare)(const void *, const void *, void *aux),
-     void *aux) {
+void sort(void *array, size_t cnt, size_t size,
+          int (*compare)(const void *, const void *, void *aux),
+          void *aux) {
   size_t i;
 
   ASSERT(array != NULL || cnt == 0);
@@ -191,4 +188,3 @@ binary_search(const void *key, const void *array, size_t cnt, size_t size,
 
   return NULL;
 }
-

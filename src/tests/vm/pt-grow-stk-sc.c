@@ -4,14 +4,13 @@
 
    From Godmar Back. */
 
-#include <string.h>
-#include <syscall.h>
-#include "tests/vm/sample.inc"
 #include "tests/lib.h"
 #include "tests/main.h"
+#include "tests/vm/sample.inc"
+#include <string.h>
+#include <syscall.h>
 
-void
-test_main(void) {
+void test_main(void) {
   int handle;
   int slen = strlen(sample);
   char buf2[65536];

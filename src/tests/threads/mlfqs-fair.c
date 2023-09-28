@@ -15,35 +15,31 @@
 
    (The above are computed via simulation in mlfqs.pm.) */
 
-#include <stdio.h>
-#include <inttypes.h>
+#include "devices/timer.h"
 #include "tests/threads/tests.h"
 #include "threads/init.h"
 #include "threads/malloc.h"
 #include "threads/palloc.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
-#include "devices/timer.h"
+#include <inttypes.h>
+#include <stdio.h>
 
 static void test_mlfqs_fair(int thread_cnt, int nice_min, int nice_step);
 
-void
-test_mlfqs_fair_2(void) {
+void test_mlfqs_fair_2(void) {
   test_mlfqs_fair(2, 0, 0);
 }
 
-void
-test_mlfqs_fair_20(void) {
+void test_mlfqs_fair_20(void) {
   test_mlfqs_fair(20, 0, 0);
 }
 
-void
-test_mlfqs_nice_2(void) {
+void test_mlfqs_nice_2(void) {
   test_mlfqs_fair(2, 0, 5);
 }
 
-void
-test_mlfqs_nice_10(void) {
+void test_mlfqs_nice_10(void) {
   test_mlfqs_fair(10, 0, 1);
 }
 
@@ -88,9 +84,9 @@ test_mlfqs_fair(int thread_cnt, int nice_min, int nice_step) {
 
     nice += nice_step;
   }
-  msg("Starting threads took %"
-  PRId64
-  " ticks.", timer_elapsed(start_time));
+  msg("Starting threads took %" PRId64
+      " ticks.",
+      timer_elapsed(start_time));
 
   msg("Sleeping 40 seconds to let threads run, please wait...");
   timer_sleep(40 * TIMER_FREQ);

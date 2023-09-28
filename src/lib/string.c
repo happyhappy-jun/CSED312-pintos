@@ -1,5 +1,5 @@
-#include <string.h>
 #include <debug.h>
+#include <string.h>
 
 /* Copies SIZE bytes from SRC to DST, which must not overlap.
    Returns DST. */
@@ -44,8 +44,7 @@ memmove(void *dst_, const void *src_, size_t size) {
    at A and B.  Returns a positive value if the byte in A is
    greater, a negative value if the byte in B is greater, or zero
    if blocks A and B are equal. */
-int
-memcmp(const void *a_, const void *b_, size_t size) {
+int memcmp(const void *a_, const void *b_, size_t size) {
   const unsigned char *a = a_;
   const unsigned char *b = b_;
 
@@ -63,8 +62,7 @@ memcmp(const void *a_, const void *b_, size_t size) {
    char) is greater, a negative value if the character in B (as
    an unsigned char) is greater, or zero if strings A and B are
    equal. */
-int
-strcmp(const char *a_, const char *b_) {
+int strcmp(const char *a_, const char *b_) {
   const unsigned char *a = (const unsigned char *) a_;
   const unsigned char *b = (const unsigned char *) b_;
 
@@ -344,4 +342,3 @@ strlcat(char *dst, const char *src, size_t size) {
   }
   return src_len + dst_len;
 }
-

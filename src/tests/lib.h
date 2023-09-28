@@ -10,10 +10,10 @@ extern const char *test_name;
 extern bool quiet;
 
 void msg(const char *, ...)
-PRINTF_FORMAT (1, 2);
+    PRINTF_FORMAT(1, 2);
 void fail(const char *, ...)
-PRINTF_FORMAT (1, 2)
-NO_RETURN;
+    PRINTF_FORMAT(1, 2)
+        NO_RETURN;
 
 /* Takes an expression to test for SUCCESS and a message, which
    may include printf-style arguments.  Logs the message, then
@@ -29,14 +29,12 @@ NO_RETURN;
      - The message must not have side effects of its own, because
        it will be printed twice on failure, or zero times on
        success if quiet is set. */
-#define CHECK(SUCCESS, ...)                     \
-        do                                      \
-          {                                     \
-            msg (__VA_ARGS__);                  \
-            if (!(SUCCESS))                     \
-              fail (__VA_ARGS__);               \
-          }                                     \
-        while (0)
+#define CHECK(SUCCESS, ...) \
+  do {                      \
+    msg(__VA_ARGS__);       \
+    if (!(SUCCESS))         \
+      fail(__VA_ARGS__);    \
+  } while (0)
 
 void shuffle(void *, size_t cnt, size_t size);
 

@@ -2,22 +2,22 @@
 
    Creates a tar archive. */
 
-#include <ustar.h>
-#include <syscall.h>
 #include <stdio.h>
 #include <string.h>
+#include <syscall.h>
+#include <ustar.h>
 
 static void usage(void);
 static bool make_tar_archive(const char *archive_name,
                              char *files[], size_t file_cnt);
 
-int
-main(int argc, char *argv[]) {
+int main(int argc, char *argv[]) {
   if (argc < 3)
     usage();
 
   return (make_tar_archive(argv[1], argv + 2, argc - 2)
-          ? EXIT_SUCCESS : EXIT_FAILURE);
+              ? EXIT_SUCCESS
+              : EXIT_FAILURE);
 }
 
 static void
@@ -169,7 +169,7 @@ write_header(const char *file_name, enum ustar_type type, int size,
              int archive_fd, bool *write_error) {
   static char header[512];
   return (ustar_make_header(file_name, type, size, header)
-      && do_write(archive_fd, header, 512, write_error));
+          && do_write(archive_fd, header, 512, write_error));
 }
 
 static bool

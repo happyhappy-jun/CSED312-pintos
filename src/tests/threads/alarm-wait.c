@@ -2,42 +2,40 @@
    duration, M times.  Records the wake-up order and verifies
    that it is valid. */
 
-#include <stdio.h>
+#include "devices/timer.h"
 #include "tests/threads/tests.h"
 #include "threads/init.h"
 #include "threads/malloc.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
-#include "devices/timer.h"
+#include <stdio.h>
 
 static void test_sleep(int thread_cnt, int iterations);
 
-void
-test_alarm_single(void) {
+void test_alarm_single(void) {
   test_sleep(5, 1);
 }
 
-void
-test_alarm_multiple(void) {
+void test_alarm_multiple(void) {
   test_sleep(5, 7);
 }
 
 /* Information about the test. */
 struct sleep_test {
-  int64_t start;              /* Current time at start of test. */
-  int iterations;             /* Number of iterations per thread. */
+  int64_t start;  /* Current time at start of test. */
+  int iterations; /* Number of iterations per thread. */
 
   /* Output. */
-  struct lock output_lock;    /* Lock protecting output buffer. */
-  int *output_pos;            /* Current position in output buffer. */
+  struct lock output_lock; /* Lock protecting output buffer. */
+  int *output_pos;         /* Current position in output buffer. */
 };
 
 /* Information about an individual thread in the test. */
 struct sleep_thread {
-  struct sleep_test *test;     /* Info shared between all threads. */
-  int id;                     /* Sleeper ID. */
-  int duration;               /* Number of ticks to sleep. */
-  int iterations;             /* Iterations counted so far. */
+  struct sleep_test *test; /* Info shared between all threads. */
+  int id;                  /* Sleeper ID. */
+  int duration;            /* Number of ticks to sleep. */
+  int iterations;          /* Iterations counted so far. */
 };
 
 static void sleeper(void *);

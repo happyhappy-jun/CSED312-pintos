@@ -7,8 +7,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-int
-main(int argc, char *argv[]) {
+int main(int argc, char *argv[]) {
   const char *program_name = argv[0];
   double timeout;
 

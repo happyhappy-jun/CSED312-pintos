@@ -1,23 +1,23 @@
 #include "devices/block.h"
-#include <list.h>
-#include <string.h>
-#include <stdio.h>
 #include "devices/ide.h"
 #include "threads/malloc.h"
+#include <list.h>
+#include <stdio.h>
+#include <string.h>
 
 /* A block device. */
 struct block {
-  struct list_elem list_elem;         /* Element in all_blocks. */
+  struct list_elem list_elem; /* Element in all_blocks. */
 
-  char name[16];                      /* Block device name. */
-  enum block_type type;                /* Type of block device. */
-  block_sector_t size;                 /* Size in sectors. */
+  char name[16];        /* Block device name. */
+  enum block_type type; /* Type of block device. */
+  block_sector_t size;  /* Size in sectors. */
 
-  const struct block_operations *ops;  /* Driver operations. */
+  const struct block_operations *ops; /* Driver operations. */
   void *aux;                          /* Extra data owned by driver. */
 
-  unsigned long long read_cnt;        /* Number of sectors read. */
-  unsigned long long write_cnt;       /* Number of sectors written. */
+  unsigned long long read_cnt;  /* Number of sectors read. */
+  unsigned long long write_cnt; /* Number of sectors written. */
 };
 
 /* List of all block devices. */
@@ -55,8 +55,7 @@ block_get_role(enum block_type role) {
 }
 
 /* Assigns BLOCK the given ROLE. */
-void
-block_set_role(enum block_type role, struct block *block) {
+void block_set_role(enum block_type role, struct block *block) {
   ASSERT(role < BLOCK_ROLE_CNT);
   block_by_role[role] = block;
 }
@@ -84,7 +83,7 @@ block_get_by_name(const char *name) {
   for (e = list_begin(&all_blocks); e != list_end(&all_blocks);
        e = list_next(e)) {
     struct block *block = list_entry(e,
-    struct block, list_elem);
+                                     struct block, list_elem);
     if (!strcmp(name, block->name))
       return block;
   }
@@ -99,12 +98,11 @@ check_sector(struct block *block, block_sector_t sector) {
   if (sector >= block->size) {
     /* We do not use ASSERT because we want to panic here
        regardless of whether NDEBUG is defined. */
-    PANIC("Access past end of device %s (sector=%"
-    PRDSNu
-    ", "
-    "size=%"
-    PRDSNu
-    ")\n", block_name(block), sector, block->size);
+    PANIC("Access past end of device %s (sector=%" PRDSNu
+          ", "
+          "size=%" PRDSNu
+          ")\n",
+          block_name(block), sector, block->size);
   }
 }
 
@@ -112,8 +110,7 @@ check_sector(struct block *block, block_sector_t sector) {
    have room for BLOCK_SECTOR_SIZE bytes.
    Internally synchronizes accesses to block devices, so external
    per-block device locking is unneeded. */
-void
-block_read(struct block *block, block_sector_t sector, void *buffer) {
+void block_read(struct block *block, block_sector_t sector, void *buffer) {
   check_sector(block, sector);
   block->ops->read(block->aux, sector, buffer);
   block->read_cnt++;
@@ -124,8 +121,7 @@ block_read(struct block *block, block_sector_t sector, void *buffer) {
    acknowledged receiving the data.
    Internally synchronizes accesses to block devices, so external
    per-block device locking is unneeded. */
-void
-block_write(struct block *block, block_sector_t sector, const void *buffer) {
+void block_write(struct block *block, block_sector_t sector, const void *buffer) {
   check_sector(block, sector);
   ASSERT(block->type != BLOCK_FOREIGN);
   block->ops->write(block->aux, sector, buffer);
@@ -151,8 +147,7 @@ block_type(struct block *block) {
 }
 
 /* Prints statistics for each block device used for a Pintos role. */
-void
-block_print_stats(void) {
+void block_print_stats(void) {
   int i;
 
   for (i = 0; i < BLOCK_ROLE_CNT; i++) {
@@ -187,9 +182,9 @@ block_register(const char *name, enum block_type type,
   block->read_cnt = 0;
   block->write_cnt = 0;
 
-  printf("%s: %'"
-  PRDSNu
-  " sectors (", block->name, block->size);
+  printf("%s: %'" PRDSNu
+         " sectors (",
+         block->name, block->size);
   print_human_readable_size((uint64_t) block->size * BLOCK_SECTOR_SIZE);
   printf(")");
   if (extra_info != NULL)
@@ -204,8 +199,7 @@ block_register(const char *name, enum block_type type,
 static struct block *
 list_elem_to_block(struct list_elem *list_elem) {
   return (list_elem != list_end(&all_blocks)
-          ? list_entry(list_elem,
-  struct block, list_elem)
-  : NULL);
+              ? list_entry(list_elem,
+                           struct block, list_elem)
+              : NULL);
 }
-

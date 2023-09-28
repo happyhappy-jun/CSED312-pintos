@@ -4,15 +4,15 @@
    verify that the result is what it should be. */
 
 #include "tests/vm/parallel-merge.h"
-#include <stdio.h>
-#include <syscall.h>
 #include "tests/arc4.h"
 #include "tests/lib.h"
 #include "tests/main.h"
+#include <stdio.h>
+#include <syscall.h>
 
 #define CHUNK_SIZE (128 * 1024)
-#define CHUNK_CNT 8                             /* Number of chunks. */
-#define DATA_SIZE (CHUNK_CNT * CHUNK_SIZE)      /* Buffer size. */
+#define CHUNK_CNT 8                        /* Number of chunks. */
+#define DATA_SIZE (CHUNK_CNT * CHUNK_SIZE) /* Buffer size. */
 
 unsigned char buf1[DATA_SIZE], buf2[DATA_SIZE];
 size_t histogram[256];
@@ -130,8 +130,7 @@ verify(void) {
   msg("success, buf_idx=%'zu", buf_idx);
 }
 
-void
-parallel_merge(const char *child_name, int exit_status) {
+void parallel_merge(const char *child_name, int exit_status) {
   init();
   sort_chunks(child_name, exit_status);
   merge();

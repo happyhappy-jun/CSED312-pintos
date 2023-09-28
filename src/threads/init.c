@@ -1,4 +1,18 @@
 #include "threads/init.h"
+#include "devices/input.h"
+#include "devices/kbd.h"
+#include "devices/rtc.h"
+#include "devices/serial.h"
+#include "devices/shutdown.h"
+#include "devices/timer.h"
+#include "devices/vga.h"
+#include "threads/interrupt.h"
+#include "threads/io.h"
+#include "threads/loader.h"
+#include "threads/malloc.h"
+#include "threads/palloc.h"
+#include "threads/pte.h"
+#include "threads/thread.h"
 #include <console.h>
 #include <debug.h>
 #include <inttypes.h>
@@ -8,24 +22,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "devices/kbd.h"
-#include "devices/input.h"
-#include "devices/serial.h"
-#include "devices/shutdown.h"
-#include "devices/timer.h"
-#include "devices/vga.h"
-#include "devices/rtc.h"
-#include "threads/interrupt.h"
-#include "threads/io.h"
-#include "threads/loader.h"
-#include "threads/malloc.h"
-#include "threads/palloc.h"
-#include "threads/pte.h"
-#include "threads/thread.h"
 #ifdef USERPROG
-#include "userprog/process.h"
 #include "userprog/exception.h"
 #include "userprog/gdt.h"
+#include "userprog/process.h"
 #include "userprog/syscall.h"
 #include "userprog/tss.h"
 #else
@@ -66,16 +66,14 @@ static void run_actions(char **argv);
 static void usage(void);
 
 #ifdef FILESYS
-static void locate_block_devices (void);
-static void locate_block_device (enum block_type, const char *name);
+static void locate_block_devices(void);
+static void locate_block_device(enum block_type, const char *name);
 #endif
 
-int main(void)NO_RETURN;
+int main(void) NO_RETURN;
 
 /* Pintos main program. */
-    int
-    main(void)
-{
+int main(void) {
   char **argv;
 
   /* Clear BSS. */
@@ -91,10 +89,9 @@ int main(void)NO_RETURN;
   console_init();
 
   /* Greet user. */
-  printf("Pintos booting with %'"
-  PRIu32
-  " kB RAM...\n",
-      init_ram_pages * PGSIZE / 1024);
+  printf("Pintos booting with %'" PRIu32
+         " kB RAM...\n",
+         init_ram_pages * PGSIZE / 1024);
 
   /* Initialize memory system. */
   palloc_init(user_page_limit);
@@ -103,8 +100,8 @@ int main(void)NO_RETURN;
 
   /* Segmentation. */
 #ifdef USERPROG
-  tss_init ();
-  gdt_init ();
+  tss_init();
+  gdt_init();
 #endif
 
   /* Initialize interrupt handlers. */
@@ -113,8 +110,8 @@ int main(void)NO_RETURN;
   kbd_init();
   input_init();
 #ifdef USERPROG
-  exception_init ();
-  syscall_init ();
+  exception_init();
+  syscall_init();
 #endif
 
   /* Start thread scheduler and enable interrupts. */
@@ -124,9 +121,9 @@ int main(void)NO_RETURN;
 
 #ifdef FILESYS
   /* Initialize file system. */
-  ide_init ();
-  locate_block_devices ();
-  filesys_init (format_filesys);
+  ide_init();
+  locate_block_devices();
+  filesys_init(format_filesys);
 #endif
 
   printf("Boot complete.\n");
@@ -183,7 +180,9 @@ paging_init(void) {
      new page tables immediately.  See [IA32-v2a] "MOV--Move
      to/from Control Registers" and [IA32-v3a] 3.7.5 "Base Address
      of the Page Directory". */
-  asm volatile ("movl %0, %%cr3" : : "r" (vtop(init_page_dir)));
+  asm volatile("movl %0, %%cr3"
+               :
+               : "r"(vtop(init_page_dir)));
 }
 
 /* Breaks the kernel command line into words and returns them as
@@ -235,15 +234,15 @@ parse_options(char **argv) {
     else if (!strcmp(name, "-r"))
       shutdown_configure(SHUTDOWN_REBOOT);
 #ifdef FILESYS
-      else if (!strcmp (name, "-f"))
-        format_filesys = true;
-      else if (!strcmp (name, "-filesys"))
-        filesys_bdev_name = value;
-      else if (!strcmp (name, "-scratch"))
-        scratch_bdev_name = value;
+    else if (!strcmp(name, "-f"))
+      format_filesys = true;
+    else if (!strcmp(name, "-filesys"))
+      filesys_bdev_name = value;
+    else if (!strcmp(name, "-scratch"))
+      scratch_bdev_name = value;
 #ifdef VM
-      else if (!strcmp (name, "-swap"))
-        swap_bdev_name = value;
+    else if (!strcmp(name, "-swap"))
+      swap_bdev_name = value;
 #endif
 #endif
     else if (!strcmp(name, "-rs"))
@@ -251,8 +250,8 @@ parse_options(char **argv) {
     else if (!strcmp(name, "-mlfqs"))
       thread_mlfqs = true;
 #ifdef USERPROG
-      else if (!strcmp (name, "-ul"))
-        user_page_limit = atoi (value);
+    else if (!strcmp(name, "-ul"))
+      user_page_limit = atoi(value);
 #endif
     else
       PANIC("unknown option `%s' (use -h for help)", name);
@@ -278,7 +277,7 @@ run_task(char **argv) {
 
   printf("Executing '%s':\n", task);
 #ifdef USERPROG
-  process_wait (process_execute (task));
+  process_wait(process_execute(task));
 #else
   run_test(task);
 #endif
@@ -291,9 +290,9 @@ static void
 run_actions(char **argv) {
   /* An action. */
   struct action {
-    char *name;                       /* Action name. */
-    int argc;                         /* # of args, including action name. */
-    void (*function)(char **argv);   /* Function to execute action. */
+    char *name;                    /* Action name. */
+    int argc;                      /* # of args, including action name. */
+    void (*function)(char **argv); /* Function to execute action. */
   };
 
   /* Table of supported actions. */
@@ -330,7 +329,6 @@ run_actions(char **argv) {
     a->function(argv);
     argv += a->argc;
   }
-
 }
 
 /* Prints a kernel command line help message and powers off the
@@ -341,35 +339,35 @@ usage(void) {
          "Options must precede actions.\n"
          "Actions are executed in the order specified.\n"
          "\nAvailable actions:\n"
-         #ifdef USERPROG
+#ifdef USERPROG
          "  run 'PROG [ARG...]' Run PROG and wait for it to complete.\n"
-         #else
+#else
          "  run TEST           Run TEST.\n"
-         #endif
-         #ifdef FILESYS
+#endif
+#ifdef FILESYS
          "  ls                 List files in the root directory.\n"
-          "  cat FILE           Print FILE to the console.\n"
-          "  rm FILE            Delete FILE.\n"
-          "Use these actions indirectly via `pintos' -g and -p options:\n"
-          "  extract            Untar from scratch device into file system.\n"
-          "  append FILE        Append FILE to tar file on scratch device.\n"
-         #endif
+         "  cat FILE           Print FILE to the console.\n"
+         "  rm FILE            Delete FILE.\n"
+         "Use these actions indirectly via `pintos' -g and -p options:\n"
+         "  extract            Untar from scratch device into file system.\n"
+         "  append FILE        Append FILE to tar file on scratch device.\n"
+#endif
          "\nOptions:\n"
          "  -h                 Print this help message and power off.\n"
          "  -q                 Power off VM after actions or on panic.\n"
          "  -r                 Reboot after actions.\n"
-         #ifdef FILESYS
+#ifdef FILESYS
          "  -f                 Format file system device during startup.\n"
-          "  -filesys=BDEV      Use BDEV for file system instead of default.\n"
-          "  -scratch=BDEV      Use BDEV for scratch instead of default.\n"
+         "  -filesys=BDEV      Use BDEV for file system instead of default.\n"
+         "  -scratch=BDEV      Use BDEV for scratch instead of default.\n"
 #ifdef VM
-          "  -swap=BDEV         Use BDEV for swap instead of default.\n"
+         "  -swap=BDEV         Use BDEV for swap instead of default.\n"
 #endif
-         #endif
+#endif
          "  -rs=SEED           Set random number seed to SEED.\n"
          "  -mlfqs             Use multi-level feedback queue scheduler.\n"
 #ifdef USERPROG
-      "  -ul=COUNT          Limit user memory to COUNT pages.\n"
+         "  -ul=COUNT          Limit user memory to COUNT pages.\n"
 #endif
   );
   shutdown_power_off();
@@ -378,12 +376,11 @@ usage(void) {
 #ifdef FILESYS
 /* Figure out what block devices to cast in the various Pintos roles. */
 static void
-locate_block_devices (void)
-{
-  locate_block_device (BLOCK_FILESYS, filesys_bdev_name);
-  locate_block_device (BLOCK_SCRATCH, scratch_bdev_name);
+locate_block_devices(void) {
+  locate_block_device(BLOCK_FILESYS, filesys_bdev_name);
+  locate_block_device(BLOCK_SCRATCH, scratch_bdev_name);
 #ifdef VM
-  locate_block_device (BLOCK_SWAP, swap_bdev_name);
+  locate_block_device(BLOCK_SWAP, swap_bdev_name);
 #endif
 }
 
@@ -392,27 +389,22 @@ locate_block_devices (void)
    otherwise the first block device in probe order of type
    ROLE. */
 static void
-locate_block_device (enum block_type role, const char *name)
-{
+locate_block_device(enum block_type role, const char *name) {
   struct block *block = NULL;
 
-  if (name != NULL)
-    {
-      block = block_get_by_name (name);
-      if (block == NULL)
-        PANIC ("No such block device \"%s\"", name);
-    }
-  else
-    {
-      for (block = block_first (); block != NULL; block = block_next (block))
-        if (block_type (block) == role)
-          break;
-    }
+  if (name != NULL) {
+    block = block_get_by_name(name);
+    if (block == NULL)
+      PANIC("No such block device \"%s\"", name);
+  } else {
+    for (block = block_first(); block != NULL; block = block_next(block))
+      if (block_type(block) == role)
+        break;
+  }
 
-  if (block != NULL)
-    {
-      printf ("%s: using %s\n", block_type_name (role), block_name (block));
-      block_set_role (role, block);
-    }
+  if (block != NULL) {
+    printf("%s: using %s\n", block_type_name(role), block_name(block));
+    block_set_role(role, block);
+  }
 }
 #endif

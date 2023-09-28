@@ -1,8 +1,8 @@
 #ifndef DEVICES_BLOCK_H
 #define DEVICES_BLOCK_H
 
-#include <stddef.h>
 #include <inttypes.h>
+#include <stddef.h>
 
 /* Size of a block device sector in bytes.
    All IDE disks use this sector size, as do most USB and SCSI
@@ -25,17 +25,17 @@ struct block;
 /* Type of a block device. */
 enum block_type {
   /* Block device types that play a role in Pintos. */
-  BLOCK_KERNEL,                /* Pintos OS kernel. */
-  BLOCK_FILESYS,               /* File system. */
-  BLOCK_SCRATCH,               /* Scratch. */
-  BLOCK_SWAP,                  /* Swap. */
+  BLOCK_KERNEL,  /* Pintos OS kernel. */
+  BLOCK_FILESYS, /* File system. */
+  BLOCK_SCRATCH, /* Scratch. */
+  BLOCK_SWAP,    /* Swap. */
   BLOCK_ROLE_CNT,
 
   /* Other kinds of block devices that Pintos may see but does
      not interact with. */
-  BLOCK_RAW = BLOCK_ROLE_CNT,  /* "Raw" device with unidentified contents. */
-  BLOCK_FOREIGN,               /* Owned by non-Pintos operating system. */
-  BLOCK_CNT                    /* Number of Pintos block types. */
+  BLOCK_RAW = BLOCK_ROLE_CNT, /* "Raw" device with unidentified contents. */
+  BLOCK_FOREIGN,              /* Owned by non-Pintos operating system. */
+  BLOCK_CNT                   /* Number of Pintos block types. */
 };
 
 const char *block_type_name(enum block_type);

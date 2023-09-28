@@ -1,21 +1,21 @@
 #include "devices/kbd.h"
-#include <ctype.h>
-#include <debug.h>
-#include <stdio.h>
-#include <string.h>
 #include "devices/input.h"
 #include "devices/shutdown.h"
 #include "threads/interrupt.h"
 #include "threads/io.h"
+#include <ctype.h>
+#include <debug.h>
+#include <stdio.h>
+#include <string.h>
 
 /* Keyboard data register port. */
 #define DATA_REG 0x60
 
 /* Current state of shift keys.
    True if depressed, false otherwise. */
-static bool left_shift, right_shift;    /* Left and right Shift keys. */
-static bool left_alt, right_alt;        /* Left and right Alt keys. */
-static bool left_ctrl, right_ctrl;      /* Left and right Ctl keys. */
+static bool left_shift, right_shift; /* Left and right Shift keys. */
+static bool left_alt, right_alt;     /* Left and right Alt keys. */
+static bool left_ctrl, right_ctrl;   /* Left and right Ctl keys. */
 
 /* Status of Caps Lock.
    True when on, false when off. */
@@ -27,21 +27,19 @@ static int64_t key_cnt;
 static intr_handler_func keyboard_interrupt;
 
 /* Initializes the keyboard. */
-void
-kbd_init(void) {
+void kbd_init(void) {
   intr_register_ext(0x21, keyboard_interrupt, "8042 Keyboard");
 }
 
 /* Prints keyboard statistics. */
-void
-kbd_print_stats(void) {
+void kbd_print_stats(void) {
   printf("Keyboard: %lld keys pressed\n", key_cnt);
 }
 
 /* Maps a set of contiguous scancodes into characters. */
 struct keymap {
-  uint8_t first_scancode;     /* First scancode. */
-  const char *chars;          /* chars[0] has scancode first_scancode,
+  uint8_t first_scancode; /* First scancode. */
+  const char *chars;      /* chars[0] has scancode first_scancode,
                                    chars[1] has scancode first_scancode + 1,
                                    and so on to the end of the string. */
 };
@@ -51,7 +49,7 @@ struct keymap {
    that we handle elsewhere.  */
 static const struct keymap invariant_keymap[] =
     {
-        {0x01, "\033"},             /* Escape. */
+        {0x01, "\033"}, /* Escape. */
         {0x0e, "\b"},
         {0x0f, "\tQWERTYUIOP"},
         {0x1c, "\r"},
@@ -59,9 +57,9 @@ static const struct keymap invariant_keymap[] =
         {0x2c, "ZXCVBNM"},
         {0x37, "*"},
         {0x39, " "},
-        {0x53, "\177"},             /* Delete. */
+        {0x53, "\177"}, /* Delete. */
         {0, NULL},
-    };
+};
 
 /* Characters for keys pressed without Shift, for those keys
    where it matters. */
@@ -73,7 +71,7 @@ static const struct keymap unshifted_keymap[] =
         {0x2b, "\\"},
         {0x33, ",./"},
         {0, NULL},
-    };
+};
 
 /* Characters for keys pressed with Shift, for those keys where
    it matters. */
@@ -85,7 +83,7 @@ static const struct keymap shifted_keymap[] =
         {0x2b, "|"},
         {0x33, "<>?"},
         {0, NULL},
-    };
+};
 
 static bool map_key(const struct keymap[], unsigned scancode, uint8_t *);
 
@@ -121,8 +119,8 @@ keyboard_interrupt(struct intr_frame *args UNUSED) {
     if (!release)
       caps_lock = !caps_lock;
   } else if (map_key(invariant_keymap, code, &c)
-      || (!shift && map_key(unshifted_keymap, code, &c))
-      || (shift && map_key(shifted_keymap, code, &c))) {
+             || (!shift && map_key(unshifted_keymap, code, &c))
+             || (shift && map_key(shifted_keymap, code, &c))) {
     /* Ordinary character. */
     if (!release) {
       /* Reboot if Ctrl+Alt+Del pressed. */

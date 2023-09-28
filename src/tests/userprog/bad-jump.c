@@ -6,8 +6,7 @@
 
 typedef int (*volatile functionptr)(void);
 
-void
-test_main(void) {
+void test_main(void) {
   functionptr fp = NULL;
   msg("Congratulations - you have successfully called NULL: %d",
       fp());

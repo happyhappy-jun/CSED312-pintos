@@ -1,35 +1,34 @@
-#include <ustar.h>
 #include <limits.h>
 #include <packed.h>
 #include <stdio.h>
 #include <string.h>
+#include <ustar.h>
 
 /* Header for ustar-format tar archive.  See the documentation of
    the "pax" utility in [SUSv3] for the the "ustar" format
    specification. */
 struct ustar_header {
-  char name[100];             /* File name.  Null-terminated if room. */
-  char mode[8];               /* Permissions as octal string. */
-  char uid[8];                /* User ID as octal string. */
-  char gid[8];                /* Group ID as octal string. */
-  char size[12];              /* File size in bytes as octal string. */
-  char mtime[12];             /* Modification time in seconds
+  char name[100];     /* File name.  Null-terminated if room. */
+  char mode[8];       /* Permissions as octal string. */
+  char uid[8];        /* User ID as octal string. */
+  char gid[8];        /* Group ID as octal string. */
+  char size[12];      /* File size in bytes as octal string. */
+  char mtime[12];     /* Modification time in seconds
                                    from Jan 1, 1970, as octal string. */
-  char chksum[8];             /* Sum of octets in header as octal string. */
-  char typeflag;              /* An enum ustar_type value. */
-  char linkname[100];         /* Name of link target.
+  char chksum[8];     /* Sum of octets in header as octal string. */
+  char typeflag;      /* An enum ustar_type value. */
+  char linkname[100]; /* Name of link target.
                                    Null-terminated if room. */
-  char magic[6];              /* "ustar\0" */
-  char version[2];            /* "00" */
-  char uname[32];             /* User name, always null-terminated. */
-  char gname[32];             /* Group name, always null-terminated. */
-  char devmajor[8];           /* Device major number as octal string. */
-  char devminor[8];           /* Device minor number as octal string. */
-  char prefix[155];           /* Prefix to file name.
+  char magic[6];      /* "ustar\0" */
+  char version[2];    /* "00" */
+  char uname[32];     /* User name, always null-terminated. */
+  char gname[32];     /* Group name, always null-terminated. */
+  char devmajor[8];   /* Device major number as octal string. */
+  char devminor[8];   /* Device minor number as octal string. */
+  char prefix[155];   /* Prefix to file name.
                                    Null-terminated if room. */
-  char padding[12];           /* Pad to 512 bytes. */
-}
-    PACKED;
+  char padding[12];   /* Pad to 512 bytes. */
+} PACKED;
 
 /* Returns the checksum for the given ustar format HEADER. */
 static unsigned int
@@ -43,7 +42,7 @@ calculate_chksum(const struct ustar_header *h) {
     /* The ustar checksum is calculated as if the chksum field
        were all spaces. */
     const size_t chksum_start = offsetof(
-    struct ustar_header, chksum);
+        struct ustar_header, chksum);
     const size_t chksum_end = chksum_start + sizeof h->chksum;
     bool in_chksum_field = i >= chksum_start && i < chksum_end;
     chksum += in_chksum_field ? ' ' : header[i];
@@ -63,8 +62,8 @@ calculate_chksum(const struct ustar_header *h) {
 static const char *
 strip_antisocial_prefixes(const char *file_name) {
   while (*file_name == '/'
-      || !memcmp(file_name, "./", 2)
-      || !memcmp(file_name, "../", 3))
+         || !memcmp(file_name, "./", 2)
+         || !memcmp(file_name, "../", 3))
     file_name = strchr(file_name, '/') + 1;
   return *file_name == '\0' || !strcmp(file_name, "..") ? "." : file_name;
 }
@@ -76,9 +75,8 @@ strip_antisocial_prefixes(const char *file_name) {
 
    If successful, returns true.  On failure (due to an
    excessively long file name), returns false. */
-bool
-ustar_make_header(const char *file_name, enum ustar_type type,
-                  int size, char header[USTAR_HEADER_SIZE]) {
+bool ustar_make_header(const char *file_name, enum ustar_type type,
+                       int size, char header[USTAR_HEADER_SIZE]) {
   struct ustar_header *h = (struct ustar_header *) header;
 
   ASSERT(sizeof(struct ustar_header) == USTAR_HEADER_SIZE);
@@ -207,4 +205,3 @@ ustar_parse_header(const char header[USTAR_HEADER_SIZE],
   *size = size_ul;
   return NULL;
 }
-

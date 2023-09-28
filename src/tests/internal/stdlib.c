@@ -8,12 +8,12 @@
 */
 
 #undef NDEBUG
+#include "threads/test.h"
 #include <debug.h>
 #include <limits.h>
 #include <random.h>
-#include <stdlib.h>
 #include <stdio.h>
-#include "threads/test.h"
+#include <stdlib.h>
 
 /* Maximum number of elements in an array that we will test. */
 #define MAX_CNT 4096
@@ -24,8 +24,7 @@ static void verify_order(const int[], size_t);
 static void verify_bsearch(const int[], size_t);
 
 /* Test sorting and searching implementations. */
-void
-test(void) {
+void test(void) {
   int cnt;
 
   printf("testing various size arrays:");
@@ -96,11 +95,11 @@ verify_bsearch(const int *array, size_t cnt) {
   /* Check that all the values in the array are found properly. */
   for (i = 0; (size_t) i < cnt; i++)
     ASSERT(bsearch(&i, array, cnt, sizeof *array, compare_ints)
-               == array + i);
+           == array + i);
 
   /* Check that some values not in the array are not found. */
   not_in_array[0] = cnt;
   for (i = 0; (size_t) i < sizeof not_in_array / sizeof *not_in_array; i++)
     ASSERT(bsearch(&not_in_array[i], array, cnt, sizeof *array, compare_ints)
-               == NULL);
+           == NULL);
 }

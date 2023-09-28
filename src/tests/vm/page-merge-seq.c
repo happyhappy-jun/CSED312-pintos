@@ -3,17 +3,17 @@
    sequence.  Then we merge the chunks and verify that the result
    is what it should be. */
 
-#include <syscall.h>
 #include "tests/arc4.h"
 #include "tests/lib.h"
 #include "tests/main.h"
+#include <syscall.h>
 
 /* This is the max file size for an older version of the Pintos
    file system that had 126 direct blocks each pointing to a
    single disk sector.  We could raise it now. */
 #define CHUNK_SIZE (126 * 512)
-#define CHUNK_CNT 16                            /* Number of chunks. */
-#define DATA_SIZE (CHUNK_CNT * CHUNK_SIZE)      /* Buffer size. */
+#define CHUNK_CNT 16                       /* Number of chunks. */
+#define DATA_SIZE (CHUNK_CNT * CHUNK_SIZE) /* Buffer size. */
 
 unsigned char buf1[DATA_SIZE], buf2[DATA_SIZE];
 size_t histogram[256];
@@ -119,8 +119,7 @@ verify(void) {
   msg("success, buf_idx=%'zu", buf_idx);
 }
 
-void
-test_main(void) {
+void test_main(void) {
   init();
   sort_chunks();
   merge();

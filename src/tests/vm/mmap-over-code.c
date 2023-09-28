@@ -1,13 +1,12 @@
 /* Verifies that mapping over the code segment is disallowed. */
 
-#include <stdint.h>
-#include <round.h>
-#include <syscall.h>
 #include "tests/lib.h"
 #include "tests/main.h"
+#include <round.h>
+#include <stdint.h>
+#include <syscall.h>
 
-void
-test_main(void) {
+void test_main(void) {
   uintptr_t test_main_page = ROUND_DOWN((uintptr_t) test_main, 4096);
   int handle;
 
@@ -15,4 +14,3 @@ test_main(void) {
   CHECK(mmap(handle, (void *) test_main_page) == MAP_FAILED,
         "try to mmap over code segment");
 }
-

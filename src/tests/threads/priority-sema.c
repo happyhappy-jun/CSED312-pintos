@@ -1,19 +1,18 @@
 /* Tests that the highest-priority thread waiting on a semaphore
    is the first to wake up. */
 
-#include <stdio.h>
+#include "devices/timer.h"
 #include "tests/threads/tests.h"
 #include "threads/init.h"
 #include "threads/malloc.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
-#include "devices/timer.h"
+#include <stdio.h>
 
 static thread_func priority_sema_thread;
 static struct semaphore sema;
 
-void
-test_priority_sema(void) {
+void test_priority_sema(void) {
   int i;
 
   /* This test does not work with the MLFQS. */

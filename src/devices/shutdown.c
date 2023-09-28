@@ -1,11 +1,11 @@
 #include "devices/shutdown.h"
-#include <console.h>
-#include <stdio.h>
 #include "devices/kbd.h"
 #include "devices/serial.h"
 #include "devices/timer.h"
 #include "threads/io.h"
 #include "threads/thread.h"
+#include <console.h>
+#include <stdio.h>
 #ifdef USERPROG
 #include "userprog/exception.h"
 #endif
@@ -25,31 +25,30 @@ static void print_stats(void);
 /* Shuts down the machine in the way configured by
    shutdown_configure().  If the shutdown type is SHUTDOWN_NONE
    (which is the default), returns without doing anything. */
-void
-shutdown(void) {
+void shutdown(void) {
   switch (how) {
-    case SHUTDOWN_POWER_OFF:shutdown_power_off();
-      break;
+  case SHUTDOWN_POWER_OFF:
+    shutdown_power_off();
+    break;
 
-    case SHUTDOWN_REBOOT:shutdown_reboot();
-      break;
+  case SHUTDOWN_REBOOT:
+    shutdown_reboot();
+    break;
 
-    default:
-      /* Nothing to do. */
-      break;
+  default:
+    /* Nothing to do. */
+    break;
   }
 }
 
 /* Sets TYPE as the way that machine will shut down when Pintos
    execution is complete. */
-void
-shutdown_configure(enum shutdown_type type) {
+void shutdown_configure(enum shutdown_type type) {
   how = type;
 }
 
 /* Reboots the machine via the keyboard controller. */
-void
-shutdown_reboot(void) {
+void shutdown_reboot(void) {
   printf("Rebooting...\n");
 
   /* See [kbd] for details on how to program the keyboard
@@ -76,13 +75,12 @@ shutdown_reboot(void) {
 
 /* Powers down the machine we're running on,
    as long as we're running on Bochs or QEMU. */
-void
-shutdown_power_off(void) {
+void shutdown_power_off(void) {
   const char s[] = "Shutdown";
   const char *p;
 
 #ifdef FILESYS
-  filesys_done ();
+  filesys_done();
 #endif
 
   print_stats();
@@ -90,7 +88,7 @@ shutdown_power_off(void) {
   printf("Powering off...\n");
   serial_flush();
 
-/* ACPI Shutdown sequence supported by Bochs and QEMU
+  /* ACPI Shutdown sequence supported by Bochs and QEMU
  http://forum.osdev.org/viewtopic.php?t=16990  */
   outw(0x604, 0x0 | 0x2000);
 
@@ -109,11 +107,15 @@ shutdown_power_off(void) {
   /* This will power off a VMware VM if "gui.exitOnCLIHLT = TRUE"
      is set in its configuration file.  (The "pintos" script does
      that automatically.)  */
-  asm volatile ("cli; hlt" : : : "memory");
+  asm volatile("cli; hlt"
+               :
+               :
+               : "memory");
 
   /* None of those worked. */
   printf("still running...\n");
-  for (;;);
+  for (;;)
+    ;
 }
 
 /* Print statistics about Pintos execution. */
@@ -122,11 +124,11 @@ print_stats(void) {
   timer_print_stats();
   thread_print_stats();
 #ifdef FILESYS
-  block_print_stats ();
+  block_print_stats();
 #endif
   console_print_stats();
   kbd_print_stats();
 #ifdef USERPROG
-  exception_print_stats ();
+  exception_print_stats();
 #endif
 }

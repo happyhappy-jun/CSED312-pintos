@@ -1,7 +1,7 @@
 #include "tests/vm/qsort.h"
-#include <stdbool.h>
 #include <debug.h>
 #include <random.h>
+#include <stdbool.h>
 
 /* Picks a pivot for the quicksort from the SIZE bytes in BUF. */
 static unsigned char
@@ -98,8 +98,7 @@ is_sorted(const unsigned char *buf, size_t size) {
 
 /* Sorts the SIZE bytes in BUF into nondecreasing order, using
    the quick-sort algorithm. */
-void
-qsort_bytes(unsigned char *buf, size_t size) {
+void qsort_bytes(unsigned char *buf, size_t size) {
   if (!is_sorted(buf, size)) {
     int pivot = pick_pivot(buf, size);
 

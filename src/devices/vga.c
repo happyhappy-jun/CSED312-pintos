@@ -1,12 +1,12 @@
 #include "devices/vga.h"
-#include <round.h>
-#include <stdint.h>
-#include <stddef.h>
-#include <string.h>
 #include "devices/speaker.h"
-#include "threads/io.h"
 #include "threads/interrupt.h"
+#include "threads/io.h"
 #include "threads/vaddr.h"
+#include <round.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
 
 /* VGA text screen support.  See [FREEVGA] for more information. */
 
@@ -46,8 +46,7 @@ init(void) {
 
 /* Writes C to the VGA text display, interpreting control
    characters in the conventional ways.  */
-void
-vga_putc(int c) {
+void vga_putc(int c) {
   /* Disable interrupts to lock out interrupt handlers
      that might write to the console. */
   enum intr_level old_level = intr_disable();
@@ -55,35 +54,41 @@ vga_putc(int c) {
   init();
 
   switch (c) {
-    case '\n':newline();
-      break;
+  case '\n':
+    newline();
+    break;
 
-    case '\f':cls();
-      break;
+  case '\f':
+    cls();
+    break;
 
-    case '\b':
-      if (cx > 0)
-        cx--;
-      break;
+  case '\b':
+    if (cx > 0)
+      cx--;
+    break;
 
-    case '\r':cx = 0;
-      break;
+  case '\r':
+    cx = 0;
+    break;
 
-    case '\t':cx = ROUND_UP(cx + 1, 8);
-      if (cx >= COL_CNT)
-        newline();
-      break;
+  case '\t':
+    cx = ROUND_UP(cx + 1, 8);
+    if (cx >= COL_CNT)
+      newline();
+    break;
 
-    case '\a':intr_set_level(old_level);
-      speaker_beep();
-      intr_disable();
-      break;
+  case '\a':
+    intr_set_level(old_level);
+    speaker_beep();
+    intr_disable();
+    break;
 
-    default:fb[cy][cx][0] = c;
-      fb[cy][cx][1] = GRAY_ON_BLACK;
-      if (++cx >= COL_CNT)
-        newline();
-      break;
+  default:
+    fb[cy][cx][0] = c;
+    fb[cy][cx][1] = GRAY_ON_BLACK;
+    if (++cx >= COL_CNT)
+      newline();
+    break;
   }
 
   /* Update cursor position. */

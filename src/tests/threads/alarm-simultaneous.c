@@ -2,26 +2,25 @@
    duration, M times.  Records the wake-up order and verifies
    that it is valid. */
 
-#include <stdio.h>
+#include "devices/timer.h"
 #include "tests/threads/tests.h"
 #include "threads/init.h"
 #include "threads/malloc.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
-#include "devices/timer.h"
+#include <stdio.h>
 
 static void test_sleep(int thread_cnt, int iterations);
 
-void
-test_alarm_simultaneous(void) {
+void test_alarm_simultaneous(void) {
   test_sleep(3, 5);
 }
 
 /* Information about the test. */
 struct sleep_test {
-  int64_t start;              /* Current time at start of test. */
-  int iterations;             /* Number of iterations per thread. */
-  int *output_pos;            /* Current position in output buffer. */
+  int64_t start;   /* Current time at start of test. */
+  int iterations;  /* Number of iterations per thread. */
+  int *output_pos; /* Current position in output buffer. */
 };
 
 static void sleeper(void *);

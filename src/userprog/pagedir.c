@@ -1,10 +1,10 @@
 #include "userprog/pagedir.h"
+#include "threads/init.h"
+#include "threads/palloc.h"
+#include "threads/pte.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <string.h>
-#include "threads/init.h"
-#include "threads/pte.h"
-#include "threads/palloc.h"
 
 static uint32_t *active_pd(void);
 static void invalidate_pagedir(uint32_t *);
@@ -23,8 +23,7 @@ pagedir_create(void) {
 
 /* Destroys page directory PD, freeing all the pages it
    references. */
-void
-pagedir_destroy(uint32_t *pd) {
+void pagedir_destroy(uint32_t *pd) {
   uint32_t *pde;
 
   if (pd == NULL)
@@ -88,8 +87,7 @@ lookup_page(uint32_t *pd, const void *vaddr, bool create) {
    otherwise it is read-only.
    Returns true if successful, false if memory allocation
    failed. */
-bool
-pagedir_set_page(uint32_t *pd, void *upage, void *kpage, bool writable) {
+bool pagedir_set_page(uint32_t *pd, void *upage, void *kpage, bool writable) {
   uint32_t *pte;
 
   ASSERT(pg_ofs(upage) == 0);
@@ -129,8 +127,7 @@ pagedir_get_page(uint32_t *pd, const void *uaddr) {
    directory PD.  Later accesses to the page will fault.  Other
    bits in the page table entry are preserved.
    UPAGE need not be mapped. */
-void
-pagedir_clear_page(uint32_t *pd, void *upage) {
+void pagedir_clear_page(uint32_t *pd, void *upage) {
   uint32_t *pte;
 
   ASSERT(pg_ofs(upage) == 0);
@@ -147,16 +144,14 @@ pagedir_clear_page(uint32_t *pd, void *upage) {
    that is, if the page has been modified since the PTE was
    installed.
    Returns false if PD contains no PTE for VPAGE. */
-bool
-pagedir_is_dirty(uint32_t *pd, const void *vpage) {
+bool pagedir_is_dirty(uint32_t *pd, const void *vpage) {
   uint32_t *pte = lookup_page(pd, vpage, false);
   return pte != NULL && (*pte & PTE_D) != 0;
 }
 
 /* Set the dirty bit to DIRTY in the PTE for virtual page VPAGE
    in PD. */
-void
-pagedir_set_dirty(uint32_t *pd, const void *vpage, bool dirty) {
+void pagedir_set_dirty(uint32_t *pd, const void *vpage, bool dirty) {
   uint32_t *pte = lookup_page(pd, vpage, false);
   if (pte != NULL) {
     if (dirty)
@@ -172,16 +167,14 @@ pagedir_set_dirty(uint32_t *pd, const void *vpage, bool dirty) {
    accessed recently, that is, between the time the PTE was
    installed and the last time it was cleared.  Returns false if
    PD contains no PTE for VPAGE. */
-bool
-pagedir_is_accessed(uint32_t *pd, const void *vpage) {
+bool pagedir_is_accessed(uint32_t *pd, const void *vpage) {
   uint32_t *pte = lookup_page(pd, vpage, false);
   return pte != NULL && (*pte & PTE_A) != 0;
 }
 
 /* Sets the accessed bit to ACCESSED in the PTE for virtual page
    VPAGE in PD. */
-void
-pagedir_set_accessed(uint32_t *pd, const void *vpage, bool accessed) {
+void pagedir_set_accessed(uint32_t *pd, const void *vpage, bool accessed) {
   uint32_t *pte = lookup_page(pd, vpage, false);
   if (pte != NULL) {
     if (accessed)
@@ -195,8 +188,7 @@ pagedir_set_accessed(uint32_t *pd, const void *vpage, bool accessed) {
 
 /* Loads page directory PD into the CPU's page directory base
    register. */
-void
-pagedir_activate(uint32_t *pd) {
+void pagedir_activate(uint32_t *pd) {
   if (pd == NULL)
     pd = init_page_dir;
 
@@ -205,7 +197,10 @@ pagedir_activate(uint32_t *pd) {
      new page tables immediately.  See [IA32-v2a] "MOV--Move
      to/from Control Registers" and [IA32-v3a] 3.7.5 "Base
      Address of the Page Directory". */
-  asm volatile ("movl %0, %%cr3" : : "r" (vtop(pd)) : "memory");
+  asm volatile("movl %0, %%cr3"
+               :
+               : "r"(vtop(pd))
+               : "memory");
 }
 
 /* Returns the currently active page directory. */
@@ -216,7 +211,8 @@ active_pd(void) {
      See [IA32-v2a] "MOV--Move to/from Control Registers" and
      [IA32-v3a] 3.7.5 "Base Address of the Page Directory". */
   uintptr_t pd;
-  asm volatile ("movl %%cr3, %0" : "=r" (pd));
+  asm volatile("movl %%cr3, %0"
+               : "=r"(pd));
   return ptov(pd);
 }
 

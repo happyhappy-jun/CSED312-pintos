@@ -1,13 +1,13 @@
 #include "threads/malloc.h"
+#include "threads/palloc.h"
+#include "threads/synch.h"
+#include "threads/vaddr.h"
 #include <debug.h>
 #include <list.h>
 #include <round.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include "threads/palloc.h"
-#include "threads/synch.h"
-#include "threads/vaddr.h"
 
 /* A simple implementation of malloc().
 
@@ -36,10 +36,10 @@
 
 /* Descriptor. */
 struct desc {
-  size_t block_size;          /* Size of each element in bytes. */
-  size_t blocks_per_arena;    /* Number of blocks in an arena. */
-  struct list free_list;      /* List of free blocks. */
-  struct lock lock;           /* Lock. */
+  size_t block_size;       /* Size of each element in bytes. */
+  size_t blocks_per_arena; /* Number of blocks in an arena. */
+  struct list free_list;   /* List of free blocks. */
+  struct lock lock;        /* Lock. */
 };
 
 /* Magic number for detecting arena corruption. */
@@ -47,9 +47,9 @@ struct desc {
 
 /* Arena. */
 struct arena {
-  unsigned magic;             /* Always set to ARENA_MAGIC. */
-  struct desc *desc;          /* Owning descriptor, null for big block. */
-  size_t free_cnt;            /* Free blocks; pages in big block. */
+  unsigned magic;    /* Always set to ARENA_MAGIC. */
+  struct desc *desc; /* Owning descriptor, null for big block. */
+  size_t free_cnt;   /* Free blocks; pages in big block. */
 };
 
 /* Free block. */
@@ -58,15 +58,14 @@ struct block {
 };
 
 /* Our set of descriptors. */
-static struct desc descs[10];   /* Descriptors. */
-static size_t desc_cnt;         /* Number of descriptors. */
+static struct desc descs[10]; /* Descriptors. */
+static size_t desc_cnt;       /* Number of descriptors. */
 
 static struct arena *block_to_arena(struct block *);
 static struct block *arena_to_block(struct arena *, size_t idx);
 
 /* Initializes the malloc() descriptors. */
-void
-malloc_init(void) {
+void malloc_init(void) {
   size_t block_size;
 
   for (block_size = 16; block_size < PGSIZE / 2; block_size *= 2) {
@@ -137,7 +136,7 @@ malloc(size_t size) {
 
   /* Get a block from free list and return it. */
   b = list_entry(list_pop_front(&d->free_list),
-  struct block, free_elem);
+                 struct block, free_elem);
   a = block_to_arena(b);
   a->free_cnt--;
   lock_release(&d->lock);
@@ -199,8 +198,7 @@ realloc(void *old_block, size_t new_size) {
 
 /* Frees block P, which must have been previously allocated with
    malloc(), calloc(), or realloc(). */
-void
-free(void *p) {
+void free(void *p) {
   if (p != NULL) {
     struct block *b = p;
     struct arena *a = block_to_arena(b);
@@ -251,7 +249,7 @@ block_to_arena(struct block *b) {
 
   /* Check that the block is properly aligned for the arena. */
   ASSERT(a->desc == NULL
-             || (pg_ofs(b) - sizeof *a) % a->desc->block_size == 0);
+         || (pg_ofs(b) - sizeof *a) % a->desc->block_size == 0);
   ASSERT(a->desc != NULL || pg_ofs(b) == sizeof *a);
 
   return a;
@@ -264,6 +262,6 @@ arena_to_block(struct arena *a, size_t idx) {
   ASSERT(a->magic == ARENA_MAGIC);
   ASSERT(idx < a->desc->blocks_per_arena);
   return (struct block *) ((uint8_t *) a
-      + sizeof *a
-      + idx * a->desc->block_size);
+                           + sizeof *a
+                           + idx * a->desc->block_size);
 }

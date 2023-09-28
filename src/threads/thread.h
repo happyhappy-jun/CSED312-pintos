@@ -7,21 +7,21 @@
 
 /* States in a thread's life cycle. */
 enum thread_status {
-  THREAD_RUNNING,     /* Running thread. */
-  THREAD_READY,       /* Not running but ready to run. */
-  THREAD_BLOCKED,     /* Waiting for an event to trigger. */
-  THREAD_DYING        /* About to be destroyed. */
+  THREAD_RUNNING, /* Running thread. */
+  THREAD_READY,   /* Not running but ready to run. */
+  THREAD_BLOCKED, /* Waiting for an event to trigger. */
+  THREAD_DYING    /* About to be destroyed. */
 };
 
 /* Thread identifier type.
    You can redefine this to whatever type you like. */
 typedef int tid_t;
-#define TID_ERROR ((tid_t) -1)          /* Error value for tid_t. */
+#define TID_ERROR ((tid_t) -1) /* Error value for tid_t. */
 
 /* Thread priorities. */
-#define PRI_MIN 0                       /* Lowest priority. */
-#define PRI_DEFAULT 31                  /* Default priority. */
-#define PRI_MAX 63                      /* Highest priority. */
+#define PRI_MIN 0      /* Lowest priority. */
+#define PRI_DEFAULT 31 /* Default priority. */
+#define PRI_MAX 63     /* Highest priority. */
 
 /* A kernel thread or user process.
 
@@ -81,23 +81,23 @@ typedef int tid_t;
    blocked state is on a semaphore wait list. */
 struct thread {
   /* Owned by thread.c. */
-  tid_t tid;                          /* Thread identifier. */
-  enum thread_status status;          /* Thread state. */
-  char name[16];                      /* Name (for debugging purposes). */
-  uint8_t *stack;                     /* Saved stack pointer. */
-  int priority;                       /* Priority. */
-  struct list_elem allelem;           /* List element for all threads list. */
+  tid_t tid;                 /* Thread identifier. */
+  enum thread_status status; /* Thread state. */
+  char name[16];             /* Name (for debugging purposes). */
+  uint8_t *stack;            /* Saved stack pointer. */
+  int priority;              /* Priority. */
+  struct list_elem allelem;  /* List element for all threads list. */
 
   /* Shared between thread.c and synch.c. */
-  struct list_elem elem;              /* List element. */
+  struct list_elem elem; /* List element. */
 
 #ifdef USERPROG
   /* Owned by userprog/process.c. */
-  uint32_t *pagedir;                  /* Page directory. */
+  uint32_t *pagedir; /* Page directory. */
 #endif
 
   /* Owned by thread.c. */
-  unsigned magic;                     /* Detects stack overflow. */
+  unsigned magic; /* Detects stack overflow. */
 };
 
 /* If false (default), use round-robin scheduler.
@@ -122,7 +122,7 @@ tid_t thread_tid(void);
 const char *thread_name(void);
 
 void thread_exit(void)
-NO_RETURN;
+    NO_RETURN;
 void thread_yield(void);
 
 /* Performs some operation on thread t, given auxiliary data AUX. */

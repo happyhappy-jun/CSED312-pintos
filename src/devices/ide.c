@@ -1,76 +1,76 @@
 #include "devices/ide.h"
+#include "devices/block.h"
+#include "devices/partition.h"
+#include "devices/timer.h"
+#include "threads/interrupt.h"
+#include "threads/io.h"
+#include "threads/synch.h"
 #include <ctype.h>
 #include <debug.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include "devices/block.h"
-#include "devices/partition.h"
-#include "devices/timer.h"
-#include "threads/io.h"
-#include "threads/interrupt.h"
-#include "threads/synch.h"
 
 /* The code in this file is an interface to an ATA (IDE)
    controller.  It attempts to comply to [ATA-3]. */
 
 /* ATA command block port addresses. */
-#define reg_data(CHANNEL) ((CHANNEL)->reg_base + 0)     /* Data. */
-#define reg_error(CHANNEL) ((CHANNEL)->reg_base + 1)    /* Error. */
-#define reg_nsect(CHANNEL) ((CHANNEL)->reg_base + 2)    /* Sector Count. */
-#define reg_lbal(CHANNEL) ((CHANNEL)->reg_base + 3)     /* LBA 0:7. */
-#define reg_lbam(CHANNEL) ((CHANNEL)->reg_base + 4)     /* LBA 15:8. */
-#define reg_lbah(CHANNEL) ((CHANNEL)->reg_base + 5)     /* LBA 23:16. */
-#define reg_device(CHANNEL) ((CHANNEL)->reg_base + 6)   /* Device/LBA 27:24. */
-#define reg_status(CHANNEL) ((CHANNEL)->reg_base + 7)   /* Status (r/o). */
-#define reg_command(CHANNEL) reg_status (CHANNEL)       /* Command (w/o). */
+#define reg_data(CHANNEL) ((CHANNEL)->reg_base + 0)   /* Data. */
+#define reg_error(CHANNEL) ((CHANNEL)->reg_base + 1)  /* Error. */
+#define reg_nsect(CHANNEL) ((CHANNEL)->reg_base + 2)  /* Sector Count. */
+#define reg_lbal(CHANNEL) ((CHANNEL)->reg_base + 3)   /* LBA 0:7. */
+#define reg_lbam(CHANNEL) ((CHANNEL)->reg_base + 4)   /* LBA 15:8. */
+#define reg_lbah(CHANNEL) ((CHANNEL)->reg_base + 5)   /* LBA 23:16. */
+#define reg_device(CHANNEL) ((CHANNEL)->reg_base + 6) /* Device/LBA 27:24. */
+#define reg_status(CHANNEL) ((CHANNEL)->reg_base + 7) /* Status (r/o). */
+#define reg_command(CHANNEL) reg_status(CHANNEL)      /* Command (w/o). */
 
 /* ATA control block port addresses.
    (If we supported non-legacy ATA controllers this would not be
    flexible enough, but it's fine for what we do.) */
-#define reg_ctl(CHANNEL) ((CHANNEL)->reg_base + 0x206)  /* Control (w/o). */
-#define reg_alt_status(CHANNEL) reg_ctl (CHANNEL)       /* Alt Status (r/o). */
+#define reg_ctl(CHANNEL) ((CHANNEL)->reg_base + 0x206) /* Control (w/o). */
+#define reg_alt_status(CHANNEL) reg_ctl(CHANNEL)       /* Alt Status (r/o). */
 
 /* Alternate Status Register bits. */
-#define STA_BSY 0x80            /* Busy. */
-#define STA_DRDY 0x40           /* Device Ready. */
-#define STA_DRQ 0x08            /* Data Request. */
+#define STA_BSY 0x80  /* Busy. */
+#define STA_DRDY 0x40 /* Device Ready. */
+#define STA_DRQ 0x08  /* Data Request. */
 
 /* Control Register bits. */
-#define CTL_SRST 0x04           /* Software Reset. */
+#define CTL_SRST 0x04 /* Software Reset. */
 
 /* Device Register bits. */
-#define DEV_MBS 0xa0            /* Must be set. */
-#define DEV_LBA 0x40            /* Linear based addressing. */
-#define DEV_DEV 0x10            /* Select device: 0=master, 1=slave. */
+#define DEV_MBS 0xa0 /* Must be set. */
+#define DEV_LBA 0x40 /* Linear based addressing. */
+#define DEV_DEV 0x10 /* Select device: 0=master, 1=slave. */
 
 /* Commands.
    Many more are defined but this is the small subset that we
    use. */
-#define CMD_IDENTIFY_DEVICE 0xec        /* IDENTIFY DEVICE. */
-#define CMD_READ_SECTOR_RETRY 0x20      /* READ SECTOR with retries. */
-#define CMD_WRITE_SECTOR_RETRY 0x30     /* WRITE SECTOR with retries. */
+#define CMD_IDENTIFY_DEVICE 0xec    /* IDENTIFY DEVICE. */
+#define CMD_READ_SECTOR_RETRY 0x20  /* READ SECTOR with retries. */
+#define CMD_WRITE_SECTOR_RETRY 0x30 /* WRITE SECTOR with retries. */
 
 /* An ATA device. */
 struct ata_disk {
-  char name[8];               /* Name, e.g. "hda". */
-  struct channel *channel;    /* Channel that disk is attached to. */
-  int dev_no;                 /* Device 0 or 1 for master or slave. */
-  bool is_ata;                /* Is device an ATA disk? */
+  char name[8];            /* Name, e.g. "hda". */
+  struct channel *channel; /* Channel that disk is attached to. */
+  int dev_no;              /* Device 0 or 1 for master or slave. */
+  bool is_ata;             /* Is device an ATA disk? */
 };
 
 /* An ATA channel (aka controller).
    Each channel can control up to two disks. */
 struct channel {
-  char name[8];               /* Name, e.g. "ide0". */
-  uint16_t reg_base;          /* Base I/O port. */
-  uint8_t irq;                /* Interrupt in use. */
+  char name[8];      /* Name, e.g. "ide0". */
+  uint16_t reg_base; /* Base I/O port. */
+  uint8_t irq;       /* Interrupt in use. */
 
-  struct lock lock;           /* Must acquire to access the controller. */
-  bool expecting_interrupt;   /* True if an interrupt is expected, false if
+  struct lock lock;                 /* Must acquire to access the controller. */
+  bool expecting_interrupt;         /* True if an interrupt is expected, false if
                                    any interrupt would be spurious. */
-  struct semaphore completion_wait;   /* Up'd by interrupt handler. */
+  struct semaphore completion_wait; /* Up'd by interrupt handler. */
 
-  struct ata_disk devices[2];     /* The devices on this channel. */
+  struct ata_disk devices[2]; /* The devices on this channel. */
 };
 
 /* We support the two "legacy" ATA channels found in a standard PC. */
@@ -96,8 +96,7 @@ static void select_device_wait(const struct ata_disk *);
 static void interrupt_handler(struct intr_frame *);
 
 /* Initialize the disk subsystem and detect disks. */
-void
-ide_init(void) {
+void ide_init(void) {
   size_t chan_no;
 
   for (chan_no = 0; chan_no < CHANNEL_CNT; chan_no++) {
@@ -107,13 +106,15 @@ ide_init(void) {
     /* Initialize channel. */
     snprintf(c->name, sizeof c->name, "ide%zu", chan_no);
     switch (chan_no) {
-      case 0:c->reg_base = 0x1f0;
-        c->irq = 14 + 0x20;
-        break;
-      case 1:c->reg_base = 0x170;
-        c->irq = 15 + 0x20;
-        break;
-      default:NOT_REACHED();
+    case 0:
+      c->reg_base = 0x1f0;
+      c->irq = 14 + 0x20;
+      break;
+    case 1:
+      c->reg_base = 0x170;
+      c->irq = 15 + 0x20;
+      break;
+    default: NOT_REACHED();
     }
     lock_init(&c->lock);
     c->expecting_interrupt = false;
@@ -164,26 +165,26 @@ reset_channel(struct channel *c) {
 
     select_device(d);
 
-    outb(reg_nsect (c), 0x55);
-    outb(reg_lbal (c), 0xaa);
+    outb(reg_nsect(c), 0x55);
+    outb(reg_lbal(c), 0xaa);
 
-    outb(reg_nsect (c), 0xaa);
-    outb(reg_lbal (c), 0x55);
+    outb(reg_nsect(c), 0xaa);
+    outb(reg_lbal(c), 0x55);
 
-    outb(reg_nsect (c), 0x55);
-    outb(reg_lbal (c), 0xaa);
+    outb(reg_nsect(c), 0x55);
+    outb(reg_lbal(c), 0xaa);
 
-    present[dev_no] = (inb(reg_nsect (c)) == 0x55
-        && inb(reg_lbal (c)) == 0xaa);
+    present[dev_no] = (inb(reg_nsect(c)) == 0x55
+                       && inb(reg_lbal(c)) == 0xaa);
   }
 
   /* Issue soft reset sequence, which selects device 0 as a side effect.
      Also enable interrupts. */
-  outb(reg_ctl (c), 0);
+  outb(reg_ctl(c), 0);
   timer_usleep(10);
-  outb(reg_ctl (c), CTL_SRST);
+  outb(reg_ctl(c), CTL_SRST);
   timer_usleep(10);
-  outb(reg_ctl (c), 0);
+  outb(reg_ctl(c), 0);
 
   timer_msleep(150);
 
@@ -199,7 +200,7 @@ reset_channel(struct channel *c) {
 
     select_device(&c->devices[1]);
     for (i = 0; i < 3000; i++) {
-      if (inb(reg_nsect (c)) == 1 && inb(reg_lbal (c)) == 1)
+      if (inb(reg_nsect(c)) == 1 && inb(reg_lbal(c)) == 1)
         break;
       timer_msleep(10);
     }
@@ -219,10 +220,10 @@ check_device_type(struct ata_disk *d) {
 
   select_device(d);
 
-  error = inb(reg_error (c));
-  lbam = inb(reg_lbam (c));
-  lbah = inb(reg_lbah (c));
-  status = inb(reg_status (c));
+  error = inb(reg_error(c));
+  lbam = inb(reg_lbam(c));
+  lbah = inb(reg_lbah(c));
+  status = inb(reg_status(c));
 
   if ((error != 1 && (error != 0x81 || d->dev_no == 1))
       || (status & STA_DRDY) == 0
@@ -263,7 +264,7 @@ identify_ata_device(struct ata_disk *d) {
 
   /* Calculate capacity.
      Read model name and serial number. */
-  capacity = *(uint32_t * ) & id[60 * 2];
+  capacity = *(uint32_t *) &id[60 * 2];
   model = descramble_ata_string(&id[10 * 2], 20);
   serial = descramble_ata_string(&id[27 * 2], 40);
   snprintf(extra_info, sizeof extra_info,
@@ -326,8 +327,7 @@ ide_read(void *d_, block_sector_t sec_no, void *buffer) {
   issue_pio_command(c, CMD_READ_SECTOR_RETRY);
   sema_down(&c->completion_wait);
   if (!wait_while_busy(d))
-    PANIC("%s: disk read failed, sector=%"
-  PRDSNu, d->name, sec_no);
+    PANIC("%s: disk read failed, sector=%" PRDSNu, d->name, sec_no);
   input_sector(c, buffer);
   lock_release(&c->lock);
 }
@@ -345,8 +345,7 @@ ide_write(void *d_, block_sector_t sec_no, const void *buffer) {
   select_sector(d, sec_no);
   issue_pio_command(c, CMD_WRITE_SECTOR_RETRY);
   if (!wait_while_busy(d))
-    PANIC("%s: disk write failed, sector=%"
-  PRDSNu, d->name, sec_no);
+    PANIC("%s: disk write failed, sector=%" PRDSNu, d->name, sec_no);
   output_sector(c, buffer);
   sema_down(&c->completion_wait);
   lock_release(&c->lock);
@@ -355,8 +354,7 @@ ide_write(void *d_, block_sector_t sec_no, const void *buffer) {
 static struct block_operations ide_operations =
     {
         ide_read,
-        ide_write
-    };
+        ide_write};
 
 /* Selects device D, waiting for it to become ready, and then
    writes SEC_NO to the disk's sector selection registers.  (We
@@ -368,11 +366,11 @@ select_sector(struct ata_disk *d, block_sector_t sec_no) {
   ASSERT(sec_no < (1UL << 28));
 
   select_device_wait(d);
-  outb(reg_nsect (c), 1);
-  outb(reg_lbal (c), sec_no);
-  outb(reg_lbam (c), sec_no >> 8);
-  outb(reg_lbah (c), (sec_no >> 16));
-  outb(reg_device (c),
+  outb(reg_nsect(c), 1);
+  outb(reg_lbal(c), sec_no);
+  outb(reg_lbam(c), sec_no >> 8);
+  outb(reg_lbah(c), (sec_no >> 16));
+  outb(reg_device(c),
        DEV_MBS | DEV_LBA | (d->dev_no == 1 ? DEV_DEV : 0) | (sec_no >> 24));
 }
 
@@ -385,21 +383,21 @@ issue_pio_command(struct channel *c, uint8_t command) {
   ASSERT(intr_get_level() == INTR_ON);
 
   c->expecting_interrupt = true;
-  outb(reg_command (c), command);
+  outb(reg_command(c), command);
 }
 
 /* Reads a sector from channel C's data register in PIO mode into
    SECTOR, which must have room for BLOCK_SECTOR_SIZE bytes. */
 static void
 input_sector(struct channel *c, void *sector) {
-  insw(reg_data (c), sector, BLOCK_SECTOR_SIZE / 2);
+  insw(reg_data(c), sector, BLOCK_SECTOR_SIZE / 2);
 }
 
 /* Writes SECTOR to channel C's data register in PIO mode.
    SECTOR must contain BLOCK_SECTOR_SIZE bytes. */
 static void
 output_sector(struct channel *c, const void *sector) {
-  outsw(reg_data (c), sector, BLOCK_SECTOR_SIZE / 2);
+  outsw(reg_data(c), sector, BLOCK_SECTOR_SIZE / 2);
 }
 
 /* Low-level ATA primitives. */
@@ -414,7 +412,7 @@ wait_until_idle(const struct ata_disk *d) {
   int i;
 
   for (i = 0; i < 1000; i++) {
-    if ((inb(reg_status (d->channel)) & (STA_BSY | STA_DRQ)) == 0)
+    if ((inb(reg_status(d->channel)) & (STA_BSY | STA_DRQ)) == 0)
       return;
     timer_usleep(10);
   }
@@ -434,10 +432,10 @@ wait_while_busy(const struct ata_disk *d) {
   for (i = 0; i < 3000; i++) {
     if (i == 700)
       printf("%s: busy, waiting...", d->name);
-    if (!(inb(reg_alt_status (c)) & STA_BSY)) {
+    if (!(inb(reg_alt_status(c)) & STA_BSY)) {
       if (i >= 700)
         printf("ok\n");
-      return (inb(reg_alt_status (c)) & STA_DRQ) != 0;
+      return (inb(reg_alt_status(c)) & STA_DRQ) != 0;
     }
     timer_msleep(10);
   }
@@ -453,8 +451,8 @@ select_device(const struct ata_disk *d) {
   uint8_t dev = DEV_MBS;
   if (d->dev_no == 1)
     dev |= DEV_DEV;
-  outb(reg_device (c), dev);
-  inb(reg_alt_status (c));
+  outb(reg_device(c), dev);
+  inb(reg_alt_status(c));
   timer_nsleep(400);
 }
 
@@ -475,8 +473,8 @@ interrupt_handler(struct intr_frame *f) {
   for (c = channels; c < channels + CHANNEL_CNT; c++)
     if (f->vec_no == c->irq) {
       if (c->expecting_interrupt) {
-        inb(reg_status (c));               /* Acknowledge interrupt. */
-        sema_up(&c->completion_wait);      /* Wake up waiter. */
+        inb(reg_status(c));           /* Acknowledge interrupt. */
+        sema_up(&c->completion_wait); /* Wake up waiter. */
       } else
         printf("%s: unexpected interrupt\n", c->name);
       return;
@@ -484,5 +482,3 @@ interrupt_handler(struct intr_frame *f) {
 
   NOT_REACHED();
 }
-
-
