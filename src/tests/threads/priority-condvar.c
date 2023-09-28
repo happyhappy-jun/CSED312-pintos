@@ -1,20 +1,19 @@
 /* Tests that cond_signal() wakes up the highest-priority thread
    waiting in cond_wait(). */
 
-#include <stdio.h>
+#include "devices/timer.h"
 #include "tests/threads/tests.h"
 #include "threads/init.h"
 #include "threads/malloc.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
-#include "devices/timer.h"
+#include <stdio.h>
 
 static thread_func priority_condvar_thread;
 static struct lock lock;
 static struct condition condition;
 
-void
-test_priority_condvar(void) {
+void test_priority_condvar(void) {
   int i;
 
   /* This test does not work with the MLFQS. */

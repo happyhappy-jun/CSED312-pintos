@@ -1,4 +1,7 @@
 #include "threads/palloc.h"
+#include "threads/loader.h"
+#include "threads/synch.h"
+#include "threads/vaddr.h"
 #include <bitmap.h>
 #include <debug.h>
 #include <inttypes.h>
@@ -7,9 +10,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include "threads/loader.h"
-#include "threads/synch.h"
-#include "threads/vaddr.h"
 
 /* Page allocator.  Hands out memory in page-size (or
    page-multiple) chunks.  See malloc.h for an allocator that
@@ -27,9 +27,9 @@
 
 /* A memory pool. */
 struct pool {
-  struct lock lock;                   /* Mutual exclusion. */
-  struct bitmap *used_map;            /* Bitmap of free pages. */
-  uint8_t *base;                      /* Base of pool. */
+  struct lock lock;        /* Mutual exclusion. */
+  struct bitmap *used_map; /* Bitmap of free pages. */
+  uint8_t *base;           /* Base of pool. */
 };
 
 /* Two pools: one for kernel data, one for user pages. */
@@ -41,8 +41,7 @@ static bool page_from_pool(const struct pool *, void *page);
 
 /* Initializes the page allocator.  At most USER_PAGE_LIMIT
    pages are put into the user pool. */
-void
-palloc_init(size_t user_page_limit) {
+void palloc_init(size_t user_page_limit) {
   /* Free memory starts at 1 MB and runs to the end of RAM. */
   uint8_t *free_start = ptov(1024 * 1024);
   uint8_t *free_end = ptov(init_ram_pages * PGSIZE);
@@ -107,8 +106,7 @@ palloc_get_page(enum palloc_flags flags) {
 }
 
 /* Frees the PAGE_CNT pages starting at PAGES. */
-void
-palloc_free_multiple(void *pages, size_t page_cnt) {
+void palloc_free_multiple(void *pages, size_t page_cnt) {
   struct pool *pool;
   size_t page_idx;
 
@@ -134,8 +132,7 @@ palloc_free_multiple(void *pages, size_t page_cnt) {
 }
 
 /* Frees the page at PAGE. */
-void
-palloc_free_page(void *page) {
+void palloc_free_page(void *page) {
   palloc_free_multiple(page, 1);
 }
 

@@ -9,18 +9,17 @@
    block thread should be immediately scheduled when the main
    thread releases the lock. */
 
-#include <stdio.h>
+#include "devices/timer.h"
 #include "tests/threads/tests.h"
 #include "threads/init.h"
 #include "threads/malloc.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
-#include "devices/timer.h"
+#include <stdio.h>
 
 static void block_thread(void *lock_);
 
-void
-test_mlfqs_block(void) {
+void test_mlfqs_block(void) {
   int64_t start_time;
   struct lock lock;
 

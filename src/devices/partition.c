@@ -1,15 +1,15 @@
 #include "devices/partition.h"
-#include <packed.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
 #include "devices/block.h"
 #include "threads/malloc.h"
+#include <packed.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 /* A partition of a block device. */
 struct partition {
-  struct block *block;                /* Underlying block device. */
-  block_sector_t start;               /* First sector within device. */
+  struct block *block;  /* Underlying block device. */
+  block_sector_t start; /* First sector within device. */
 };
 
 static struct block_operations partition_operations;
@@ -23,8 +23,7 @@ static void found_partition(struct block *, uint8_t type,
 static const char *partition_type_name(uint8_t);
 
 /* Scans BLOCK for partitions of interest to Pintos. */
-void
-partition_scan(struct block *block) {
+void partition_scan(struct block *block) {
   int part_nr = 0;
   read_partition_table(block, 0, 0, &part_nr);
   if (part_nr == 0)
@@ -50,32 +49,29 @@ read_partition_table(struct block *block, block_sector_t sector,
                      int *part_nr) {
   /* Format of a partition table entry.  See [Partitions]. */
   struct partition_table_entry {
-    uint8_t bootable;         /* 0x00=not bootable, 0x80=bootable. */
-    uint8_t start_chs[3];     /* Encoded starting cylinder, head, sector. */
-    uint8_t type;             /* Partition type (see partition_type_name). */
-    uint8_t end_chs[3];       /* Encoded ending cylinder, head, sector. */
-    uint32_t offset;          /* Start sector offset from partition table. */
-    uint32_t size;            /* Number of sectors. */
-  }
-      PACKED;
+    uint8_t bootable;     /* 0x00=not bootable, 0x80=bootable. */
+    uint8_t start_chs[3]; /* Encoded starting cylinder, head, sector. */
+    uint8_t type;         /* Partition type (see partition_type_name). */
+    uint8_t end_chs[3];   /* Encoded ending cylinder, head, sector. */
+    uint32_t offset;      /* Start sector offset from partition table. */
+    uint32_t size;        /* Number of sectors. */
+  } PACKED;
 
   /* Partition table sector. */
   struct partition_table {
-    uint8_t loader[446];      /* Loader, in top-level partition table. */
-    struct partition_table_entry partitions[4];       /* Table entries. */
-    uint16_t signature;       /* Should be 0xaa55. */
-  }
-      PACKED;
+    uint8_t loader[446];                        /* Loader, in top-level partition table. */
+    struct partition_table_entry partitions[4]; /* Table entries. */
+    uint16_t signature;                         /* Should be 0xaa55. */
+  } PACKED;
 
   struct partition_table *pt;
   size_t i;
 
   /* Check SECTOR validity. */
   if (sector >= block_size(block)) {
-    printf("%s: Partition table at sector %"
-    PRDSNu
-    " past end of device.\n",
-        block_name(block), sector);
+    printf("%s: Partition table at sector %" PRDSNu
+           " past end of device.\n",
+           block_name(block), sector);
     return;
   }
 
@@ -91,10 +87,9 @@ read_partition_table(struct block *block, block_sector_t sector,
     if (primary_extended_sector == 0)
       printf("%s: Invalid partition table signature\n", block_name(block));
     else
-      printf("%s: Invalid extended partition table in sector %"
-    PRDSNu
-    "\n",
-        block_name(block), sector);
+      printf("%s: Invalid extended partition table in sector %" PRDSNu
+             "\n",
+             block_name(block), sector);
     free(pt);
     return;
   }
@@ -105,15 +100,14 @@ read_partition_table(struct block *block, block_sector_t sector,
 
     if (e->size == 0 || e->type == 0) {
       /* Ignore empty partition. */
-    } else if (e->type == 0x05       /* Extended partition. */
-        || e->type == 0x0f    /* Windows 98 extended partition. */
-        || e->type == 0x85    /* Linux extended partition. */
-        || e->type == 0xc5)   /* DR-DOS extended partition. */
+    } else if (e->type == 0x05     /* Extended partition. */
+               || e->type == 0x0f  /* Windows 98 extended partition. */
+               || e->type == 0x85  /* Linux extended partition. */
+               || e->type == 0xc5) /* DR-DOS extended partition. */
     {
-      printf("%s: Extended partition in sector %"
-      PRDSNu
-      "\n",
-          block_name(block), sector);
+      printf("%s: Extended partition in sector %" PRDSNu
+             "\n",
+             block_name(block), sector);
 
       /* The interpretation of the offset field for extended
          partitions is bizarre.  When the extended partition
@@ -149,24 +143,20 @@ found_partition(struct block *block, uint8_t part_type,
                 block_sector_t start, block_sector_t size,
                 int part_nr) {
   if (start >= block_size(block))
-    printf("%s%d: Partition starts past end of device (sector %"
-  PRDSNu
-  ")\n",
-      block_name(block), part_nr, start);
+    printf("%s%d: Partition starts past end of device (sector %" PRDSNu
+           ")\n",
+           block_name(block), part_nr, start);
   else if (start + size < start || start + size > block_size(block))
-    printf("%s%d: Partition end (%"
-  PRDSNu
-  ") past end of device (%"
-  PRDSNu
-  ")\n",
-      block_name(block), part_nr, start + size, block_size(block));
-  else
-  {
-    enum block_type type = (part_type == 0x20 ? BLOCK_KERNEL
-                                              : part_type == 0x21 ? BLOCK_FILESYS
-                                                                  : part_type == 0x22 ? BLOCK_SCRATCH
-                                                                                      : part_type == 0x23 ? BLOCK_SWAP
-                                                                                                          : BLOCK_FOREIGN);
+    printf("%s%d: Partition end (%" PRDSNu
+           ") past end of device (%" PRDSNu
+           ")\n",
+           block_name(block), part_nr, start + size, block_size(block));
+  else {
+    enum block_type type = (part_type == 0x20       ? BLOCK_KERNEL
+                                : part_type == 0x21 ? BLOCK_FILESYS
+                                : part_type == 0x22 ? BLOCK_SCRATCH
+                                : part_type == 0x23 ? BLOCK_SWAP
+                                                    : BLOCK_FOREIGN);
     struct partition *p;
     char extra_info[128];
     char name[16];
@@ -316,5 +306,4 @@ partition_write(void *p_, block_sector_t sector, const void *buffer) {
 static struct block_operations partition_operations =
     {
         partition_read,
-        partition_write
-    };
+        partition_write};

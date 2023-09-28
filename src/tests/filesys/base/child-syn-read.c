@@ -4,17 +4,16 @@
    significant amount of contention in the kernel file system
    code. */
 
+#include "tests/filesys/base/syn-read.h"
+#include "tests/lib.h"
 #include <random.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <syscall.h>
-#include "tests/lib.h"
-#include "tests/filesys/base/syn-read.h"
 
 static char buf[BUF_SIZE];
 
-int
-main(int argc, const char *argv[]) {
+int main(int argc, const char *argv[]) {
   int child_idx;
   int fd;
   size_t i;
@@ -38,4 +37,3 @@ main(int argc, const char *argv[]) {
 
   return child_idx;
 }
-

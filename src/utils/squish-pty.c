@@ -18,8 +18,8 @@
 
 static void
 fail_io(const char *msg, ...)
-__attribute__ ((noreturn))
-__attribute__ ((format (printf, 1, 2)));
+    __attribute__((noreturn))
+    __attribute__((format(printf, 1, 2)));
 
 /* Prints MSG, formatting as with printf(),
    plus an error message based on errno,
@@ -212,13 +212,12 @@ relay(int pty, int dead_child_fd) {
 static int dead_child_fd;
 
 static void
-sigchld_handler(int signo __attribute__ ((unused))) {
+sigchld_handler(int signo __attribute__((unused))) {
   if (write(dead_child_fd, "", 1) < 0)
     _exit(1);
 }
 
-int
-main(int argc __attribute__ ((unused)), char *argv[]) {
+int main(int argc __attribute__((unused)), char *argv[]) {
   int master, slave;
   char *name;
   pid_t pid;

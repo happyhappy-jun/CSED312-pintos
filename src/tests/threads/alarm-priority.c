@@ -1,20 +1,19 @@
 /* Checks that when the alarm clock wakes up threads, the
    higher-priority threads run first. */
 
-#include <stdio.h>
+#include "devices/timer.h"
 #include "tests/threads/tests.h"
 #include "threads/init.h"
 #include "threads/malloc.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
-#include "devices/timer.h"
+#include <stdio.h>
 
 static thread_func alarm_priority_thread;
 static int64_t wake_time;
 static struct semaphore wait_sema;
 
-void
-test_alarm_priority(void) {
+void test_alarm_priority(void) {
   int i;
 
   /* This test does not work with the MLFQS. */

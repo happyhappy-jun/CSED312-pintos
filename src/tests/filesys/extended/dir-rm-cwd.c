@@ -2,9 +2,9 @@
    fail.  The requirements in each case are different; refer to
    the assignment for details. */
 
-#include <syscall.h>
 #include "tests/lib.h"
 #include "tests/main.h"
+#include <syscall.h>
 
 static int
 wrap_open(const char *name) {
@@ -19,8 +19,7 @@ wrap_open(const char *name) {
   return fd;
 }
 
-void
-test_main(void) {
+void test_main(void) {
   int root_fd, a_fd0;
   char name[READDIR_MAX_LEN + 1];
 

@@ -1,13 +1,12 @@
 /* Runs 4 child-linear processes at once. */
 
-#include <syscall.h>
 #include "tests/lib.h"
 #include "tests/main.h"
+#include <syscall.h>
 
 #define CHILD_CNT 4
 
-void
-test_main(void) {
+void test_main(void) {
   pid_t children[CHILD_CNT];
   int i;
 

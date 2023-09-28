@@ -8,13 +8,13 @@
 */
 
 #undef NDEBUG
+#include "threads/test.h"
 #include <limits.h>
 #include <stdarg.h>
 #include <stddef.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
-#include "threads/test.h"
 
 /* Number of failures so far. */
 static int failure_cnt;
@@ -38,8 +38,7 @@ checkf(const char *expect, const char *format, ...) {
 }
 
 /* Test printf() implementation. */
-void
-test(void) {
+void test(void) {
   printf("Testing formats:");
 
   /* Check that commas show up in the right places, for positive
@@ -178,27 +177,27 @@ test(void) {
   checkf("f6bfb000", "%- x", (unsigned) 0xf6bfb000);
   checkf("36657730000", "%-to", (ptrdiff_t) 036657730000);
   checkf("4139757568", "%-tu", (ptrdiff_t) 4139757568UL);
-  checkf("-155209728", "%-zi", (size_t) - 155209728);
-  checkf("-155209728", "%-zd", (size_t) - 155209728);
+  checkf("-155209728", "%-zi", (size_t) -155209728);
+  checkf("-155209728", "%-zd", (size_t) -155209728);
   checkf("036657730000", "%+#o", (unsigned) 036657730000);
   checkf("0xf6bfb000", "%+#x", (unsigned) 0xf6bfb000);
-  checkf("-155209728", "% zi", (size_t) - 155209728);
-  checkf("-155209728", "% zd", (size_t) - 155209728);
+  checkf("-155209728", "% zi", (size_t) -155209728);
+  checkf("-155209728", "% zd", (size_t) -155209728);
   checkf("4139757568", "% tu", (ptrdiff_t) 4139757568UL);
   checkf("036657730000", "% #o", (unsigned) 036657730000);
   checkf("0xf6bfb000", "% #x", (unsigned) 0xf6bfb000);
   checkf("0xf6bfb000", "%# x", (unsigned) 0xf6bfb000);
-  checkf("-155209728", "%#zd", (size_t) - 155209728);
-  checkf("-155209728", "%0zi", (size_t) - 155209728);
+  checkf("-155209728", "%#zd", (size_t) -155209728);
+  checkf("-155209728", "%0zi", (size_t) -155209728);
   checkf("4,139,757,568", "%'tu", (ptrdiff_t) 4139757568UL);
   checkf("-155,209,728", "%-'d", -155209728);
-  checkf("-155209728", "%.zi", (size_t) - 155209728);
-  checkf("-155209728", "%zi", (size_t) - 155209728);
-  checkf("-155209728", "%zd", (size_t) - 155209728);
-  checkf("-155209728", "%+zi", (size_t) - 155209728);
+  checkf("-155209728", "%.zi", (size_t) -155209728);
+  checkf("-155209728", "%zi", (size_t) -155209728);
+  checkf("-155209728", "%zd", (size_t) -155209728);
+  checkf("-155209728", "%+zi", (size_t) -155209728);
 
   if (failure_cnt == 0)
     printf("\nstdio: PASS\n");
   else
     printf("\nstdio: FAIL: %d tests failed\n", failure_cnt);
-}                                                                  
+}

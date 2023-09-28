@@ -1,17 +1,16 @@
 /* Encrypts, then decrypts, 2 MB of memory and verifies that the
    values are as they should be. */
 
-#include <string.h>
 #include "tests/arc4.h"
 #include "tests/lib.h"
 #include "tests/main.h"
+#include <string.h>
 
 #define SIZE (2 * 1024 * 1024)
 
 static char buf[SIZE];
 
-void
-test_main(void) {
+void test_main(void) {
   struct arc4 arc4;
   size_t i;
 

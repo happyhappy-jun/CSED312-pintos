@@ -10,19 +10,19 @@
 #include <string.h>
 #include <stropts.h>
 #include <sys/ioctl.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
-#include <sys/wait.h>
-#include <sys/socket.h>
 #include <sys/un.h>
+#include <sys/wait.h>
 #include <termios.h>
 #include <unistd.h>
 
 static void
 fail_io(const char *msg, ...)
-__attribute__ ((noreturn))
-__attribute__ ((format (printf, 1, 2)));
+    __attribute__((noreturn))
+    __attribute__((format(printf, 1, 2)));
 
 /* Prints MSG, formatting as with printf(),
    plus an error message based on errno,
@@ -123,7 +123,7 @@ relay(int sock) {
   pipes[1].out = STDOUT_FILENO;
 
   while (pipes[0].in != -1 || pipes[1].in != -1
-      || (pipes[1].size && pipes[1].out != -1)) {
+         || (pipes[1].size && pipes[1].out != -1)) {
     fd_set read_fds, write_fds;
     sigset_t empty_set;
     int retval;
@@ -208,12 +208,11 @@ relay(int sock) {
 }
 
 static void
-sigchld_handler(int signo __attribute__ ((unused))) {
+sigchld_handler(int signo __attribute__((unused))) {
   /* Nothing to do. */
 }
 
-int
-main(int argc __attribute__ ((unused)), char *argv[]) {
+int main(int argc __attribute__((unused)), char *argv[]) {
   pid_t pid;
   struct itimerval zero_itimerval;
   struct sockaddr_un sun;
@@ -241,9 +240,10 @@ main(int argc __attribute__ ((unused)), char *argv[]) {
     fail_io("unlink");
   if (bind(sock, (struct sockaddr *) &sun,
            (offsetof(
-    struct sockaddr_un, sun_path)
-  +strlen(sun.sun_path) + 1)) < 0)
-  fail_io("bind");
+                struct sockaddr_un, sun_path)
+            + strlen(sun.sun_path) + 1))
+      < 0)
+    fail_io("bind");
 
   /* Listen on socket. */
   if (listen(sock, 1) < 0)

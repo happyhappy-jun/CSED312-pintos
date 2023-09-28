@@ -24,11 +24,11 @@
   
    Written by Godmar Back <gback@cs.vt.edu> */
 
-#include <stdio.h>
 #include "tests/threads/tests.h"
 #include "threads/init.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
+#include <stdio.h>
 
 #define NESTING_DEPTH 8
 
@@ -40,8 +40,7 @@ struct lock_pair {
 static thread_func donor_thread_func;
 static thread_func interloper_thread_func;
 
-void
-test_priority_donate_chain(void) {
+void test_priority_donate_chain(void) {
   int i;
   struct lock locks[NESTING_DEPTH - 1];
   struct lock_pair lock_pairs[NESTING_DEPTH];

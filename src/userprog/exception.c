@@ -1,9 +1,9 @@
 #include "userprog/exception.h"
-#include <inttypes.h>
-#include <stdio.h>
-#include "userprog/gdt.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "userprog/gdt.h"
+#include <inttypes.h>
+#include <stdio.h>
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -26,8 +26,7 @@ static void page_fault(struct intr_frame *);
 
    Refer to [IA32-v3a] section 5.15 "Exception and Interrupt
    Reference" for a description of each of these exceptions. */
-void
-exception_init(void) {
+void exception_init(void) {
   /* These exceptions can be raised explicitly by a user program,
      e.g. via the INT, INT3, INTO, and BOUND instructions.  Thus,
      we set DPL==3, meaning that user programs are allowed to
@@ -60,8 +59,7 @@ exception_init(void) {
 }
 
 /* Prints exception statistics. */
-void
-exception_print_stats(void) {
+void exception_print_stats(void) {
   printf("Exception: %lld page faults\n", page_fault_cnt);
 }
 
@@ -79,28 +77,28 @@ kill(struct intr_frame *f) {
   /* The interrupt frame's code segment value tells us where the
      exception originated. */
   switch (f->cs) {
-    case SEL_UCSEG:
-      /* User's code segment, so it's a user exception, as we
+  case SEL_UCSEG:
+    /* User's code segment, so it's a user exception, as we
          expected.  Kill the user process.  */
-      printf("%s: dying due to interrupt %#04x (%s).\n",
-             thread_name(), f->vec_no, intr_name(f->vec_no));
-      intr_dump_frame(f);
-      thread_exit();
+    printf("%s: dying due to interrupt %#04x (%s).\n",
+           thread_name(), f->vec_no, intr_name(f->vec_no));
+    intr_dump_frame(f);
+    thread_exit();
 
-    case SEL_KCSEG:
-      /* Kernel's code segment, which indicates a kernel bug.
+  case SEL_KCSEG:
+    /* Kernel's code segment, which indicates a kernel bug.
          Kernel code shouldn't throw exceptions.  (Page faults
          may cause kernel exceptions--but they shouldn't arrive
          here.)  Panic the kernel to make the point.  */
-      intr_dump_frame(f);
-      PANIC("Kernel bug - unexpected interrupt in kernel");
+    intr_dump_frame(f);
+    PANIC("Kernel bug - unexpected interrupt in kernel");
 
-    default:
-      /* Some other code segment?  Shouldn't happen.  Panic the
+  default:
+    /* Some other code segment?  Shouldn't happen.  Panic the
          kernel. */
-      printf("Interrupt %#04x (%s) in unknown segment %04x\n",
-             f->vec_no, intr_name(f->vec_no), f->cs);
-      thread_exit();
+    printf("Interrupt %#04x (%s) in unknown segment %04x\n",
+           f->vec_no, intr_name(f->vec_no), f->cs);
+    thread_exit();
   }
 }
 
@@ -117,10 +115,10 @@ kill(struct intr_frame *f) {
    [IA32-v3a] section 5.15 "Exception and Interrupt Reference". */
 static void
 page_fault(struct intr_frame *f) {
-  bool not_present;  /* True: not-present page, false: writing r/o page. */
-  bool write;        /* True: access was write, false: access was read. */
-  bool user;         /* True: access by user, false: access by kernel. */
-  void *fault_addr;  /* Fault address. */
+  bool not_present; /* True: not-present page, false: writing r/o page. */
+  bool write;       /* True: access was write, false: access was read. */
+  bool user;        /* True: access by user, false: access by kernel. */
+  void *fault_addr; /* Fault address. */
 
   /* Obtain faulting address, the virtual address that was
      accessed to cause the fault.  It may point to code or to
@@ -129,7 +127,8 @@ page_fault(struct intr_frame *f) {
      See [IA32-v2a] "MOV--Move to/from Control Registers" and
      [IA32-v3a] 5.15 "Interrupt 14--Page Fault Exception
      (#PF)". */
-  asm ("movl %%cr2, %0" : "=r" (fault_addr));
+  asm("movl %%cr2, %0"
+      : "=r"(fault_addr));
 
   /* Turn interrupts back on (they were only off so that we could
      be assured of reading CR2 before it changed). */
@@ -153,4 +152,3 @@ page_fault(struct intr_frame *f) {
          user ? "user" : "kernel");
   kill(f);
 }
-

@@ -1,23 +1,22 @@
-#include <debug.h>
+#include "devices/serial.h"
+#include "devices/shutdown.h"
+#include "threads/init.h"
+#include "threads/interrupt.h"
+#include "threads/switch.h"
+#include "threads/thread.h"
+#include "threads/vaddr.h"
 #include <console.h>
+#include <debug.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
-#include "threads/init.h"
-#include "threads/interrupt.h"
-#include "threads/thread.h"
-#include "threads/switch.h"
-#include "threads/vaddr.h"
-#include "devices/serial.h"
-#include "devices/shutdown.h"
 
 /* Halts the OS, printing the source file name, line number, and
    function name, plus a user-specific message. */
-void
-debug_panic(const char *file, int line, const char *function,
-            const char *message, ...) {
+void debug_panic(const char *file, int line, const char *function,
+                 const char *message, ...) {
   static int level;
   va_list args;
 
@@ -43,7 +42,8 @@ debug_panic(const char *file, int line, const char *function,
 
   serial_flush();
   shutdown();
-  for (;;);
+  for (;;)
+    ;
 }
 
 /* Print call stack of a thread.
@@ -54,16 +54,19 @@ print_stacktrace(struct thread *t, void *aux UNUSED) {
   const char *status = "UNKNOWN";
 
   switch (t->status) {
-    case THREAD_RUNNING:status = "RUNNING";
-      break;
+  case THREAD_RUNNING:
+    status = "RUNNING";
+    break;
 
-    case THREAD_READY:status = "READY";
-      break;
+  case THREAD_READY:
+    status = "READY";
+    break;
 
-    case THREAD_BLOCKED:status = "BLOCKED";
-      break;
+  case THREAD_BLOCKED:
+    status = "BLOCKED";
+    break;
 
-    default:break;
+  default: break;
   }
 
   printf("Call stack of thread `%s' (status %s):", t->name, status);
@@ -100,8 +103,7 @@ print_stacktrace(struct thread *t, void *aux UNUSED) {
 }
 
 /* Prints call stack of all threads. */
-void
-debug_backtrace_all(void) {
+void debug_backtrace_all(void) {
   enum intr_level oldlevel = intr_disable();
 
   thread_foreach(print_stacktrace, 0);

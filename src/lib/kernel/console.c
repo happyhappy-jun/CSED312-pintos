@@ -1,11 +1,11 @@
-#include <console.h>
-#include <stdarg.h>
-#include <stdio.h>
 #include "devices/serial.h"
 #include "devices/vga.h"
 #include "threads/init.h"
 #include "threads/interrupt.h"
 #include "threads/synch.h"
+#include <console.h>
+#include <stdarg.h>
+#include <stdio.h>
 
 static void vprintf_helper(char, void *);
 static void putchar_have_lock(uint8_t c);
@@ -60,8 +60,7 @@ static int console_lock_depth;
 static int64_t write_cnt;
 
 /* Enable console locking. */
-void
-console_init(void) {
+void console_init(void) {
   lock_init(&console_lock);
   use_console_lock = true;
 }
@@ -69,14 +68,12 @@ console_init(void) {
 /* Notifies the console that a kernel panic is underway,
    which warns it to avoid trying to take the console lock from
    now on. */
-void
-console_panic(void) {
+void console_panic(void) {
   use_console_lock = false;
 }
 
 /* Prints console statistics. */
-void
-console_print_stats(void) {
+void console_print_stats(void) {
   printf("Console: %lld characters output\n", write_cnt);
 }
 
@@ -107,15 +104,14 @@ release_console(void) {
 static bool
 console_locked_by_current_thread(void) {
   return (intr_context()
-      || !use_console_lock
-      || lock_held_by_current_thread(&console_lock));
+          || !use_console_lock
+          || lock_held_by_current_thread(&console_lock));
 }
 
 /* The standard vprintf() function,
    which is like printf() but uses a va_list.
    Writes its output to both vga display and serial port. */
-int
-vprintf(const char *format, va_list args) {
+int vprintf(const char *format, va_list args) {
   int char_cnt = 0;
 
   acquire_console();
@@ -127,8 +123,7 @@ vprintf(const char *format, va_list args) {
 
 /* Writes string S to the console, followed by a new-line
    character. */
-int
-puts(const char *s) {
+int puts(const char *s) {
   acquire_console();
   while (*s != '\0')
     putchar_have_lock(*s++);
@@ -139,8 +134,7 @@ puts(const char *s) {
 }
 
 /* Writes the N characters in BUFFER to the console. */
-void
-putbuf(const char *buffer, size_t n) {
+void putbuf(const char *buffer, size_t n) {
   acquire_console();
   while (n-- > 0)
     putchar_have_lock(*buffer++);
@@ -148,8 +142,7 @@ putbuf(const char *buffer, size_t n) {
 }
 
 /* Writes C to the vga display and serial port. */
-int
-putchar(int c) {
+int putchar(int c) {
   acquire_console();
   putchar_have_lock(c);
   release_console();

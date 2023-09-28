@@ -10,11 +10,11 @@
 
    Written by Godmar Back <gback@cs.vt.edu>. */
 
-#include <stdio.h>
 #include "tests/threads/tests.h"
 #include "threads/init.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
+#include <stdio.h>
 
 struct lock_and_sema {
   struct lock lock;
@@ -25,8 +25,7 @@ static thread_func l_thread_func;
 static thread_func m_thread_func;
 static thread_func h_thread_func;
 
-void
-test_priority_donate_sema(void) {
+void test_priority_donate_sema(void) {
   struct lock_and_sema ls;
 
   /* This test does not work with the MLFQS. */

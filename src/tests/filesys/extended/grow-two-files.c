@@ -1,10 +1,10 @@
 /* Grows two files in parallel and checks that their contents are
    correct. */
 
-#include <random.h>
-#include <syscall.h>
 #include "tests/lib.h"
 #include "tests/main.h"
+#include <random.h>
+#include <syscall.h>
 
 #define FILE_SIZE 8143
 static char buf_a[FILE_SIZE];
@@ -26,8 +26,7 @@ write_some_bytes(const char *file_name, int fd, const char *buf, size_t *ofs) {
   }
 }
 
-void
-test_main(void) {
+void test_main(void) {
   int fd_a, fd_b;
   size_t ofs_a = 0, ofs_b = 0;
 

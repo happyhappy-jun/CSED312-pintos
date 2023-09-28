@@ -15,19 +15,20 @@
    Written by Godmar Back <godmar@gmail.com>
  */
 
-#include <debug.h>
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <syscall.h>
-#include <random.h>
 #include "tests/lib.h"
+#include <debug.h>
+#include <random.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <syscall.h>
 
 static const int EXPECTED_DEPTH_TO_PASS = 30;
 static const int EXPECTED_REPETITIONS = 10;
 
-enum child_termination_mode { RECURSE, CRASH };
+enum child_termination_mode { RECURSE,
+                              CRASH };
 
 /* Spawn a recursive copy of ourselves, passing along instructions
    for the child. */
@@ -65,18 +66,19 @@ consume_some_resources_and_die(int seed) {
   volatile int *PHYS_BASE = (volatile int *) 0xC0000000;
 
   switch (random_ulong() % 5) {
-    case 0:*(volatile int *) NULL = 42;
+  case 0: *(volatile int *) NULL = 42;
 
-    case 1:return *(volatile int *) NULL;
+  case 1: return *(volatile int *) NULL;
 
-    case 2:return *PHYS_BASE;
+  case 2: return *PHYS_BASE;
 
-    case 3:*PHYS_BASE = 42;
+  case 3: *PHYS_BASE = 42;
 
-    case 4:open((char *) PHYS_BASE);
-      exit(-1);
+  case 4:
+    open((char *) PHYS_BASE);
+    exit(-1);
 
-    default:NOT_REACHED();
+  default: NOT_REACHED();
   }
   return 0;
 }
@@ -90,8 +92,7 @@ consume_some_resources_and_die(int seed) {
    Some children are started with the '-k' flag, which will
    result in abnormal termination.
  */
-int
-main(int argc, char *argv[]) {
+int main(int argc, char *argv[]) {
   int n;
 
   test_name = "multi-oom";

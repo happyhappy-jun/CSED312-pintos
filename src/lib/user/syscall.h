@@ -1,8 +1,8 @@
 #ifndef __LIB_USER_SYSCALL_H
 #define __LIB_USER_SYSCALL_H
 
-#include <stdbool.h>
 #include <debug.h>
+#include <stdbool.h>
 
 /* Process identifier. */
 typedef int pid_t;
@@ -16,14 +16,14 @@ typedef int mapid_t;
 #define READDIR_MAX_LEN 14
 
 /* Typical return values from main() and arguments to exit(). */
-#define EXIT_SUCCESS 0          /* Successful execution. */
-#define EXIT_FAILURE 1          /* Unsuccessful execution. */
+#define EXIT_SUCCESS 0 /* Successful execution. */
+#define EXIT_FAILURE 1 /* Unsuccessful execution. */
 
 /* Projects 2 and later. */
 void halt(void)
-NO_RETURN;
+    NO_RETURN;
 void exit(int status)
-NO_RETURN;
+    NO_RETURN;
 pid_t exec(const char *file);
 int wait(pid_t);
 bool create(const char *file, unsigned initial_size);

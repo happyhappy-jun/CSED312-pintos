@@ -7,19 +7,19 @@
    <gmh@leland.stanford.edu>, Yu Ping Hu <yph@cs.stanford.edu>.
    Modified by arens. */
 
-#include <stdio.h>
+#include "devices/timer.h"
 #include "tests/threads/tests.h"
 #include "threads/init.h"
-#include "devices/timer.h"
 #include "threads/malloc.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
+#include <stdio.h>
 
 struct simple_thread_data {
-  int id;                     /* Sleeper ID. */
-  int iterations;             /* Iterations so far. */
-  struct lock *lock;          /* Lock on output. */
-  int **op;                   /* Output buffer position. */
+  int id;            /* Sleeper ID. */
+  int iterations;    /* Iterations so far. */
+  struct lock *lock; /* Lock on output. */
+  int **op;          /* Output buffer position. */
 };
 
 #define THREAD_CNT 16
@@ -27,8 +27,7 @@ struct simple_thread_data {
 
 static thread_func simple_thread_func;
 
-void
-test_priority_fifo(void) {
+void test_priority_fifo(void) {
   struct simple_thread_data data[THREAD_CNT];
   struct lock lock;
   int *output, *op;
