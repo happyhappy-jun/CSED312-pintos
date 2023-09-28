@@ -231,12 +231,13 @@ void thread_unblock(struct thread *t) {
 }
 
 bool is_preemptive() {
+  if(list_empty(&ready_list))
+    return false;
+
   struct thread *current_thread = thread_current();
   struct thread *next_thread = list_entry(list_front(&ready_list), struct thread, elem);
 
-  if (!list_empty(&ready_list) && current_thread->priority < next_thread->priority)
-    return true;
-  return false;
+  return current_thread->priority < next_thread->priority;
 }
 
 /* Returns the name of the running thread. */
