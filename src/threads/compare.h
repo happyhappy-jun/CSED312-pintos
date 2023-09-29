@@ -12,4 +12,6 @@
 
 bool compare_thread_priority(const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
 bool compare_sema_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+bool compare_thread_wakeup_tick(const struct list_elem *a,
+                                const struct list_elem *b, void *aux UNUSED);
 #endif//COMPARE_H
