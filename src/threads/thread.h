@@ -107,12 +107,6 @@ struct sleep_list_elem {
   struct semaphore semaphore;
 };
 
-struct sleep_list_elem {
-  struct list_elem elem;
-  int64_t end_tick;
-  struct semaphore semaphore;
-};
-
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
