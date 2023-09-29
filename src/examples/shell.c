@@ -6,8 +6,7 @@
 static void read_line(char line[], size_t);
 static bool backspace(char **pos, char line[]);
 
-int
-main(void) {
+int main(void) {
   printf("Shell starting...\n");
   for (;;) {
     char command[80];
@@ -49,25 +48,27 @@ read_line(char line[], size_t size) {
     read(STDIN_FILENO, &c, 1);
 
     switch (c) {
-      case '\r':*pos = '\0';
-        putchar('\n');
-        return;
+    case '\r':
+      *pos = '\0';
+      putchar('\n');
+      return;
 
-      case '\b':backspace(&pos, line);
-        break;
+    case '\b':
+      backspace(&pos, line);
+      break;
 
-      case ('U' - 'A') + 1:       /* Ctrl+U. */
-        while (backspace(&pos, line))
-          continue;
-        break;
+    case ('U' - 'A') + 1: /* Ctrl+U. */
+      while (backspace(&pos, line))
+        continue;
+      break;
 
-      default:
-        /* Add character to line. */
-        if (pos < line + size - 1) {
-          putchar(c);
-          *pos++ = c;
-        }
-        break;
+    default:
+      /* Add character to line. */
+      if (pos < line + size - 1) {
+        putchar(c);
+        *pos++ = c;
+      }
+      break;
     }
   }
 }

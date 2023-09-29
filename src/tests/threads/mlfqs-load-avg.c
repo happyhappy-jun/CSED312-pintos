@@ -108,13 +108,13 @@
    After 178 seconds, load average=8.98.
 */
 
-#include <stdio.h>
+#include "devices/timer.h"
 #include "tests/threads/tests.h"
 #include "threads/init.h"
 #include "threads/malloc.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
-#include "devices/timer.h"
+#include <stdio.h>
 
 static int64_t start_time;
 
@@ -122,8 +122,7 @@ static void load_thread(void *seq_no);
 
 #define THREAD_CNT 60
 
-void
-test_mlfqs_load_avg(void) {
+void test_mlfqs_load_avg(void) {
   int i;
 
   ASSERT(thread_mlfqs);

@@ -8,9 +8,9 @@
    given as the first argument, the type, size, and inumber of
    each file is also printed.  This won't work until project 4. */
 
-#include <syscall.h>
 #include <stdio.h>
 #include <string.h>
+#include <syscall.h>
 
 static bool
 list_dir(const char *dir, bool verbose) {
@@ -56,8 +56,7 @@ list_dir(const char *dir, bool verbose) {
   return true;
 }
 
-int
-main(int argc, char *argv[]) {
+int main(int argc, char *argv[]) {
   bool success = true;
   bool verbose = false;
 

@@ -23,21 +23,18 @@
    Traps with a divide error (#DE) if the quotient does not fit
    in 32 bits. */
 static inline uint32_t
-divl (uint64_t
-n,
-uint32_t d
-)
-{
-uint32_t n1 = n >> 32;
-uint32_t n0 = n;
-uint32_t q, r;
+divl(uint64_t
+         n,
+     uint32_t d) {
+  uint32_t n1 = n >> 32;
+  uint32_t n0 = n;
+  uint32_t q, r;
 
-asm ("divl %4"
-    : "=d" (r), "=a" (q)
-    : "0" (n1), "1" (n0), "rm" (d));
+  asm("divl %4"
+      : "=d"(r), "=a"(q)
+      : "0"(n1), "1"(n0), "rm"(d));
 
-return
-q;
+  return q;
 }
 
 /* Returns the number of leading zero bits in X,
@@ -132,11 +129,9 @@ umod64(uint64_t n, uint64_t d) {
 static int64_t
 sdiv64(int64_t n, int64_t d) {
   uint64_t
-  n_abs = n >= 0 ? (uint64_t) n : -(uint64_t)
-  n;
+      n_abs = n >= 0 ? (uint64_t) n : -(uint64_t) n;
   uint64_t
-  d_abs = d >= 0 ? (uint64_t) d : -(uint64_t)
-  d;
+      d_abs = d >= 0 ? (uint64_t) d : -(uint64_t) d;
   uint64_t q_abs = udiv64(n_abs, d_abs);
   return (n < 0) == (d < 0) ? (int64_t) q_abs : -(int64_t) q_abs;
 }

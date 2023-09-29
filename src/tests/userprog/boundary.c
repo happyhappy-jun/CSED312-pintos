@@ -2,15 +2,15 @@
    passing them data that crosses from one virtual page to
    another. */
 
+#include "tests/userprog/boundary.h"
 #include <inttypes.h>
 #include <round.h>
 #include <string.h>
-#include "tests/userprog/boundary.h"
 
 /* Together with statements in src/lib/user/user.lds, arranges
    for the following array to be at the very end of the .bss
    segment (needed for get_bad_boundary below). */
-static char dst[8192] __attribute__ ((section (".testEndmem,\"aw\",@nobits#")));
+static char dst[8192] __attribute__((section(".testEndmem,\"aw\",@nobits#")));
 
 /* Returns the beginning of a page.  There are at least 2048
    modifiable bytes on either side of the pointer returned. */
@@ -40,5 +40,5 @@ void *
 get_bad_boundary(void) {
   /* This code assumes that dst will be in the highest page
    * allocated to the user process. */
-  return (void *) ROUND_UP((uintptr_t)(dst + sizeof(dst) - 1), 4096);
+  return (void *) ROUND_UP((uintptr_t) (dst + sizeof(dst) - 1), 4096);
 }

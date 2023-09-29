@@ -11,7 +11,7 @@ static inline int isxdigit(int c) {
 }
 static inline int isspace(int c) {
   return (c == ' ' || c == '\f' || c == '\n'
-      || c == '\r' || c == '\t' || c == '\v');
+          || c == '\r' || c == '\t' || c == '\v');
 }
 static inline int isblank(int c) { return c == ' ' || c == '\t'; }
 static inline int isgraph(int c) { return c > 32 && c < 127; }

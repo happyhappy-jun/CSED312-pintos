@@ -1,10 +1,10 @@
 #include "userprog/tss.h"
+#include "threads/palloc.h"
+#include "threads/thread.h"
+#include "threads/vaddr.h"
+#include "userprog/gdt.h"
 #include <debug.h>
 #include <stddef.h>
-#include "userprog/gdt.h"
-#include "threads/thread.h"
-#include "threads/palloc.h"
-#include "threads/vaddr.h"
 
 /* The Task-State Segment (TSS).
 
@@ -50,8 +50,8 @@
    how stack switching occurs during an interrupt. */
 struct tss {
   uint16_t back_link, : 16;
-  void *esp0;                         /* Ring 0 stack virtual address. */
-  uint16_t ss0, : 16;                  /* Ring 0 stack segment selector. */
+  void *esp0;         /* Ring 0 stack virtual address. */
+  uint16_t ss0, : 16; /* Ring 0 stack segment selector. */
   void *esp1;
   uint16_t ss1, : 16;
   void *esp2;
@@ -75,8 +75,7 @@ struct tss {
 static struct tss *tss;
 
 /* Initializes the kernel TSS. */
-void
-tss_init(void) {
+void tss_init(void) {
   /* Our TSS is never used in a call gate or task gate, so only a
      few fields of it are ever referenced, and those are the only
      ones we initialize. */
@@ -95,8 +94,7 @@ tss_get(void) {
 
 /* Sets the ring 0 stack pointer in the TSS to point to the end
    of the thread stack. */
-void
-tss_update(void) {
+void tss_update(void) {
   ASSERT(tss != NULL);
   tss->esp0 = (uint8_t *) thread_current() + PGSIZE;
 }

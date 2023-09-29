@@ -1,15 +1,15 @@
 #include "devices/pit.h"
-#include <debug.h>
-#include <stdint.h>
 #include "threads/interrupt.h"
 #include "threads/io.h"
+#include <debug.h>
+#include <stdint.h>
 
 /* Interface to 8254 Programmable Interrupt Timer (PIT).
    Refer to [8254] for details. */
 
 /* 8254 registers. */
-#define PIT_PORT_CONTROL          0x43                /* Control port. */
-#define PIT_PORT_COUNTER(CHANNEL) (0x40 + (CHANNEL))  /* Counter port. */
+#define PIT_PORT_CONTROL 0x43                        /* Control port. */
+#define PIT_PORT_COUNTER(CHANNEL) (0x40 + (CHANNEL)) /* Counter port. */
 
 /* PIT cycles per second. */
 #define PIT_HZ 1193180
@@ -42,8 +42,7 @@
      - Other modes are less useful.
 
    FREQUENCY is the number of periods per second, in Hz. */
-void
-pit_configure_channel(int channel, int mode, int frequency) {
+void pit_configure_channel(int channel, int mode, int frequency) {
   uint16_t count;
   enum intr_level old_level;
 
@@ -72,7 +71,7 @@ pit_configure_channel(int channel, int mode, int frequency) {
   /* Configure the PIT mode and load its counters. */
   old_level = intr_disable();
   outb(PIT_PORT_CONTROL, (channel << 6) | 0x30 | (mode << 1));
-  outb(PIT_PORT_COUNTER (channel), count);
-  outb(PIT_PORT_COUNTER (channel), count >> 8);
+  outb(PIT_PORT_COUNTER(channel), count);
+  outb(PIT_PORT_COUNTER(channel), count >> 8);
   intr_set_level(old_level);
 }

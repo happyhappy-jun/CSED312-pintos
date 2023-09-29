@@ -1,18 +1,17 @@
 /* Grows a file in chunks while subprocesses read the growing
    file. */
 
-#include <random.h>
-#include <syscall.h>
 #include "tests/filesys/extended/syn-rw.h"
 #include "tests/lib.h"
 #include "tests/main.h"
+#include <random.h>
+#include <syscall.h>
 
 char buf[BUF_SIZE];
 
 #define CHILD_CNT 4
 
-void
-test_main(void) {
+void test_main(void) {
   pid_t children[CHILD_CNT];
   size_t ofs;
   int fd;

@@ -1,5 +1,5 @@
-#include <stdint.h>
 #include "tests/arc4.h"
+#include <stdint.h>
 
 /* Swap bytes. */
 static inline void
@@ -9,8 +9,7 @@ swap_byte(uint8_t *a, uint8_t *b) {
   *b = t;
 }
 
-void
-arc4_init(struct arc4 *arc4, const void *key_, size_t size) {
+void arc4_init(struct arc4 *arc4, const void *key_, size_t size) {
   const uint8_t *key = key_;
   size_t key_idx;
   uint8_t *s;
@@ -28,8 +27,7 @@ arc4_init(struct arc4 *arc4, const void *key_, size_t size) {
   }
 }
 
-void
-arc4_crypt(struct arc4 *arc4, void *buf_, size_t size) {
+void arc4_crypt(struct arc4 *arc4, void *buf_, size_t size) {
   uint8_t *buf = buf_;
   uint8_t *s;
   uint8_t i, j;

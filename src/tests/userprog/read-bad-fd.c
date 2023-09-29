@@ -2,13 +2,12 @@
    which must either fail silently or terminate the process with
    exit code -1. */
 
-#include <limits.h>
-#include <syscall.h>
 #include "tests/lib.h"
 #include "tests/main.h"
+#include <limits.h>
+#include <syscall.h>
 
-void
-test_main(void) {
+void test_main(void) {
   char buf;
   read(0x20101234, &buf, 1);
   read(5, &buf, 1);

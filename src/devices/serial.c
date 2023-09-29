@@ -1,12 +1,12 @@
 #include "devices/serial.h"
-#include <debug.h>
 #include "devices/input.h"
 #include "devices/intq.h"
 #include "devices/timer.h"
-#include "threads/io.h"
 #include "threads/interrupt.h"
+#include "threads/io.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
+#include <debug.h>
 
 /* Register definitions for the 16550A UART used in PCs.
    The 16550A has a lot more going on than shown here, but this
@@ -18,38 +18,40 @@
 #define IO_BASE 0x3f8
 
 /* DLAB=0 registers. */
-#define RBR_REG (IO_BASE + 0)   /* Receiver Buffer Reg. (read-only). */
-#define THR_REG (IO_BASE + 0)   /* Transmitter Holding Reg. (write-only). */
-#define IER_REG (IO_BASE + 1)   /* Interrupt Enable Reg.. */
+#define RBR_REG (IO_BASE + 0) /* Receiver Buffer Reg. (read-only). */
+#define THR_REG (IO_BASE + 0) /* Transmitter Holding Reg. (write-only). */
+#define IER_REG (IO_BASE + 1) /* Interrupt Enable Reg.. */
 
 /* DLAB=1 registers. */
-#define LS_REG (IO_BASE + 0)    /* Divisor Latch (LSB). */
-#define MS_REG (IO_BASE + 1)    /* Divisor Latch (MSB). */
+#define LS_REG (IO_BASE + 0) /* Divisor Latch (LSB). */
+#define MS_REG (IO_BASE + 1) /* Divisor Latch (MSB). */
 
 /* DLAB-insensitive registers. */
-#define IIR_REG (IO_BASE + 2)   /* Interrupt Identification Reg. (read-only) */
-#define FCR_REG (IO_BASE + 2)   /* FIFO Control Reg. (write-only). */
-#define LCR_REG (IO_BASE + 3)   /* Line Control Register. */
-#define MCR_REG (IO_BASE + 4)   /* MODEM Control Register. */
-#define LSR_REG (IO_BASE + 5)   /* Line Status Register (read-only). */
+#define IIR_REG (IO_BASE + 2) /* Interrupt Identification Reg. (read-only) */
+#define FCR_REG (IO_BASE + 2) /* FIFO Control Reg. (write-only). */
+#define LCR_REG (IO_BASE + 3) /* Line Control Register. */
+#define MCR_REG (IO_BASE + 4) /* MODEM Control Register. */
+#define LSR_REG (IO_BASE + 5) /* Line Status Register (read-only). */
 
 /* Interrupt Enable Register bits. */
-#define IER_RECV 0x01           /* Interrupt when data received. */
-#define IER_XMIT 0x02           /* Interrupt when transmit finishes. */
+#define IER_RECV 0x01 /* Interrupt when data received. */
+#define IER_XMIT 0x02 /* Interrupt when transmit finishes. */
 
 /* Line Control Register bits. */
-#define LCR_N81 0x03            /* No parity, 8 data bits, 1 stop bit. */
-#define LCR_DLAB 0x80           /* Divisor Latch Access Bit (DLAB). */
+#define LCR_N81 0x03  /* No parity, 8 data bits, 1 stop bit. */
+#define LCR_DLAB 0x80 /* Divisor Latch Access Bit (DLAB). */
 
 /* MODEM Control Register. */
-#define MCR_OUT2 0x08           /* Output line 2. */
+#define MCR_OUT2 0x08 /* Output line 2. */
 
 /* Line Status Register. */
-#define LSR_DR 0x01             /* Data Ready: received data byte is in RBR. */
-#define LSR_THRE 0x20           /* THR Empty. */
+#define LSR_DR 0x01   /* Data Ready: received data byte is in RBR. */
+#define LSR_THRE 0x20 /* THR Empty. */
 
 /* Transmission mode. */
-static enum { UNINIT, POLL, QUEUE } mode;
+static enum { UNINIT,
+              POLL,
+              QUEUE } mode;
 
 /* Data to be transmitted. */
 static struct intq txq;
@@ -66,10 +68,10 @@ static intr_handler_func serial_interrupt;
 static void
 init_poll(void) {
   ASSERT(mode == UNINIT);
-  outb(IER_REG, 0);                    /* Turn off all interrupts. */
-  outb(FCR_REG, 0);                    /* Disable FIFO. */
-  set_serial(9600);                    /* 9.6 kbps, N-8-1. */
-  outb(MCR_REG, MCR_OUT2);             /* Required to enable interrupts. */
+  outb(IER_REG, 0);        /* Turn off all interrupts. */
+  outb(FCR_REG, 0);        /* Disable FIFO. */
+  set_serial(9600);        /* 9.6 kbps, N-8-1. */
+  outb(MCR_REG, MCR_OUT2); /* Required to enable interrupts. */
   intq_init(&txq);
   mode = POLL;
 }
@@ -77,8 +79,7 @@ init_poll(void) {
 /* Initializes the serial port device for queued interrupt-driven
    I/O.  With interrupt-driven I/O we don't waste CPU time
    waiting for the serial device to become ready. */
-void
-serial_init_queue(void) {
+void serial_init_queue(void) {
   enum intr_level old_level;
 
   if (mode == UNINIT)
@@ -93,8 +94,7 @@ serial_init_queue(void) {
 }
 
 /* Sends BYTE to the serial port. */
-void
-serial_putc(uint8_t byte) {
+void serial_putc(uint8_t byte) {
   enum intr_level old_level = intr_disable();
 
   if (mode != QUEUE) {
@@ -124,8 +124,7 @@ serial_putc(uint8_t byte) {
 
 /* Flushes anything in the serial buffer out the port in polling
    mode. */
-void
-serial_flush(void) {
+void serial_flush(void) {
   enum intr_level old_level = intr_disable();
   while (!intq_empty(&txq))
     putc_poll(intq_getc(&txq));
@@ -136,8 +135,7 @@ serial_flush(void) {
    whether we should block receive interrupts.
    Called by the input buffer routines when characters are added
    to or removed from the buffer. */
-void
-serial_notify(void) {
+void serial_notify(void) {
   ASSERT(intr_get_level() == INTR_OFF);
   if (mode == QUEUE)
     write_ier();
@@ -146,8 +144,8 @@ serial_notify(void) {
 /* Configures the serial port for BPS bits per second. */
 static void
 set_serial(int bps) {
-  int base_rate = 1843200 / 16;         /* Base rate of 16550A, in Hz. */
-  uint16_t divisor = base_rate / bps;   /* Clock rate divisor. */
+  int base_rate = 1843200 / 16;       /* Base rate of 16550A, in Hz. */
+  uint16_t divisor = base_rate / bps; /* Clock rate divisor. */
 
   ASSERT(bps >= 300 && bps <= 115200);
 

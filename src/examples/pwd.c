@@ -2,15 +2,14 @@
    
    Prints the absolute name of the present working directory. */
 
-#include <syscall.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
+#include <syscall.h>
 
 static bool getcwd(char *cwd, size_t cwd_size);
 
-int
-main(void) {
+int main(void) {
   char cwd[128];
   if (getcwd(cwd, sizeof cwd)) {
     printf("%s\n", cwd);

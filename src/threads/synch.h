@@ -6,8 +6,14 @@
 
 /* A counting semaphore. */
 struct semaphore {
-  unsigned value;             /* Current value. */
-  struct list waiters;        /* List of waiting threads. */
+  unsigned value;      /* Current value. */
+  struct list waiters; /* List of waiting threads. */
+};
+
+/* One semaphore in a list. */
+struct semaphore_elem {
+    struct list_elem elem;              /* List element. */
+    struct semaphore semaphore;         /* This semaphore. */
 };
 
 void sema_init(struct semaphore *, unsigned value);
@@ -30,7 +36,7 @@ bool lock_held_by_current_thread(const struct lock *);
 
 /* Condition variable. */
 struct condition {
-  struct list waiters;        /* List of waiting threads. */
+  struct list waiters; /* List of waiting threads. */
 };
 
 void cond_init(struct condition *);
@@ -43,6 +49,9 @@ void cond_broadcast(struct condition *, struct lock *);
    The compiler will not reorder operations across an
    optimization barrier.  See "Optimization Barriers" in the
    reference guide for more information.*/
-#define barrier() asm volatile ("" : : : "memory")
+#define barrier() asm volatile("" \
+                               :  \
+                               :  \
+                               : "memory")
 
 #endif /* threads/synch.h */

@@ -8,11 +8,11 @@
 */
 
 #undef NDEBUG
+#include "threads/test.h"
 #include <debug.h>
 #include <list.h>
 #include <random.h>
 #include <stdio.h>
-#include "threads/test.h"
 
 /* Maximum number of elements in a linked list that we will
    test. */
@@ -20,8 +20,8 @@
 
 /* A linked list element. */
 struct value {
-  struct list_elem elem;      /* List element. */
-  int value;                  /* Item value. */
+  struct list_elem elem; /* List element. */
+  int value;             /* Item value. */
 };
 
 static void shuffle(struct value[], size_t);
@@ -31,8 +31,7 @@ static void verify_list_fwd(struct list *, int size);
 static void verify_list_bkwd(struct list *, int size);
 
 /* Test the linked list implementation. */
-void
-test(void) {
+void test(void) {
   int size;
 
   printf("testing various size lists:");
@@ -59,12 +58,16 @@ test(void) {
       /* Verify correct minimum and maximum elements. */
       e = list_min(&list, value_less, NULL);
       ASSERT(size ? list_entry(e,
-      struct value, elem)->value == 0
-      : e == list_begin(&list));
+                               struct value, elem)
+                         ->value
+                     == 0
+                  : e == list_begin(&list));
       e = list_max(&list, value_less, NULL);
       ASSERT(size ? list_entry(e,
-      struct value, elem)->value == size - 1
-      : e == list_begin(&list));
+                               struct value, elem)
+                         ->value
+                     == size - 1
+                  : e == list_begin(&list));
 
       /* Sort and verify list. */
       list_sort(&list, value_less, NULL);
@@ -88,7 +91,7 @@ test(void) {
       for (e = list_begin(&list); e != list_end(&list);
            e = list_next(e)) {
         struct value *v = list_entry(e,
-        struct value, elem);
+                                     struct value, elem);
         int copies = random_ulong() % 4;
         while (copies-- > 0) {
           values[ofs].value = v->value;
@@ -124,9 +127,9 @@ static bool
 value_less(const struct list_elem *a_, const struct list_elem *b_,
            void *aux UNUSED) {
   const struct value *a = list_entry(a_,
-  struct value, elem);
+                                     struct value, elem);
   const struct value *b = list_entry(b_,
-  struct value, elem);
+                                     struct value, elem);
 
   return a->value < b->value;
 }
@@ -142,7 +145,7 @@ verify_list_fwd(struct list *list, int size) {
        i < size && e != list_end(list);
        i++, e = list_next(e)) {
     struct value *v = list_entry(e,
-    struct value, elem);
+                                 struct value, elem);
     ASSERT(i == v->value);
   }
   ASSERT(i == size);
@@ -160,7 +163,7 @@ verify_list_bkwd(struct list *list, int size) {
        i < size && e != list_rend(list);
        i++, e = list_prev(e)) {
     struct value *v = list_entry(e,
-    struct value, elem);
+                                 struct value, elem);
     ASSERT(i == v->value);
   }
   ASSERT(i == size);

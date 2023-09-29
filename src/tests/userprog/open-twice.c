@@ -2,12 +2,11 @@
    which must succeed and must return a different file descriptor
    in each case. */
 
-#include <syscall.h>
 #include "tests/lib.h"
 #include "tests/main.h"
+#include <syscall.h>
 
-void
-test_main(void) {
+void test_main(void) {
   int h1 = open("sample.txt");
   int h2 = open("sample.txt");
 
