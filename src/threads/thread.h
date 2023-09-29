@@ -147,4 +147,7 @@ void thread_set_nice(int);
 int thread_get_recent_cpu(void);
 int thread_get_load_avg(void);
 
+/* P1 alarm clock */
+void thread_sleep(int64_t end_tick);
+
 #endif /* threads/thread.h */
