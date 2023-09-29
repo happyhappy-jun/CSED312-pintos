@@ -99,23 +99,22 @@ bool sema_try_down(struct semaphore *sema) {
 
    This function may be called from an interrupt handler. */
 void sema_up(struct semaphore *sema) {
-  ASSERT(sema != NULL);
   enum intr_level old_level;
-  bool yield_on_return = false;
+  bool check_preempt = false;
+
+  ASSERT(sema != NULL);
 
   old_level = intr_disable();
   if (!list_empty(&sema->waiters)) {
+    check_preempt = true;
     list_sort(&sema->waiters, compare_thread_priority, NULL);
     thread_unblock(list_entry(list_pop_front(&sema->waiters),
                               struct thread, elem));
-    if(is_preemptive()){
-      yield_on_return = true;
-    }
   }
   sema->value++;
-  intr_set_level(old_level);
-  if (!intr_context() && yield_on_return)
+  if (check_preempt && is_preemptive())
     thread_yield();
+  intr_set_level(old_level);
 }
 
 static void sema_test_helper(void *sema_);
@@ -286,12 +285,11 @@ void cond_signal(struct condition *cond, struct lock *lock UNUSED) {
   ASSERT(!intr_context());
   ASSERT(lock_held_by_current_thread(lock));
 
-  if (!list_empty(&cond->waiters)) {
+  if (!list_empty(&cond->waiters))
     list_sort(&cond->waiters, compare_sema_priority, NULL);
     sema_up(&list_entry(list_pop_front(&cond->waiters),
                         struct semaphore_elem, elem)
                  ->semaphore);
-  }
 }
 
 /* Wakes up all threads, if any, waiting on COND (protected by
