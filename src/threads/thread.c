@@ -161,6 +161,7 @@ tid_t thread_create(const char *name, int priority,
   struct switch_entry_frame *ef;
   struct switch_threads_frame *sf;
   tid_t tid;
+  enum intr_level old_level;
 
   ASSERT(function != NULL);
 
@@ -190,9 +191,11 @@ tid_t thread_create(const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock(t);
+
+  old_level = intr_disable();
   if(is_preemptive())
     thread_yield();
-
+  intr_set_level(old_level);
   return tid;
 }
 
@@ -323,9 +326,13 @@ void thread_foreach(thread_action_func *func, void *aux) {
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void thread_set_priority(int new_priority) {
+  enum intr_level old_level;
   thread_current()->priority = new_priority;
+
+  old_level = intr_disable();
   if(is_preemptive())
     thread_yield();
+  intr_set_level(old_level);
 }
 
 /* Returns the current thread's priority. */
