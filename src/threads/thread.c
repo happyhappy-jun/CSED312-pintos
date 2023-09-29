@@ -573,10 +573,9 @@ void thread_wakeup(int64_t current_tick) {
   struct sleep_list_elem *elem;
 
   /* While loop until the `sleep_list` empty */
-  while (!list_empty(&ready_list)) {
+  while (!list_empty(&sleep_list)) {
     /* Get the front element */
-    elem = list_entry(list_front(&ready_list), struct sleep_list_elem, elem);
-
+    elem = list_entry(list_front(&sleep_list), struct sleep_list_elem, elem);
     /* Break the while loop if the element's `end_tick` is greater than
      * `current_tick` */
     if (elem->end_tick > current_tick) {
@@ -585,7 +584,7 @@ void thread_wakeup(int64_t current_tick) {
 
     /* Else, pop front from the `sleep_list` and call sema_up for its
      * `semaphore` */
-    list_pop_front(&ready_list);
+    list_pop_front(&sleep_list);
     sema_up(&elem->semaphore);
   }
 }
