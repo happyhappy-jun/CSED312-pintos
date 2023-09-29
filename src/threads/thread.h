@@ -1,6 +1,7 @@
 #ifndef THREADS_THREAD_H
 #define THREADS_THREAD_H
 
+#include "threads/synch.h"
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
@@ -98,6 +99,12 @@ struct thread {
 
   /* Owned by thread.c. */
   unsigned magic;                     /* Detects stack overflow. */
+};
+
+struct sleep_list_elem {
+  struct list_elem elem;
+  int64_t end_tick;
+  struct semaphore semaphore;
 };
 
 /* If false (default), use round-robin scheduler.
