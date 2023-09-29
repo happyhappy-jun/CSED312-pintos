@@ -16,7 +16,7 @@ bool compare_thread_priority(const struct list_elem *a, const struct list_elem *
 }
 
 bool compare_thread_wakeup_tick(const struct list_elem *a,
-                                const struct list_elem *b void *aux) {
+                                const struct list_elem *b, void *aux) {
   const struct sleep_list_elem *elem_a =
       list_entry(a, struct sleep_list_elem, elem);
   const struct sleep_list_elem *elem_b =
