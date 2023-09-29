@@ -149,5 +149,6 @@ int thread_get_load_avg(void);
 
 /* P1 alarm clock */
 void thread_sleep(int64_t end_tick);
+void thread_wakeup(int64_t current_tick);
 
 #endif /* threads/thread.h */

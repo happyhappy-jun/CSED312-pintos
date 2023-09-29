@@ -568,6 +568,28 @@ void thread_sleep(int64_t end_tick) {
   sema_down(&sleep_list_elem.semaphore);
 }
 
+void thread_wakeup(int64_t current_tick) {
+  /* Define a placeholder for iterating */
+  struct sleep_list_elem *elem;
+
+  /* While loop until the `sleep_list` empty */
+  while (!list_empty(&ready_list)) {
+    /* Get the front element */
+    elem = list_entry(list_front(&ready_list), struct sleep_list_elem, elem);
+
+    /* Break the while loop if the element's `end_tick` is greater than
+     * `current_tick` */
+    if (elem->end_tick > current_tick) {
+      break;
+    }
+
+    /* Else, pop front from the `sleep_list` and call sema_up for its
+     * `semaphore` */
+    list_pop_front(&ready_list);
+    sema_up(&elem->semaphore);
+  }
+}
+
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof(
