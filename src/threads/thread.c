@@ -553,6 +553,21 @@ allocate_tid(void) {
   return tid;
 }
 
+/* P1 alarm clock */
+void thread_sleep(int64_t end_tick) {
+  /* Define `sleep_list_elem` variable and initialize it */
+  struct sleep_list_elem sleep_list_elem;
+  sleep_list_elem.end_tick = end_tick;
+  sema_init(&sleep_list_elem.semaphore, 0);
+
+  /* Insert `sleep_list_elem` into the `sleep_list` */
+  list_insert_ordered(&sleep_list, &sleep_list_elem.elem,
+                      compare_thread_wakeup_tick, NULL);
+
+  /* Semaphore down. (i.e., Start sleeping) */
+  sema_down(&sleep_list_elem.semaphore);
+}
+
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof(
