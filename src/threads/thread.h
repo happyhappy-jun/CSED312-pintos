@@ -31,6 +31,8 @@ typedef int tid_t;
 
 #define RECENT_CPU_INITIAL 0
 
+#define LOAD_AVG_INITIAL 0
+
 /* A kernel thread or user process.
 
    Each thread structure is stored in its own 4 kB page.  The

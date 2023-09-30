@@ -61,6 +61,8 @@ static unsigned thread_ticks; /* # of timer ticks since last yield. */
    Controlled by kernel command-line option "-o mlfqs". */
 bool thread_mlfqs;
 
+fixed_t load_avg;
+
 static void kernel_thread(thread_func *, void *aux);
 
 static void idle(void *aux UNUSED);
@@ -93,6 +95,8 @@ void thread_init(void) {
   list_init(&ready_list);
   list_init(&all_list);
   list_init(&sleep_list);
+
+  load_avg = LOAD_AVG_INITIAL;
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread();
