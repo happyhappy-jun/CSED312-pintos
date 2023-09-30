@@ -358,8 +358,8 @@ int thread_get_nice(void) {
   return nice;
 }
 
-/* Returns 100 times the system load average. */
-int thread_get_load_avg(void) {
+/* Returns 100 times the current thread's recent_cpu value. */
+int thread_get_recent_cpu(void) {
   enum intr_level old_level = intr_disable();
   fixed_t recent_cpu = thread_current()->recent_cpu;
   int result = fp2int_round(fp_mul_n(recent_cpu, 100));
@@ -367,8 +367,8 @@ int thread_get_load_avg(void) {
   return result;
 }
 
-/* Returns 100 times the current thread's recent_cpu value. */
-int thread_get_recent_cpu(void) {
+/* Returns 100 times the system load average. */
+int thread_get_load_avg(void) {
   enum intr_level old_level = intr_disable();
   int result = fp2int_round(fp_mul_n(load_avg, 100));
   intr_set_level(old_level);
