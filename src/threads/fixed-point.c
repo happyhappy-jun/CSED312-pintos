@@ -5,9 +5,9 @@
 #include "threads/fixed-point.h"
 #include <inttypes.h>
 
-int P = 17;
-int Q = 14;
-int F = 1 << Q;
+const int P = 17;
+const int Q = 14;
+const int F = 1 << Q;
 
 fixed_t int2fp(int n) {
   return n * F;
