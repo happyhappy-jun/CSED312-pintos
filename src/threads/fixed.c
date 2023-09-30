@@ -1,5 +1,5 @@
 //
-// Created by ±èÄ¡Çå on 2023/09/30.
+// Created by ChiHeon Kim on 2023/09/30.
 //
 
 #include "threads/fixed.h"
