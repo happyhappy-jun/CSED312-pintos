@@ -24,6 +24,9 @@ typedef int tid_t;
 #define PRI_DEFAULT 31 /* Default priority. */
 #define PRI_MAX 63     /* Highest priority. */
 
+/* P1 priority donation */
+#define MAX_DONATION_DEPTH 8 /* Based on the test requirment at priority-donate-chain.c */
+
 /* A kernel thread or user process.
 
    Each thread structure is stored in its own 4 kB page.  The

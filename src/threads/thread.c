@@ -270,9 +270,9 @@ void update_donations(void) {
 
 void donate_priority() {
   struct thread *temp_t = thread_current();
+  int depth = 0;
 
-  int depth = 1;
-  while (depth < 32 && temp_t->waiting_lock != NULL) {
+  while (depth < MAX_DONATION_DEPTH && temp_t->waiting_lock != NULL) {
     temp_t = temp_t->waiting_lock->holder;
 
     if (temp_t->priority < thread_current()->priority)
