@@ -637,7 +637,9 @@ void calculate_recent_cpu(struct thread *t) {
 }
 
 void calculate_load_avg() {
-  int size = list_size(&ready_list);
+  size_t size = list_size(&ready_list);
+  if (thread_current() != idle_thread)
+    size += 1;
   fixed_t c1 = fp_div_n(int2fp(59), 60);
   fixed_t c2 = fp_div_n(int2fp(1), 60);
   load_avg = fp_add_y(fp_mul_y(c1, load_avg), fp_mul_n(c2, size));
