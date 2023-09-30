@@ -233,6 +233,55 @@ void thread_unblock(struct thread *t) {
   intr_set_level(old_level);
 }
 
+void clear_from_donations(struct lock *lock) {
+  struct list_elem *e;
+  struct thread *t;
+
+  e = list_begin(&thread_current()->donations);
+  for (e; e != list_end(&thread_current()->donations); e = list_next(e)) {
+    t = list_entry(e, struct thread, donation_elem);
+    if (t->waiting_lock == lock) {
+      list_remove(e);
+    }
+  }
+}
+
+void update_donations(void) {
+  struct thread *current_thread;
+
+  current_thread = thread_current();
+
+  current_thread->priority = current_thread->original_priority;
+
+  if (list_empty(&current_thread->donations)) {
+    current_thread->priority = current_thread->original_priority;
+    return;
+  }
+
+  struct thread *max = list_entry(
+      list_max(&current_thread->donations, compare_thread_priority, NULL),
+      struct thread,
+      donation_elem);
+
+  if (max->priority > current_thread->original_priority) {
+    current_thread->priority = max->priority;
+  }
+}
+
+void donate_priority() {
+  struct thread *temp_t = thread_current();
+
+  int depth = 1;
+  while (depth < 32 && temp_t->waiting_lock != NULL) {
+    temp_t = temp_t->waiting_lock->holder;
+
+    if (temp_t->priority < thread_current()->priority)
+      temp_t->priority = thread_current()->priority;
+
+    depth++;
+  }
+}
+
 /* Returns the name of the running thread. */
 const char *
 thread_name(void) {
@@ -320,7 +369,9 @@ void thread_set_priority(int new_priority) {
   enum intr_level old_level;
 
   old_level = intr_disable();
-  thread_current()->priority = new_priority;
+  thread_current()->original_priority = new_priority;
+  update_donations();
+  donate_priority();
 
   if (list_empty(&ready_list)) {
     intr_set_level(old_level);
@@ -445,6 +496,11 @@ init_thread(struct thread *t, const char *name, int priority) {
   strlcpy(t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+
+  t->original_priority = priority;
+  t->waiting_lock = NULL;
+  list_init(&t->donations);
+
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable();

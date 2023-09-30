@@ -97,6 +97,10 @@ struct thread {
   uint32_t *pagedir; /* Page directory. */
 #endif
 
+  int original_priority;          /* Original priority of the thread */
+  struct lock *waiting_lock;      /* Lock that the thread is waiting for */
+  struct list donations;          /* List of donations to handle multiple donations */
+  struct list_elem donation_elem; /* List element for donation list */
   /* Owned by thread.c. */
   unsigned magic; /* Detects stack overflow. */
 };
@@ -131,6 +135,10 @@ const char *thread_name(void);
 void thread_exit(void)
     NO_RETURN;
 void thread_yield(void);
+
+void clear_from_donations(struct lock *lock);
+void update_donations(void);
+void donate_priority(void);
 
 /* Performs some operation on thread t, given auxiliary data AUX. */
 typedef void thread_action_func(struct thread *t, void *aux);
