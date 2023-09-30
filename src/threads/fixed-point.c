@@ -2,7 +2,7 @@
 // Created by ChiHeon Kim on 2023/09/30.
 //
 
-#include "threads/fixed.h"
+#include "threads/fixed-point.h"
 #include <inttypes.h>
 
 int P = 17;
