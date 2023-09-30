@@ -19,9 +19,9 @@ int fp2int(fixed_t x) {
 
 int fp2int_round(fixed_t x) {
   if (x >= 0) {
-    return (x + F / 2) / F;
+    return (x + (F >> 1)) / F;
   } else {
-    return (x - F / 2) / F;
+    return (x - (F >> 1)) / F;
   }
 }
 
