@@ -607,6 +607,42 @@ void thread_wakeup(int64_t current_tick) {
   }
 }
 
+void calculate_priority(struct thread *t) {
+  if (t != idle_thread) {
+    int nice = t->nice;
+    fixed_t recent_cpu = t->recent_cpu;
+    t->priority = fp2int(fp_add_n(fp_div_n(recent_cpu, 4), PRI_MAX - nice * 2));
+    if (t->priority > PRI_MAX)
+      t->priority = PRI_MAX;
+    else if (t->priority < PRI_MIN)
+      t->priority = PRI_MIN;
+  }
+}
+
+void increase_recent_cpu(struct thread *t) {
+  if (t != idle_thread) {
+    t->recent_cpu = fp_add_n(t->recent_cpu, 1);
+  }
+}
+
+void calculate_recent_cpu(struct thread *t) {
+  if (t != idle_thread) {
+    fixed_t load_avg_mul_2 = fp_mul_n(load_avg, 2);
+    t->recent_cpu = fp_add_n(
+        fp_mul_y(
+            fp_div_y(load_avg_mul_2, fp_add_n(load_avg_mul_2, 1)),
+            t->recent_cpu),
+        t->nice);
+  }
+}
+
+void calculate_load_avg() {
+  int size = list_size(&ready_list);
+  fixed_t c1 = fp_div_n(int2fp(59), 60);
+  fixed_t c2 = fp_div_n(int2fp(1), 60);
+  load_avg = fp_add_y(fp_mul_y(c1, load_avg), fp_mul_n(c2, size));
+}
+
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof(

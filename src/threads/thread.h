@@ -158,4 +158,10 @@ int thread_get_load_avg(void);
 void thread_sleep(int64_t end_tick);
 void thread_wakeup(int64_t current_tick);
 
+/* P1 Advanced Scheduler */
+void calculate_priority(struct thread *t);
+void increase_recent_cpu(struct thread *t);
+void calculate_recent_cpu(struct thread *t);
+void calculate_load_avg(void);
+
 #endif /* threads/thread.h */
