@@ -164,4 +164,6 @@ void increase_recent_cpu(struct thread *t);
 void calculate_recent_cpu(struct thread *t);
 void calculate_load_avg(void);
 
+void sort_ready_list(void);
+
 #endif /* threads/thread.h */

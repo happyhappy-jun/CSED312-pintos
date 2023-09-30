@@ -643,6 +643,10 @@ void calculate_load_avg() {
   load_avg = fp_add_y(fp_mul_y(c1, load_avg), fp_mul_n(c2, size));
 }
 
+void sort_ready_list() {
+  list_sort(&ready_list, compare_thread_priority, NULL);
+}
+
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof(
