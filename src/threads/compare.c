@@ -3,7 +3,6 @@
 //
 
 #include "compare.h"
-#include "threads/synch.h"
 #include "threads/thread.h"
 
 bool compare_thread_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
@@ -16,6 +15,16 @@ bool compare_thread_priority(const struct list_elem *a, const struct list_elem *
   return priority_a > priority_b;
 }
 
+bool compare_thread_wakeup_tick(const struct list_elem *a,
+                                const struct list_elem *b, void *aux) {
+  const struct sleep_list_elem *elem_a =
+      list_entry(a, struct sleep_list_elem, elem);
+  const struct sleep_list_elem *elem_b =
+      list_entry(b, struct sleep_list_elem, elem);
+
+  return elem_a->end_tick < elem_b->end_tick;
+}
+
 bool compare_sema_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
   struct semaphore_elem *sema_a = list_entry(a, struct semaphore_elem, elem);
   struct semaphore_elem *sema_b = list_entry(b, struct semaphore_elem, elem);
@@ -25,3 +34,4 @@ bool compare_sema_priority(const struct list_elem *a, const struct list_elem *b,
 
   return thread_a->priority > thread_b->priority;
 }
+

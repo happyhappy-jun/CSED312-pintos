@@ -1,6 +1,7 @@
 #ifndef THREADS_THREAD_H
 #define THREADS_THREAD_H
 
+#include "threads/synch.h"
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
@@ -100,6 +101,12 @@ struct thread {
   unsigned magic; /* Detects stack overflow. */
 };
 
+struct sleep_list_elem {
+  struct list_elem elem;
+  int64_t end_tick;
+  struct semaphore semaphore;
+};
+
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
@@ -136,5 +143,9 @@ int thread_get_nice(void);
 void thread_set_nice(int);
 int thread_get_recent_cpu(void);
 int thread_get_load_avg(void);
+
+/* P1 alarm clock */
+void thread_sleep(int64_t end_tick);
+void thread_wakeup(int64_t current_tick);
 
 #endif /* threads/thread.h */

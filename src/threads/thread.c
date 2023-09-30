@@ -29,6 +29,8 @@ static struct list ready_list;
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
 
+static struct list sleep_list;
+
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -90,6 +92,7 @@ void thread_init(void) {
   lock_init(&tid_lock);
   list_init(&ready_list);
   list_init(&all_list);
+  list_init(&sleep_list);
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread();
@@ -550,6 +553,42 @@ allocate_tid(void) {
   lock_release(&tid_lock);
 
   return tid;
+}
+
+/* P1 alarm clock */
+void thread_sleep(int64_t end_tick) {
+  /* Define `sleep_list_elem` variable and initialize it */
+  struct sleep_list_elem sleep_list_elem;
+  sleep_list_elem.end_tick = end_tick;
+  sema_init(&sleep_list_elem.semaphore, 0);
+
+  /* Insert `sleep_list_elem` into the `sleep_list` */
+  list_insert_ordered(&sleep_list, &sleep_list_elem.elem,
+                      compare_thread_wakeup_tick, NULL);
+
+  /* Semaphore down. (i.e., Start sleeping) */
+  sema_down(&sleep_list_elem.semaphore);
+}
+
+void thread_wakeup(int64_t current_tick) {
+  /* Define a placeholder for iterating */
+  struct sleep_list_elem *elem;
+
+  /* While loop until the `sleep_list` empty */
+  while (!list_empty(&sleep_list)) {
+    /* Get the front element */
+    elem = list_entry(list_front(&sleep_list), struct sleep_list_elem, elem);
+    /* Break the while loop if the element's `end_tick` is greater than
+     * `current_tick` */
+    if (elem->end_tick > current_tick) {
+      break;
+    }
+
+    /* Else, pop front from the `sleep_list` and call sema_up for its
+     * `semaphore` */
+    list_pop_front(&sleep_list);
+    sema_up(&elem->semaphore);
+  }
 }
 
 /* Offset of `stack' member within `struct thread'.
