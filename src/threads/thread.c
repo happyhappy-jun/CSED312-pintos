@@ -611,7 +611,7 @@ void calculate_priority(struct thread *t) {
   if (t != idle_thread) {
     int nice = t->nice;
     fixed_t recent_cpu = t->recent_cpu;
-    t->priority = fp2int(fp_add_n(fp_div_n(recent_cpu, 4), PRI_MAX - nice * 2));
+    t->priority = fp2int(fp_add_n(fp_div_n(recent_cpu, -4), PRI_MAX - nice * 2));
     if (t->priority > PRI_MAX)
       t->priority = PRI_MAX;
     else if (t->priority < PRI_MIN)
