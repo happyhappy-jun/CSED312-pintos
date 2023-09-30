@@ -119,7 +119,7 @@ void sema_up(struct semaphore *sema) {
 
   old_level = intr_disable();
   if (t != NULL) {
-    if (check_yield_on_return && is_preemptive()) {
+    if (check_yield_on_return && thread_current()->priority < t->priority) {
       if (intr_context())
         intr_yield_on_return();
       else
