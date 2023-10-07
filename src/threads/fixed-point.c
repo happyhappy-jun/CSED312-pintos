@@ -25,34 +25,34 @@ int fp2int_round(fixed_t x) {
   }
 }
 
-fixed_t add_y(fixed_t x, fixed_t y) {
+fixed_t fp_add_y(fixed_t x, fixed_t y) {
   return x + y;
 }
 
-fixed_t add_n(fixed_t x, int n) {
+fixed_t fp_add_n(fixed_t x, int n) {
   return x + n * F;
 }
 
-fixed_t sub_y(fixed_t x, fixed_t y) {
+fixed_t fp_sub_y(fixed_t x, fixed_t y) {
   return x - y;
 }
 
-fixed_t sub_n(fixed_t x, int n) {
+fixed_t fp_sub_n(fixed_t x, int n) {
   return x - n * F;
 }
 
-fixed_t mul_y(fixed_t x, fixed_t y) {
+fixed_t fp_mul_y(fixed_t x, fixed_t y) {
   return ((int64_t) x) * y / F;
 }
 
-fixed_t mul_n(fixed_t x, int n) {
+fixed_t fp_mul_n(fixed_t x, int n) {
   return x * n;
 }
 
-fixed_t div_y(fixed_t x, fixed_t y) {
+fixed_t fp_div_y(fixed_t x, fixed_t y) {
   return ((int64_t) x) * F / y;
 }
 
-fixed_t div_n(fixed_t x, int n) {
+fixed_t fp_div_n(fixed_t x, int n) {
   return x / n;
 }

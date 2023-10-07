@@ -1,6 +1,7 @@
 #ifndef THREADS_THREAD_H
 #define THREADS_THREAD_H
 
+#include "threads/fixed-point.h"
 #include "threads/synch.h"
 #include <debug.h>
 #include <list.h>
@@ -23,6 +24,14 @@ typedef int tid_t;
 #define PRI_MIN 0      /* Lowest priority. */
 #define PRI_DEFAULT 31 /* Default priority. */
 #define PRI_MAX 63     /* Highest priority. */
+
+#define NICE_MIN -20
+#define NICE_DEFAULT 0
+#define NICE_MAX 20
+
+#define RECENT_CPU_INITIAL 0
+
+#define LOAD_AVG_INITIAL 0
 
 /* A kernel thread or user process.
 
@@ -88,7 +97,8 @@ struct thread {
   uint8_t *stack;            /* Saved stack pointer. */
   int priority;              /* Priority. */
   struct list_elem allelem;  /* List element for all threads list. */
-
+  int nice;                  /* Niceness. */
+  fixed_t recent_cpu;        /* Recent CPU Time. */
   /* Shared between thread.c and synch.c. */
   struct list_elem elem; /* List element. */
 
@@ -147,5 +157,13 @@ int thread_get_load_avg(void);
 /* P1 alarm clock */
 void thread_sleep(int64_t end_tick);
 void thread_wakeup(int64_t current_tick);
+
+/* P1 Advanced Scheduler */
+void calculate_priority(struct thread *t);
+void increase_recent_cpu(struct thread *t);
+void calculate_recent_cpu(struct thread *t);
+void calculate_load_avg(void);
+
+void sort_ready_list(void);
 
 #endif /* threads/thread.h */
