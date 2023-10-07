@@ -61,6 +61,8 @@ static unsigned thread_ticks; /* # of timer ticks since last yield. */
    Controlled by kernel command-line option "-o mlfqs". */
 bool thread_mlfqs;
 
+fixed_t load_avg;
+
 static void kernel_thread(thread_func *, void *aux);
 
 static void idle(void *aux UNUSED);
@@ -93,6 +95,8 @@ void thread_init(void) {
   list_init(&ready_list);
   list_init(&all_list);
   list_init(&sleep_list);
+
+  load_avg = LOAD_AVG_INITIAL;
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread();
@@ -391,26 +395,35 @@ int thread_get_priority(void) {
 }
 
 /* Sets the current thread's nice value to NICE. */
-void thread_set_nice(int nice UNUSED) {
-  /* Not yet implemented. */
+void thread_set_nice(int nice) {
+  enum intr_level old_level = intr_disable();
+  thread_current()->nice = nice;
+  intr_set_level(old_level);
 }
 
 /* Returns the current thread's nice value. */
 int thread_get_nice(void) {
-  /* Not yet implemented. */
-  return 0;
-}
-
-/* Returns 100 times the system load average. */
-int thread_get_load_avg(void) {
-  /* Not yet implemented. */
-  return 0;
+  enum intr_level old_level = intr_disable();
+  int nice = thread_current()->nice;
+  intr_set_level(old_level);
+  return nice;
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
 int thread_get_recent_cpu(void) {
-  /* Not yet implemented. */
-  return 0;
+  enum intr_level old_level = intr_disable();
+  fixed_t recent_cpu = thread_current()->recent_cpu;
+  int result = fp2int_round(fp_mul_n(recent_cpu, 100));
+  intr_set_level(old_level);
+  return result;
+}
+
+/* Returns 100 times the system load average. */
+int thread_get_load_avg(void) {
+  enum intr_level old_level = intr_disable();
+  int result = fp2int_round(fp_mul_n(load_avg, 100));
+  intr_set_level(old_level);
+  return result;
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -500,6 +513,9 @@ init_thread(struct thread *t, const char *name, int priority) {
   t->original_priority = priority;
   t->waiting_lock = NULL;
   list_init(&t->donations);
+
+  t->nice = NICE_DEFAULT;
+  t->recent_cpu = RECENT_CPU_INITIAL;
 
   t->magic = THREAD_MAGIC;
 
@@ -646,6 +662,48 @@ void thread_wakeup(int64_t current_tick) {
     list_pop_front(&sleep_list);
     sema_up(&elem->semaphore);
   }
+}
+
+void calculate_priority(struct thread *t) {
+  if (t != idle_thread) {
+    int nice = t->nice;
+    fixed_t recent_cpu = t->recent_cpu;
+    t->priority = fp2int(fp_add_n(fp_div_n(recent_cpu, -4), PRI_MAX - nice * 2));
+    if (t->priority > PRI_MAX)
+      t->priority = PRI_MAX;
+    else if (t->priority < PRI_MIN)
+      t->priority = PRI_MIN;
+  }
+}
+
+void increase_recent_cpu(struct thread *t) {
+  if (t != idle_thread) {
+    t->recent_cpu = fp_add_n(t->recent_cpu, 1);
+  }
+}
+
+void calculate_recent_cpu(struct thread *t) {
+  if (t != idle_thread) {
+    fixed_t load_avg_mul_2 = fp_mul_n(load_avg, 2);
+    t->recent_cpu = fp_add_n(
+        fp_mul_y(
+            fp_div_y(load_avg_mul_2, fp_add_n(load_avg_mul_2, 1)),
+            t->recent_cpu),
+        t->nice);
+  }
+}
+
+void calculate_load_avg() {
+  size_t size = list_size(&ready_list);
+  if (thread_current() != idle_thread)
+    size += 1;
+  fixed_t c1 = fp_div_n(int2fp(59), 60);
+  fixed_t c2 = fp_div_n(int2fp(1), 60);
+  load_avg = fp_add_y(fp_mul_y(c1, load_avg), fp_mul_n(c2, size));
+}
+
+void sort_ready_list() {
+  list_sort(&ready_list, compare_thread_priority, NULL);
 }
 
 /* Offset of `stack' member within `struct thread'.
