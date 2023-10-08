@@ -189,4 +189,11 @@ timer_interrupt(struct intr_frame *args UNUSED) {
 }
 ```
 
+모든 쓰레드에 대해 호출해야 하는 함수인` calculate_priority()`와 `calculate_recent_cpu()`는 pintos에서 기본 구현되어있는 `thread_foreach()`를 이용해
+호출합니다.
+
+`calculate_priority()`에 의해서 쓰레드의 우선 순위가 조정된 후에는 `ready_list`를 새로 정렬해야 합니다.
+`devices/timer.c`에서는 `threads/thread.c`에서 정의된 `ready_list`에 접근할 수 없기 때문에 이를 정렬하는 함수를 따로 작성하여 `calculate_priority()`를
+호출하는 부분 뒷쪽에 추가해 줬습니다.
+
 ## Discussion
