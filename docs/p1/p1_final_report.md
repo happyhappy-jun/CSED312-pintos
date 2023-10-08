@@ -31,27 +31,27 @@ struct sleep_list_elem {
 ```c
 // devices/timer.c
 void timer_sleep(int64_t ticks) {
-  int64_t start = timer_ticks();
+int64_t start = timer_ticks();
 
-  ASSERT(intr_get_level() == INTR_ON);
-  thread_sleep(start + ticks);
+ASSERT(intr_get_level() == INTR_ON);
+thread_sleep(start + ticks);
 }
 ```
 
 ```c
 // threads/thread.c
 void thread_sleep(int64_t end_tick) {
-  /* Define `sleep_list_elem` variable and initialize it */
-  struct sleep_list_elem sleep_list_elem;
-  sleep_list_elem.end_tick = end_tick;
-  sema_init(&sleep_list_elem.semaphore, 0);
+/* Define `sleep_list_elem` variable and initialize it */
+struct sleep_list_elem sleep_list_elem;
+sleep_list_elem.end_tick = end_tick;
+sema_init(&sleep_list_elem.semaphore, 0);
 
-  /* Insert `sleep_list_elem` into the `sleep_list` */
-  list_insert_ordered(&sleep_list, &sleep_list_elem.elem,
-                      compare_thread_wakeup_tick, NULL);
+/* Insert `sleep_list_elem` into the `sleep_list` */
+list_insert_ordered(&sleep_list, &sleep_list_elem.elem,
+compare_thread_wakeup_tick, NULL);
 
-  /* Semaphore down. (i.e., Start sleeping) */
-  sema_down(&sleep_list_elem.semaphore);
+/* Semaphore down. (i.e., Start sleeping) */
+sema_down(&sleep_list_elem.semaphore);
 }
 ```
 
@@ -64,33 +64,33 @@ void thread_sleep(int64_t end_tick) {
 // devices/timer.c
 static void
 timer_interrupt(struct intr_frame *args UNUSED) {
-  ticks++;
-  thread_tick();
-  thread_wakeup(ticks);
+ticks++;
+thread_tick();
+thread_wakeup(ticks);
 }
 ```
 
 ```c
 // threads/thread.c
 void thread_wakeup(int64_t current_tick) {
-  /* Define a placeholder for iterating */
-  struct sleep_list_elem *elem;
+/* Define a placeholder for iterating */
+struct sleep_list_elem *elem;
 
-  /* While loop until the `sleep_list` empty */
-  while (!list_empty(&sleep_list)) {
-    /* Get the front element */
-    elem = list_entry(list_front(&sleep_list), struct sleep_list_elem, elem);
-    /* Break the while loop if the element's `end_tick` is greater than
-     * `current_tick` */
-    if (elem->end_tick > current_tick) {
-      break;
-    }
+/* While loop until the `sleep_list` empty */
+while (!list_empty(&sleep_list)) {
+/* Get the front element */
+elem = list_entry(list_front(&sleep_list), struct sleep_list_elem, elem);
+/* Break the while loop if the element's `end_tick` is greater than
+ * `current_tick` */
+if (elem->end_tick > current_tick) {
+break;
+}
 
-    /* Else, pop front from the `sleep_list` and call sema_up for its
-     * `semaphore` */
-    list_pop_front(&sleep_list);
-    sema_up(&elem->semaphore);
-  }
+/* Else, pop front from the `sleep_list` and call sema_up for its
+ * `semaphore` */
+list_pop_front(&sleep_list);
+sema_up(&elem->semaphore);
+}
 }
 ```
 
@@ -109,7 +109,281 @@ void thread_wakeup(int64_t current_tick) {
 
 ## Solution
 
+### Data Structure
+
+디자인 레포트에서 언급한 아래의 필드들을 `struct thread` 에 추가해 수정없이 구현했다.
+`original_priority`는 스레드의 원래 우선순위를 저장하고, `waiting_lock`은 스레드가 기다리고 있는 락을 저장한다.
+`donations`은 스레드가 받은 우선순위를 저장하는 리스트이고, `donation_elem`은 `donations` 리스트에 삽입될 때
+사용되는 리스트 엘리먼트이다. 추가적으로 `init_thread` 함수를 콜하는 곳에어 각 필드를 초기화하는 코드를 추가했다.
+
+```c
+int original_priority;          /* Original priority of the thread */
+struct lock *waiting_lock;      /* Lock that the thread is waiting for */
+struct list donations;          /* List of donations to handle multiple donations */
+struct list_elem donation_elem; /* List element for donation list */
+
+// init_thread
+//    t->original_priority = priority;
+//    t->waiting_lock = NULL;
+//    list_init(&t->donations);
+```
+
+### lock_acquire
+
+`lock_acquire()`는 공유 자원 접근을 위해 락을 획득할때 스레드가 부르는 함수다.
+락을 획득하기 전에 스레드가 기다리고 있는 락을 `waiting_lock`에 저장하고, `donations` 리스트에 스레드의 우선순위를
+삽입한다. 그리고 `donate_priority()`를 호출해 현재 스레드가 기다리고 있는 락 (by referencing `waiting_lock`) 을
+보유하고 있는 홀더에서 priority donation을 recursive 하게 수행한다. `donate_priority()` 의 자세한 로직은 하기 서술한다.
+
+```c
+void lock_acquire(struct lock *lock) {
+  ASSERT(lock != NULL);
+  ASSERT(!intr_context());
+  ASSERT(!lock_held_by_current_thread(lock));
+
+  struct thread *current_thread = thread_current();
+
+  if (lock->holder != NULL) {
+    current_thread->waiting_lock = lock;
+    list_insert_ordered(&lock->holder->donations,
+                        &current_thread->donation_elem,
+                        compare_thread_priority, NULL);
+    donate_priority();
+  }
+  sema_down(&lock->semaphore);
+  current_thread->waiting_lock = NULL;
+  lock->holder = current_thread;
+}
+```
+
+### lock_release
+
+공유 자원에 대한 락을 해제하게 된다면, 해당 락을 사용하고 싶어 우선순위를 빌려주었던 스레드 들에게 우선순위를 다시 반환해야한다.
+`donations` 리스트에 있는 스레드가 우선순위를 빌려주었던 이유인 `waiting_lock`이 현재 락이라면, `donations` 리스트에서
+해당 스레드를 제거한다. 그리고 `update_donations()`를 호출해 `donations` 리스트에 있는 스레드들의 우선순위를
+재정렬 해준다.
+
+```c
+void lock_release(struct lock *lock) {
+  ASSERT(lock != NULL);
+  ASSERT(lock_held_by_current_thread(lock));
+
+  lock->holder = NULL;
+
+  clear_from_donations(lock);
+  update_donations();
+
+  sema_up(&lock->semaphore);
+}
+```
+
+### clear_from_donations
+
+위에서 언급한 이유로 donations 리스트를 순회하며 더이상 우선 순위를 빌려줄 필요가 없는 녀석들을 지워준다.
+
+```c
+void clear_from_donations(struct lock *lock) {
+struct list_elem *e;
+struct thread *t;
+
+e = list_begin(&thread_current()->donations);
+  for (e; e != list_end(&thread_current()->donations); e = list_next(e)) {
+    t = list_entry(e, struct thread, donation_elem);
+    if (t->waiting_lock == lock) {
+      list_remove(e);
+    }
+  }
+}
+```
+
+### update_donations
+
+`donations` 리스트를 순회하며 스레드의 우선순위를 재정렬 해준다. 만약 `donations` 리스트가 비어있다면, 스레드의
+원래 우선순위를 돌려준다. 그리고 `donations` 리스트에 있는 스레드들 중 가장 우선순위가 높은 스레드의 우선순위를
+현재 스레드의 우선순위로 재배정을 해준다.
+
+```c
+void update_donations(void) {
+  struct thread *current_thread;
+  
+  current_thread = thread_current();
+  
+  current_thread->priority = current_thread->original_priority;
+  
+  if (list_empty(&current_thread->donations)) {
+    current_thread->priority = current_thread->original_priority;
+  return;
+  }
+
+  struct thread *max = list_entry(
+    list_max(&current_thread->donations, compare_thread_priority, NULL),
+    struct thread,
+    donation_elem
+  );
+  
+  if (max->priority > current_thread->original_priority) {
+    current_thread->priority = max->priority;
+  }
+}
+```
+
+### donate_priority
+
+우선순위 기부를 recursive 하게 수행한다. `MAX_DONATION_DEPTH` 를 넘어가면 더이상 기부를 하지 않는다. 현재 스레드가
+대기하고 있는 락의 홀더에 대해서 만약에 홀더의 우선순위가 현재 스레드의 우선순위보다 낮다면, 홀더의 우선순위를
+현재 스레드의 우선순위로 재설정해준다. `depth` 변수가 추가되었는데, 도네이션 상황에서 donation chain 을 고려해야하는
+스펙이다. 하지만, 얼마나 깊이까지 donation chain 을 고려해야하는지에 대한 스펙은 없어 디자인 레포트는 이 문제에 대해
+고려해야한다고 언급하고 설계는 없었다. 이 부분에 대해서는 구현상의 변경점으로 discussion 섹션에서 설명한다.
+
+```c
+void donate_priority() {
+  struct thread *temp_t = thread_current();
+  int depth = 0;
+
+  while (depth < MAX_DONATION_DEPTH && temp_t->waiting_lock != NULL) {
+    temp_t = temp_t->waiting_lock->holder;
+    
+    if (temp_t->priority < thread_current()->priority)
+      temp_t->priority = thread_current()->priority;
+    
+    depth++;
+  }
+}
+```
+
+### thread_set_priority
+
+현재 스레드의 우선순위를 임의로 변경한다. 우선순위가 변경될 때마다, 도네이션의 상황을 고려해야하기 때문에, 바로 우선순위를 배정하지 않고
+`original_priority` 에 저장해두고, `update_donations()` 과 `donate_priority()` 를 호출해 도네이션을 고려해
+`priority` 는 indirectly 업데이트하도록 한다. 추가로, 스레드의 우선 순위를 변경으로 `preemptive yield` 상황이 발생할
+수 있기 때문에 그 부분에 대한 코드가 추가 되었다. 만약에 `ready_list` 가 비어있다면, `thread_yield()` 를 호출하지 않고
+원래 인터럽트 상태를 복구하고 함수를 종료한다. 만약에 `ready_list` 에 스레드가 대기하고 있는 상태라면, `ready_list` 에서
+가장 우선순위가 높은 스레드를 뽑아 현재 스레드의 우선순위와 비교해 현재 스레드의 우선순위가 더 낮다면, voluntary yield 를 한다.
+이때 후술할 레이스 컨디션등의 문제로 인해 인터럽트 컨텍스트에서 호출되는 경우에는 `thread_yield()` 를 호출하지 않는다.
+
+```c
+void thread_set_priority(int new_priority) {
+  ASSERT(!thread_mlfqs);
+  enum intr_level old_level;
+  
+  old_level = intr_disable();
+  thread_current()->original_priority = new_priority;
+  update_donations();
+  donate_priority();
+  
+  if (list_empty(&ready_list)) {
+    intr_set_level(old_level);
+    return;
+  }
+  
+  struct thread *t = list_entry(list_front(&ready_list), struct thread, elem);
+  if (new_priority < t->priority)
+    if (!intr_context())
+      thread_yield();
+  intr_set_level(old_level);
+}
+```
+
+### cond
+
+우선도 기반의 스케쥴링이 도입됨에 따라 cond 도 우선도 기반으로 움직여야한다. 따라서, 아래와 같이 cond 의 waiters 리스트를
+정렬하는 기능을 추가했다.
+
+```diff
+Subject: [PATCH] cond 도 thread_priority 기준으로 정렬하도록 구현
+diff --git a/src/threads/synch.c b/src/threads/synch.c
+--- a/src/threads/synch.c	(revision ed0f9fc2dc7bd68b02f456cd811b4f3756d5c9fe)
++++ b/src/threads/synch.c	(revision 11051e72892e05129a3ca88266dc98485fec1032)
+
+ /* Initializes condition variable COND.  A condition variable
+    allows one piece of code to signal a condition and cooperating
+    code to receive the signal and act upon it. */
+@@ -266,7 +266,7 @@
+   ASSERT(lock_held_by_current_thread(lock));
+ 
+   sema_init(&waiter.semaphore, 0);
+-  list_push_back(&cond->waiters, &waiter.elem);
++  list_insert_ordered(&cond->waiters, &waiter.elem, compare_sema_priority, NULL);
+   lock_release(lock);
+   sema_down(&waiter.semaphore);
+   lock_acquire(lock);
+@@ -286,6 +286,7 @@
+   ASSERT(lock_held_by_current_thread(lock));
+ 
+   if (!list_empty(&cond->waiters))
++    list_sort(&cond->waiters, compare_sema_priority, NULL);
+     sema_up(&list_entry(list_pop_front(&cond->waiters),
+                         struct semaphore_elem, elem)
+                  ->semaphore);
+
+}
+```
+
 ## Discussion
+
+큰 틀에서 디자인 리포트와 실제 구현은 크게 다르지 않다. 하지만, 가장 크게 차이가 갈렸던 부분은 preemptive yield 에 관한 부분이다.
+
+### preemptive yield
+
+이번 프로젝트에서는 특정 스레드의 우선도가 변경될 때, 스레드가 대기 리스트에 있다면, cpu 를 뺐거나, 현재 스레드가 cpu 를 가지고
+있는데, 우선도가 낮다면, cpu 를 양보해야한다. 이에 대한 해결책으로써 `preemptive_yield()` 함수를 설계 했다. 하지만,
+`alarm_clock`과 병합하는 과정에서 문제가 생겼다. `alarm_clock` 의 구현에서는 스레드를 직접적으로 관리하는 것이 아니라,
+세마포어를 통해 간접적으로 관리한다. 그래서 `sema_up()` 에서 `preemptive_yield()` 를 호출할 때 만약에 `sema_up()` 이
+interrupt context 에서 불린거라면, `thread_yield()`를 호출해서는 안된다. 왜냐하면, 인터럽트는 CPU의 제어권을 뺏는 행위인데,
+제어권을 뺐은 상태에서 yield 를 부르게 된다면, 다양한 사이드 이펙트 등이 생긴다. 예를 들자면, yield 중에 timer interrupt 가
+걸리고, scheduler 도 yield 가 필요하다 판단해 `intr_yield_on_return`을 통해 또 yield 하게 되면, 다른 로직 버그들을
+일으킨다. 이 경우에는 `thread` 와 외부 하드웨어 모듈간의 레이스 컨디션이기 때문에, 세마포어나 락을 통해 synchronization 확보가
+불가능해, 인터럽트를 사용한다. 따라서 다음과 같이 구현이 변경되었다. `sema_up()`에서 preempt 해야한다 판단이 되면,
+만약에 인터럽트 컨택스트 안이라면 `intr_yield_on_return`, 아니라면 `thread_yield()` 를 호출한다. preempt 에 대한 판단중
+`TIME_SLICE` 로 `thread_yield` 가 이뤄진다면, `ready_list` 에서 레이스 컨디션이 발생할 수 있다. 디자인 리포트에서
+언급했던, preemptive yield 로직이 들어가야하는 곳에 적절하게 인터럽트에 따라서 yield 전 준비를 하는 로직을 추가해 해결했습니다.
+
+```c
+// thread_create
+old_level = intr_disable();
+if (thread_current()->priority < t->priority)
+if (!intr_context())
+thread_yield();
+intr_set_level(old_level);
+
+// sema_up
+void sema_up(struct semaphore *sema) {
+// initialize
+old_level = intr_disable();
+check_yield_on_return = false;
+if (!list_empty(&sema->waiters)) {
+check_yield_on_return = true;
+// sort the waiters list and unblock
+}
+sema->value++;
+intr_set_level(old_level);
+
+old_level = intr_disable();
+if (t != NULL) {
+if (check_yield_on_return && thread_current()->priority < t->priority) {
+if (intr_context())
+intr_yield_on_return();
+else
+thread_yield();
+}
+}
+intr_set_level(old_level);
+}
+
+// thread_set_priority
+struct thread *t = list_entry(list_front(&ready_list),
+struct thread, elem);
+if (new_priority < t->priority)
+if (!intr_context())
+thread_yield();
+intr_set_level(old_level);
+```
+
+### donatation chain
+
+디자인 리포트에서 탐색 깊이에 대한 핸들링이 있어야한다 언급했었는데, 이부분은 테스트 코드를 확인함으로써 처리 했다. `priority-donate-chain`
+코드 상에서 `#define NESTING_DEPTH 8` 으로 선언 되어있어 이 상수를 반영해서 구현했다. 이 부분에 대한 상세한 스펙 명시가 없어
+테스트 코드에 따라 임의로 구현했고, 값을 조정함으로 수정하면 된다.
 
 # Advanced Scheduler
 
