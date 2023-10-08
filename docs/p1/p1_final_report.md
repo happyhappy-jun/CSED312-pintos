@@ -111,6 +111,82 @@ sorted in ascending order of `end_tick`.
 
 # Advanced Scheduler
 
+개선된 스케쥴러인 MLFQS를 구현해야 합니다.
+
 ## Solution
+
+MLFQS 구현하기 위해서는 `recent_cpu`, `load_avg`를 계산하는 데 필요한 실수 연산이 있어야 합니다.
+pintos에서 기본적으로 제공하는 부동소수점 연산이 없기 때문에 직접 고정점 연산을 `threads/fixed-point.c`에서 구현했습니다.
+
+MLFQS를 구현하기 위해서 새로운 함수들을 작성했습니다. 각 함수는 공식 문서에 제시된 계산 식들을 참고했습니다.
+
+```c
+void calculate_priority(struct thread *t) {
+  if (t != idle_thread) {
+    int nice = t->nice;
+    fixed_t recent_cpu = t->recent_cpu;
+    t->priority = fp2int(fp_add_n(fp_div_n(recent_cpu, -4), PRI_MAX - nice * 2));
+    if (t->priority > PRI_MAX)
+      t->priority = PRI_MAX;
+    else if (t->priority < PRI_MIN)
+      t->priority = PRI_MIN;
+  }
+}
+
+void increase_recent_cpu(struct thread *t) {
+  if (t != idle_thread) {
+    t->recent_cpu = fp_add_n(t->recent_cpu, 1);
+  }
+}
+
+void calculate_recent_cpu(struct thread *t) {
+  if (t != idle_thread) {
+    fixed_t load_avg_mul_2 = fp_mul_n(load_avg, 2);
+    t->recent_cpu = fp_add_n(
+        fp_mul_y(
+            fp_div_y(load_avg_mul_2, fp_add_n(load_avg_mul_2, 1)),
+            t->recent_cpu),
+        t->nice);
+  }
+}
+
+void calculate_load_avg() {
+  size_t size = list_size(&ready_list);
+  if (thread_current() != idle_thread)
+    size += 1;
+  fixed_t c1 = fp_div_n(int2fp(59), 60);
+  fixed_t c2 = fp_div_n(int2fp(1), 60);
+  load_avg = fp_add_y(fp_mul_y(c1, load_avg), fp_mul_n(c2, size));
+}
+```
+
+이 함수들은 각각 언제 어떻게 호출하는지에 대한 기본 규칙이 존재합니다.
+
+- `calculate_priority()`: 4틱 마다 모든 쓰레드에 대해 호출합니다.
+- `increase_recent_cpu()`: 매 틱마다 현재 쓰레드에 대해 호출합니다.
+- `calculate_recent_cpu()`: 1초마다 모든 쓰레드에 대해 호출 합니다.
+- `calculate_load_avg()`: 1초마다 호출합니다.
+
+각 규칙을 적용하기 위해 `devices/timer.c`의 `timer_interrupt()`에 위 함수들을 다음과 같이 추가했습니다.
+
+```c
+static void
+timer_interrupt(struct intr_frame *args UNUSED) {
+  ticks++;
+  thread_tick();
+  thread_wakeup(ticks);
+  if (thread_mlfqs) {
+    increase_recent_cpu(thread_current());
+    if (ticks % TIMER_FREQ == 0) {
+      calculate_load_avg();
+      thread_foreach(calculate_recent_cpu, NULL);
+    }
+    if (ticks % 4 == 0) {
+      thread_foreach(calculate_priority, NULL);
+      sort_ready_list();
+    }
+  }
+}
+```
 
 ## Discussion
