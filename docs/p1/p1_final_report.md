@@ -10,15 +10,13 @@ Team Number: 20
 
 # Alarm Clock
 
-Our goal was to reimplement the `timer_sleep()` function defined in `devices/timer.c` which was originally implemented
-as "busy waiting".
+기존에 "busy waiting" 방식으로 구현된 `devices/timer.c`의 `timer_sleep()`을 새로 구현하는 것이 목적입니다.
 
 ## Solution
 
-We solved this problem by defining a `sleep_list` and its element `sleep_list_elem` and keeping the list in sorted
-manner.
+우리는 이 문제를 `sleep_list`라는 리스트와 원소 구조체 `sleep_list_elem`를 새롭게 정의한 후, 이 리스트를 일어나야하는 틱에 대해 정렬된 상태로 유지시키는 방식으로 해결하였습니다.
 
-`sleep_list_elem` is defined as below.
+`sleep_list_elem`은 다음과 같이 정의했습니다.
 
 ```c
 struct sleep_list_elem {
@@ -28,7 +26,7 @@ struct sleep_list_elem {
 };
 ```
 
-Everytime a thread calls `timer_sleep()`, the new defined `thread_sleep()` is called eventually.
+쓰레드가 `timer_sleep()`을 호출하면 새로 작성한 `thread_sleep()` 함수가 호출됩니다.
 
 ```c
 // devices/timer.c
@@ -57,10 +55,10 @@ void thread_sleep(int64_t end_tick) {
 }
 ```
 
-`thread_sleep()` initiates a new `sleep_elem` and insert it into `sleep_list` in ascending order of `end_tick`.
-Then, it makes the thread sleeps until the `sema_up()` using `sema_down()`.
+`thread_sleep()`은 `sleep_elem`을 초기화하고 `sleep_list`에 `end_tick`에 대한 오름차순으로 삽입합니다.
+이후, `sema_down()`을 호출하여 `sema_up()`이 호출될 때 까지 쓰레드를 재웁니다.
 
-To wake up the sleeping threads, we make a new function `thread_wakeup()` and call it every single tick.
+자고있는 쓰레드를 깨우기 위해서 새로운 함수 `thread_wakeup()`을 작성하였고 매 틱마다 호출되도록 하였습니다.
 
 ```c
 // devices/timer.c
@@ -96,10 +94,9 @@ void thread_wakeup(int64_t current_tick) {
 }
 ```
 
-`thread_wakeup()` iterates the `sleep_list`, awakening the threads until it finds the element whose `end_tick` is
-greater than the current tick.
-It means the element and every element behind hold the threads which have to sleep more because the `sleep_list` is
-sorted in ascending order of `end_tick`.
+`thread_wakeup()`은 현재 틱보다 `end_tick`이 큰 원소가 나올 때까지 `sleep_list`를 순회하면서 잠든 쓰레드들을 깨웁니다.
+`end_tick`이 현재 틱 보다 큰 원소를 기준으로 앞 쪽 원소에 담긴 쓰레드는 깨워야하고, 뒤 쪽은 아직 일어날 시간이 되지 않았음을 의미합니다.
+이는 `sleep_list`가 `end_tick`에 대해 오름차순으로 정렬되어 있기 때문입니다.
 
 ## Discussion
 
