@@ -168,6 +168,7 @@ tid_t thread_create(const char *name, int priority,
   struct switch_entry_frame *ef;
   struct switch_threads_frame *sf;
   tid_t tid;
+  enum intr_level old_level;
 
   ASSERT(function != NULL);
 
@@ -197,8 +198,12 @@ tid_t thread_create(const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock(t);
+
+  old_level = intr_disable();
   if (thread_current()->priority < t->priority)
-    thread_yield();
+    if (!intr_context())
+      thread_yield();
+  intr_set_level(old_level);
 
   return tid;
 }
