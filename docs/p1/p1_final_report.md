@@ -128,6 +128,28 @@ struct list_elem donation_elem; /* List element for donation list */
 //    list_init(&t->donations);
 ```
 
+### priority scheduling
+
+우선도 기반 스케쥴링을 위해 다음과 같이 우선도 정렬로 `ready_list`를 관리하는 로직을 추가했다.
+
+```c
+bool compare_thread_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
+  struct thread *thread_a = list_entry(a, struct thread, elem);
+  struct thread *thread_b = list_entry(b, struct thread, elem);
+
+  const int priority_a = thread_a->priority;
+  const int priority_b = thread_b->priority;
+
+  return priority_a > priority_b;
+}
+```
+
+이후 `ready_list` 에 무언가를 삽입할때는 다음 처럼 스레드를 삽입하고 뺄때는 front 를 pop하는 식으로 구현했다.
+
+```c
+    list_insert_ordered(&ready_list, &cur->elem, compare_thread_priority, NULL);
+```
+
 ### lock_acquire
 
 `lock_acquire()`는 공유 자원 접근을 위해 락을 획득할때 스레드가 부르는 함수다.
