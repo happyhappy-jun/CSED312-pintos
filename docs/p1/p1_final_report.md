@@ -26,7 +26,7 @@ struct sleep_list_elem {
 };
 ```
 
-쓰레드가 `timer_sleep()`을 호출하면 새로 작성한 `thread_sleep()` 함수가 호출됩니다.
+스레드가 `timer_sleep()`을 호출하면 새로 작성한 `thread_sleep()` 함수가 호출됩니다.
 
 ```c
 // devices/timer.c
@@ -56,9 +56,9 @@ sema_down(&sleep_list_elem.semaphore);
 ```
 
 `thread_sleep()`은 `sleep_elem`을 초기화하고 `sleep_list`에 `end_tick`에 대한 오름차순으로 삽입합니다.
-이후, `sema_down()`을 호출하여 `sema_up()`이 호출될 때 까지 쓰레드를 재웁니다.
+이후, `sema_down()`을 호출하여 `sema_up()`이 호출될 때 까지 스레드를 재웁니다.
 
-자고있는 쓰레드를 깨우기 위해서 새로운 함수 `thread_wakeup()`을 작성하였고 매 틱마다 호출되도록 하였습니다.
+자고있는 스레드를 깨우기 위해서 새로운 함수 `thread_wakeup()`을 작성하였고 매 틱마다 호출되도록 하였습니다.
 
 ```c
 // devices/timer.c
@@ -94,15 +94,15 @@ sema_up(&elem->semaphore);
 }
 ```
 
-`thread_wakeup()`은 현재 틱보다 `end_tick`이 큰 원소가 나올 때까지 `sleep_list`를 순회하면서 잠든 쓰레드들을 깨웁니다.
-`end_tick`이 현재 틱 보다 큰 원소를 기준으로 앞 쪽 원소에 담긴 쓰레드는 깨워야하고, 뒤 쪽은 아직 일어날 시간이 되지 않았음을 의미합니다.
+`thread_wakeup()`은 현재 틱보다 `end_tick`이 큰 원소가 나올 때까지 `sleep_list`를 순회하면서 잠든 스레드들을 깨웁니다.
+`end_tick`이 현재 틱 보다 큰 원소를 기준으로 앞 쪽 원소에 담긴 스레드는 깨워야하고, 뒤 쪽은 아직 일어날 시간이 되지 않았음을 의미합니다.
 이는 `sleep_list`가 `end_tick`에 대해 오름차순으로 정렬되어 있기 때문입니다.
 
 ## Discussion
 
-잠들어 있던 쓰레드들이 동시에 일어나야 할 때, 우선 순위와는 상관없이 sleep_list에 들어온 순서대로 `sema_up()`이 호출되면서 `ready_list`로 들어갑니다.
-이로 인해 다음 실행될 쓰레드를 선택해야하는 경우, 우선 순위가 고려되지 않을 수 있습니다.
-하지만 이 부분은 Priority Scheduler 파트에서 ready_list에 쓰레드가 삽입되는 모든 경우에 대해 우선 순위를 고려한 삽입을 하도록 구현하면 해결되는 문제입니다.
+잠들어 있던 스레드들이 동시에 일어나야 할 때, 우선순위와는 상관없이 sleep_list에 들어온 순서대로 `sema_up()`이 호출되면서 `ready_list`로 들어갑니다.
+이로 인해 다음 실행될 스레드를 선택해야하는 경우, 우선순위가 고려되지 않을 수 있습니다.
+하지만 이 부분은 Priority Scheduler 파트에서 ready_list에 스레드가 삽입되는 모든 경우에 대해 우선순위를 고려한 삽입을 하도록 구현하면 해결되는 문제입니다.
 따라서, timer_sleep()의 관점에서는 그대로 두어도 괜찮겠다는 결론을 내렸습니다.
 
 # Priority Scheduler
@@ -130,7 +130,7 @@ struct list_elem donation_elem; /* List element for donation list */
 
 ### priority scheduling
 
-우선도 기반 스케쥴링을 위해 다음과 같이 우선도 정렬로 `ready_list`를 관리하는 로직을 추가했다.
+우선순위 기반 스케쥴링을 위해 다음과 같이 우선순위 정렬로 `ready_list`를 관리하는 로직을 추가했다.
 
 ```c
 bool compare_thread_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
@@ -201,7 +201,7 @@ void lock_release(struct lock *lock) {
 
 ### clear_from_donations
 
-위에서 언급한 이유로 donations 리스트를 순회하며 더이상 우선 순위를 빌려줄 필요가 없는 녀석들을 지워준다.
+위에서 언급한 이유로 donations 리스트를 순회하며 더이상 우선순위를 빌려줄 필요가 없는 녀석들을 지워준다.
 
 ```c
 void clear_from_donations(struct lock *lock) {
@@ -277,7 +277,7 @@ void donate_priority() {
 
 현재 스레드의 우선순위를 임의로 변경한다. 우선순위가 변경될 때마다, 도네이션의 상황을 고려해야하기 때문에, 바로 우선순위를 배정하지 않고
 `original_priority` 에 저장해두고, `update_donations()` 과 `donate_priority()` 를 호출해 도네이션을 고려해
-`priority` 는 indirectly 업데이트하도록 한다. 추가로, 스레드의 우선 순위를 변경으로 `preemptive yield` 상황이 발생할
+`priority` 는 indirectly 업데이트하도록 한다. 추가로, 스레드의 우선순위를 변경으로 `preemptive yield` 상황이 발생할
 수 있기 때문에 그 부분에 대한 코드가 추가 되었다. 만약에 `ready_list` 가 비어있다면, `thread_yield()` 를 호출하지 않고
 원래 인터럽트 상태를 복구하고 함수를 종료한다. 만약에 `ready_list` 에 스레드가 대기하고 있는 상태라면, `ready_list` 에서
 가장 우선순위가 높은 스레드를 뽑아 현재 스레드의 우선순위와 비교해 현재 스레드의 우선순위가 더 낮다면, voluntary yield 를 한다.
@@ -308,7 +308,7 @@ void thread_set_priority(int new_priority) {
 
 ### cond
 
-우선도 기반의 스케쥴링이 도입됨에 따라 cond 도 우선도 기반으로 움직여야한다. 따라서, 아래와 같이 cond 의 waiters 리스트를
+우선순위 기반의 스케쥴링이 도입됨에 따라 cond 도 우선순위 기반으로 움직여야한다. 따라서, 아래와 같이 cond 의 waiters 리스트를
 정렬하는 기능을 추가했다.
 
 ```diff
@@ -347,8 +347,8 @@ diff --git a/src/threads/synch.c b/src/threads/synch.c
 
 ### preemptive yield
 
-이번 프로젝트에서는 특정 스레드의 우선도가 변경될 때, 스레드가 대기 리스트에 있다면, cpu 를 뺐거나, 현재 스레드가 cpu 를 가지고
-있는데, 우선도가 낮다면, cpu 를 양보해야한다. 이에 대한 해결책으로써 `preemptive_yield()` 함수를 설계 했다. 하지만,
+이번 프로젝트에서는 특정 스레드의 우선순위가 변경될 때, 스레드가 대기 리스트에 있다면, cpu 를 뺐거나, 현재 스레드가 cpu 를 가지고
+있는데, 우선순위가 낮다면, cpu 를 양보해야한다. 이에 대한 해결책으로써 `preemptive_yield()` 함수를 설계 했다. 하지만,
 `alarm_clock`과 병합하는 과정에서 문제가 생겼다. `alarm_clock` 의 구현에서는 스레드를 직접적으로 관리하는 것이 아니라,
 세마포어를 통해 간접적으로 관리한다. 그래서 `sema_up()` 에서 `preemptive_yield()` 를 호출할 때 만약에 `sema_up()` 이
 interrupt context 에서 불린거라면, `thread_yield()`를 호출해서는 안된다. 왜냐하면, 인터럽트는 CPU의 제어권을 뺏는 행위인데,
@@ -460,9 +460,9 @@ void calculate_load_avg() {
 
 이 함수들은 각각 언제 어떻게 호출하는지에 대한 기본 규칙이 존재합니다.
 
-- `calculate_priority()`: 4틱 마다 모든 쓰레드에 대해 호출합니다.
-- `increase_recent_cpu()`: 매 틱마다 현재 쓰레드에 대해 호출합니다.
-- `calculate_recent_cpu()`: 1초마다 모든 쓰레드에 대해 호출 합니다.
+- `calculate_priority()`: 4틱 마다 모든 스레드에 대해 호출합니다.
+- `increase_recent_cpu()`: 매 틱마다 현재 스레드에 대해 호출합니다.
+- `calculate_recent_cpu()`: 1초마다 모든 스레드에 대해 호출 합니다.
 - `calculate_load_avg()`: 1초마다 호출합니다.
 
 각 규칙을 적용하기 위해 `devices/timer.c`의 `timer_interrupt()`에 위 함수들을 다음과 같이 추가했습니다.
@@ -487,16 +487,16 @@ timer_interrupt(struct intr_frame *args UNUSED) {
 }
 ```
 
-모든 쓰레드에 대해 호출해야 하는 함수인` calculate_priority()`와 `calculate_recent_cpu()`는 pintos에서 기본 구현되어있는 `thread_foreach()`를 이용해
+모든 스레드에 대해 호출해야 하는 함수인` calculate_priority()`와 `calculate_recent_cpu()`는 pintos에서 기본 구현되어있는 `thread_foreach()`를 이용해
 호출합니다.
 
-`calculate_priority()`에 의해서 쓰레드의 우선 순위가 조정된 후에는 `ready_list`를 새로 정렬해야 합니다.
+`calculate_priority()`에 의해서 스레드의 우선순위가 조정된 후에는 `ready_list`를 새로 정렬해야 합니다.
 `devices/timer.c`에서는 `threads/thread.c`에서 정의된 `ready_list`에 접근할 수 없기 때문에 이를 정렬하는 함수를 따로 작성하여 `calculate_priority()`를
 호출하는 부분 뒷쪽에 추가해 줬습니다.
 
 ## Discussion
 
-공식 문서에서 설명하는 MLFQS는 가능한 우선 순위에 대한 큐를 각각 가지고 있고, 다음 실행될 쓰레드를 비어있지 않은 가장 높은 우선순위의 큐에서 라운드-로빈 방식으로 선택합니다.
-하지만, 4틱마다 모든 쓰레드의 우선 순위를 새로 계산하는데, 매번 쓰레드들을 서로 다른 큐로 옮기는 것은 오버헤드가 큰 작업이라고 생각했습니다.
-또한 기존의 `ready_list`를 우선 순위에 따라 정렬된 상태로 유지하기 위한 구현들을 해두었기 때문에 이를 그대로 사용하기로 결정했습니다.
-`ready_list`가 우선 순위를 기준으로 정렬된 상태로 유지되고 있다면 각 우선 순위에 대한 큐를 순서대로 이어붙인 것과 동등하기 때문입니다.
+공식 문서에서 설명하는 MLFQS는 가능한 우선순위에 대한 큐를 각각 가지고 있고, 다음 실행될 스레드를 비어있지 않은 가장 높은 우선순위의 큐에서 라운드-로빈 방식으로 선택합니다.
+하지만, 4틱마다 모든 스레드의 우선순위를 새로 계산하는데, 매번 스레드들을 서로 다른 큐로 옮기는 것은 오버헤드가 큰 작업이라고 생각했습니다.
+또한 기존의 `ready_list`를 우선순위에 따라 정렬된 상태로 유지하기 위한 구현들을 해두었기 때문에 이를 그대로 사용하기로 결정했습니다.
+`ready_list`가 우선순위를 기준으로 정렬된 상태로 유지되고 있다면 각 우선순위에 대한 큐를 순서대로 이어붙인 것과 동등하기 때문입니다.
