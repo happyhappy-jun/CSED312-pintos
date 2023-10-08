@@ -197,8 +197,12 @@ tid_t thread_create(const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock(t);
+
+  old_level = intr_disable();
   if (thread_current()->priority < t->priority)
-    thread_yield();
+    if (!intr_context())
+      thread_yield();
+  intr_set_level(old_level);
 
   return tid;
 }
