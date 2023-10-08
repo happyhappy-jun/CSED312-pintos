@@ -100,6 +100,11 @@ void thread_wakeup(int64_t current_tick) {
 
 ## Discussion
 
+잠들어 있던 쓰레드들이 동시에 일어나야 할 때, 우선 순위와는 상관없이 sleep_list에 들어온 순서대로 `sema_up()`이 호출되면서 `ready_list`로 들어갑니다.
+이로 인해 다음 실행될 쓰레드를 선택해야하는 경우, 우선 순위가 고려되지 않을 수 있습니다.
+하지만 이 부분은 Priority Scheduler 파트에서 ready_list에 쓰레드가 삽입되는 모든 경우에 대해 우선 순위를 고려한 삽입을 하도록 구현하면 해결되는 문제입니다.
+따라서, timer_sleep()의 관점에서는 그대로 두어도 괜찮겠다는 결론을 내렸습니다.
+
 # Priority Scheduler
 
 ## Solution
