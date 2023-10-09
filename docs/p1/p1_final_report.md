@@ -10,9 +10,9 @@ Team Number: 20
 
 # Alarm Clock
 
-기존에 "busy waiting" 방식으로 구현된 `devices/timer.c`의 `timer_sleep()`을 새로 구현하는 것이 목적이다.
-
 ## Solution
+
+### Data Structure
 
 우리는 이 문제를 `sleep_list`라는 리스트와 원소 구조체 `sleep_list_elem`를 새롭게 정의한 후, 이 리스트를 일어나야하는 틱에 대해 정렬된 상태로 유지시키는 방식으로 해결했다.
 
@@ -25,6 +25,8 @@ struct sleep_list_elem {
   struct semaphore semaphore;     /* Semaphore to block a sleeping thread */
 };
 ```
+
+### thread_sleep
 
 스레드가 `timer_sleep()`을 호출하면 새로 작성한 `thread_sleep()` 함수가 호출된다.
 
@@ -57,6 +59,8 @@ sema_down(&sleep_list_elem.semaphore);
 
 `thread_sleep()`은 `sleep_elem`을 초기화하고 `sleep_list`에 `end_tick`에 대한 오름차순으로 삽입한다.
 이후, `sema_down()`을 호출해 `sema_up()`이 호출될 때 까지 스레드를 재운다.
+
+### thread_wakeup
 
 자고있는 스레드를 깨우기 위해서 새로운 함수 `thread_wakeup()`을 작성하였고 매 틱마다 호출되도록 했다.
 
@@ -99,6 +103,8 @@ sema_up(&elem->semaphore);
 이는 `sleep_list`가 `end_tick`에 대해 오름차순으로 정렬되어 있기 때문이다.
 
 ## Discussion
+
+### Priority Management
 
 잠들어 있던 스레드들이 동시에 일어나야 할 때, 우선순위와는 상관없이 sleep_list에 들어온 순서대로 `sema_up()`이 호출되면서 `ready_list`로 들어간다.
 이로 인해 다음 실행될 스레드를 선택해야하는 경우, 우선순위가 고려되지 않을 수 있다.
@@ -409,12 +415,14 @@ intr_set_level(old_level);
 
 # Advanced Scheduler
 
-개선된 스케쥴러인 MLFQS를 구현해야 한다.
-
 ## Solution
+
+### Fixed-point arithmetic
 
 MLFQS 구현하기 위해서는 `recent_cpu`, `load_avg`를 계산하는 데 필요한 실수 연산이 있어야 한다.
 pintos에서 기본적으로 제공하는 부동소수점 연산이 없기 때문에 직접 고정점 연산을 `threads/fixed-point.c`에서 구현했다.
+
+### Calculating priority, recent_cpu, load_avg
 
 MLFQS를 구현하기 위해서 새로운 함수들을 작성했다. 각 함수는 공식 문서에 제시된 계산 식들을 참고했다.
 
@@ -495,6 +503,8 @@ timer_interrupt(struct intr_frame *args UNUSED) {
 호출하는 부분 뒷쪽에 추가해주었다.
 
 ## Discussion
+
+### Queues for every priority levels or ready_list
 
 공식 문서에서 설명하는 MLFQS는 가능한 우선순위에 대한 큐를 각각 가지고 있고, 다음 실행될 스레드를 비어있지 않은 가장 높은 우선순위의 큐에서 라운드-로빈 방식으로 선택한다.
 하지만, 4틱마다 모든 스레드의 우선순위를 새로 계산하는데, 매번 스레드들을 서로 다른 큐로 옮기는 것은 오버헤드가 큰 작업이라고 생각했다.
