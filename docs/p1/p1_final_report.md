@@ -423,12 +423,14 @@ intr_set_level(old_level);
 
 # Advanced Scheduler
 
-개선된 스케쥴러인 MLFQS를 구현해야 합니다.
-
 ## Solution
 
-MLFQS 구현하기 위해서는 `recent_cpu`, `load_avg`를 계산하는 데 필요한 실수 연산이 있어야 합니다.
+### Fixed-point arithmetic
+
+MLFQS 구현하기 위해서는 `recent_cpu`, `load_avg`를 계산하는 데 필요한 실수 연산이 있어야 한다.
 pintos에서 기본적으로 제공하는 부동소수점 연산이 없기 때문에 직접 고정점 연산을 `threads/fixed-point.c`에서 구현했다.
+
+### Calculating priority, recent_cpu, load_avg
 
 MLFQS를 구현하기 위해서 새로운 함수들을 작성했다. 각 함수는 공식 문서에 제시된 계산 식들을 참고했다.
 
