@@ -10,13 +10,13 @@ Team Number: 20
 
 # Alarm Clock
 
-기존에 "busy waiting" 방식으로 구현된 `devices/timer.c`의 `timer_sleep()`을 새로 구현하는 것이 목적입니다.
+기존에 "busy waiting" 방식으로 구현된 `devices/timer.c`의 `timer_sleep()`을 새로 구현하는 것이 목적이다.
 
 ## Solution
 
-우리는 이 문제를 `sleep_list`라는 리스트와 원소 구조체 `sleep_list_elem`를 새롭게 정의한 후, 이 리스트를 일어나야하는 틱에 대해 정렬된 상태로 유지시키는 방식으로 해결하였습니다.
+우리는 이 문제를 `sleep_list`라는 리스트와 원소 구조체 `sleep_list_elem`를 새롭게 정의한 후, 이 리스트를 일어나야하는 틱에 대해 정렬된 상태로 유지시키는 방식으로 해결했다.
 
-`sleep_list_elem`은 다음과 같이 정의했습니다.
+`sleep_list_elem`은 다음과 같이 정의했다.
 
 ```c
 struct sleep_list_elem {
@@ -26,7 +26,7 @@ struct sleep_list_elem {
 };
 ```
 
-스레드가 `timer_sleep()`을 호출하면 새로 작성한 `thread_sleep()` 함수가 호출됩니다.
+스레드가 `timer_sleep()`을 호출하면 새로 작성한 `thread_sleep()` 함수가 호출된다.
 
 ```c
 // devices/timer.c
@@ -55,10 +55,10 @@ sema_down(&sleep_list_elem.semaphore);
 }
 ```
 
-`thread_sleep()`은 `sleep_elem`을 초기화하고 `sleep_list`에 `end_tick`에 대한 오름차순으로 삽입합니다.
-이후, `sema_down()`을 호출하여 `sema_up()`이 호출될 때 까지 스레드를 재웁니다.
+`thread_sleep()`은 `sleep_elem`을 초기화하고 `sleep_list`에 `end_tick`에 대한 오름차순으로 삽입한다.
+이후, `sema_down()`을 호출해 `sema_up()`이 호출될 때 까지 스레드를 재운다.
 
-자고있는 스레드를 깨우기 위해서 새로운 함수 `thread_wakeup()`을 작성하였고 매 틱마다 호출되도록 하였습니다.
+자고있는 스레드를 깨우기 위해서 새로운 함수 `thread_wakeup()`을 작성하였고 매 틱마다 호출되도록 했다.
 
 ```c
 // devices/timer.c
@@ -94,16 +94,16 @@ sema_up(&elem->semaphore);
 }
 ```
 
-`thread_wakeup()`은 현재 틱보다 `end_tick`이 큰 원소가 나올 때까지 `sleep_list`를 순회하면서 잠든 스레드들을 깨웁니다.
-`end_tick`이 현재 틱 보다 큰 원소를 기준으로 앞 쪽 원소에 담긴 스레드는 깨워야하고, 뒤 쪽은 아직 일어날 시간이 되지 않았음을 의미합니다.
-이는 `sleep_list`가 `end_tick`에 대해 오름차순으로 정렬되어 있기 때문입니다.
+`thread_wakeup()`은 현재 틱보다 `end_tick`이 큰 원소가 나올 때까지 `sleep_list`를 순회하면서 잠든 스레드들을 깨운다.
+`end_tick`이 현재 틱 보다 큰 원소를 기준으로 앞 쪽 원소에 담긴 스레드는 깨워야하고, 뒤 쪽은 아직 일어날 시간이 되지 않았음을 의미한다.
+이는 `sleep_list`가 `end_tick`에 대해 오름차순으로 정렬되어 있기 때문이다.
 
 ## Discussion
 
-잠들어 있던 스레드들이 동시에 일어나야 할 때, 우선순위와는 상관없이 sleep_list에 들어온 순서대로 `sema_up()`이 호출되면서 `ready_list`로 들어갑니다.
-이로 인해 다음 실행될 스레드를 선택해야하는 경우, 우선순위가 고려되지 않을 수 있습니다.
-하지만 이 부분은 Priority Scheduler 파트에서 ready_list에 스레드가 삽입되는 모든 경우에 대해 우선순위를 고려한 삽입을 하도록 구현하면 해결되는 문제입니다.
-따라서, timer_sleep()의 관점에서는 그대로 두어도 괜찮겠다는 결론을 내렸습니다.
+잠들어 있던 스레드들이 동시에 일어나야 할 때, 우선순위와는 상관없이 sleep_list에 들어온 순서대로 `sema_up()`이 호출되면서 `ready_list`로 들어간다.
+이로 인해 다음 실행될 스레드를 선택해야하는 경우, 우선순위가 고려되지 않을 수 있다.
+하지만 이 부분은 Priority Scheduler 파트에서 ready_list에 스레드가 삽입되는 모든 경우에 대해 우선순위를 고려한 삽입을 하도록 구현하면 해결되는 문제다.
+따라서, timer_sleep()의 관점에서는 그대로 두어도 괜찮겠다는 결론을 내렸다.
 
 # Priority Scheduler
 
@@ -409,14 +409,14 @@ intr_set_level(old_level);
 
 # Advanced Scheduler
 
-개선된 스케쥴러인 MLFQS를 구현해야 합니다.
+개선된 스케쥴러인 MLFQS를 구현해야 한다.
 
 ## Solution
 
-MLFQS 구현하기 위해서는 `recent_cpu`, `load_avg`를 계산하는 데 필요한 실수 연산이 있어야 합니다.
-pintos에서 기본적으로 제공하는 부동소수점 연산이 없기 때문에 직접 고정점 연산을 `threads/fixed-point.c`에서 구현했습니다.
+MLFQS 구현하기 위해서는 `recent_cpu`, `load_avg`를 계산하는 데 필요한 실수 연산이 있어야 한다.
+pintos에서 기본적으로 제공하는 부동소수점 연산이 없기 때문에 직접 고정점 연산을 `threads/fixed-point.c`에서 구현했다.
 
-MLFQS를 구현하기 위해서 새로운 함수들을 작성했습니다. 각 함수는 공식 문서에 제시된 계산 식들을 참고했습니다.
+MLFQS를 구현하기 위해서 새로운 함수들을 작성했다. 각 함수는 공식 문서에 제시된 계산 식들을 참고했다.
 
 ```c
 void calculate_priority(struct thread *t) {
@@ -458,14 +458,14 @@ void calculate_load_avg() {
 }
 ```
 
-이 함수들은 각각 언제 어떻게 호출하는지에 대한 기본 규칙이 존재합니다.
+이 함수들은 각각 언제 어떻게 호출하는지에 대한 기본 규칙이 존재한다.
 
-- `calculate_priority()`: 4틱 마다 모든 스레드에 대해 호출합니다.
-- `increase_recent_cpu()`: 매 틱마다 현재 스레드에 대해 호출합니다.
-- `calculate_recent_cpu()`: 1초마다 모든 스레드에 대해 호출 합니다.
-- `calculate_load_avg()`: 1초마다 호출합니다.
+- `calculate_priority()`: 4틱 마다 모든 스레드에 대해 호출한다.
+- `increase_recent_cpu()`: 매 틱마다 현재 스레드에 대해 호출한다.
+- `calculate_recent_cpu()`: 1초마다 모든 스레드에 대해 호출한다.
+- `calculate_load_avg()`: 1초마다 호출한다.
 
-각 규칙을 적용하기 위해 `devices/timer.c`의 `timer_interrupt()`에 위 함수들을 다음과 같이 추가했습니다.
+각 규칙을 적용하기 위해 `devices/timer.c`의 `timer_interrupt()`에 위 함수들을 다음과 같이 추가했다.
 
 ```c
 static void
@@ -488,15 +488,15 @@ timer_interrupt(struct intr_frame *args UNUSED) {
 ```
 
 모든 스레드에 대해 호출해야 하는 함수인` calculate_priority()`와 `calculate_recent_cpu()`는 pintos에서 기본 구현되어있는 `thread_foreach()`를 이용해
-호출합니다.
+호출한다.
 
-`calculate_priority()`에 의해서 스레드의 우선순위가 조정된 후에는 `ready_list`를 새로 정렬해야 합니다.
+`calculate_priority()`에 의해서 스레드의 우선순위가 조정된 후에는 `ready_list`를 새로 정렬해야한다.
 `devices/timer.c`에서는 `threads/thread.c`에서 정의된 `ready_list`에 접근할 수 없기 때문에 이를 정렬하는 함수를 따로 작성하여 `calculate_priority()`를
-호출하는 부분 뒷쪽에 추가해 줬습니다.
+호출하는 부분 뒷쪽에 추가해주었다.
 
 ## Discussion
 
-공식 문서에서 설명하는 MLFQS는 가능한 우선순위에 대한 큐를 각각 가지고 있고, 다음 실행될 스레드를 비어있지 않은 가장 높은 우선순위의 큐에서 라운드-로빈 방식으로 선택합니다.
-하지만, 4틱마다 모든 스레드의 우선순위를 새로 계산하는데, 매번 스레드들을 서로 다른 큐로 옮기는 것은 오버헤드가 큰 작업이라고 생각했습니다.
-또한 기존의 `ready_list`를 우선순위에 따라 정렬된 상태로 유지하기 위한 구현들을 해두었기 때문에 이를 그대로 사용하기로 결정했습니다.
-`ready_list`가 우선순위를 기준으로 정렬된 상태로 유지되고 있다면 각 우선순위에 대한 큐를 순서대로 이어붙인 것과 동등하기 때문입니다.
+공식 문서에서 설명하는 MLFQS는 가능한 우선순위에 대한 큐를 각각 가지고 있고, 다음 실행될 스레드를 비어있지 않은 가장 높은 우선순위의 큐에서 라운드-로빈 방식으로 선택한다.
+하지만, 4틱마다 모든 스레드의 우선순위를 새로 계산하는데, 매번 스레드들을 서로 다른 큐로 옮기는 것은 오버헤드가 큰 작업이라고 생각했다.
+또한 기존의 `ready_list`를 우선순위에 따라 정렬된 상태로 유지하기 위한 구현들을 해두었기 때문에 이를 그대로 사용하기로 결정했다.
+`ready_list`가 우선순위를 기준으로 정렬된 상태로 유지되고 있다면 각 우선순위에 대한 큐를 순서대로 이어붙인 것과 동등하기 때문이다.
