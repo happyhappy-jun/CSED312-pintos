@@ -367,8 +367,8 @@ diff --git a/src/threads/synch.c b/src/threads/synch.c
 context switching 이 벌어져 다시 interrupt 가 enable 되지 못할 수 있다.
 
 타이머에서 문제가 생긴 것은 타이머는 인터럽트 context에서 사용가능한 synchronization method인 semaphore를 사용하고 있는데, sema_up 과정에서 불리는 preemptive
-yield가 인터럽트 context에서는 불려서는 안되는 함수였기 때문입니다. 이를 해결하기 위해서는 yield를 하기전에 인터럽트 context인지 검사하는 것이 필요하고, 인터럽트 context라면 이런 경우를
-핸들하기 위해 미리 구현된 `intr_yield_on_return을`, 아니라면 `thread_yield`를 호출하는 것으로 해결했습니다.
+yield가 인터럽트 context에서는 불려서는 안되는 함수이기 때문이다. 이를 해결하기 위해서는 yield를 하기전에 인터럽트 context인지 검사하는 것이 필요하고, 인터럽트 context라면 이런 경우를
+핸들하기 위해 미리 구현된 `intr_yield_on_return을`, 아니라면 `thread_yield`를 호출했다.
 
 `ready_list` 와 관련된 레이스 컨디션 문제도 해결을 했다. preempt 에 대한 판단중 `TIME_SLICE` 로
 `thread_yield` 가 이뤄진다면, `ready_list` 에서 레이스 컨디션이 발생할 수 있다.
