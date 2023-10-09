@@ -353,18 +353,26 @@ diff --git a/src/threads/synch.c b/src/threads/synch.c
 
 ### preemptive yield
 
-이번 프로젝트에서는 특정 스레드의 우선순위가 변경될 때, 스레드가 대기 리스트에 있다면, cpu 를 뺐거나, 현재 스레드가 cpu 를 가지고
-있는데, 우선순위가 낮다면, cpu 를 양보해야한다. 이에 대한 해결책으로써 `preemptive_yield()` 함수를 설계 했다. 하지만,
-`alarm_clock`과 병합하는 과정에서 문제가 생겼다. `alarm_clock` 의 구현에서는 스레드를 직접적으로 관리하는 것이 아니라,
-세마포어를 통해 간접적으로 관리한다. 그래서 `sema_up()` 에서 `preemptive_yield()` 를 호출할 때 만약에 `sema_up()` 이
-interrupt context 에서 불린거라면, `thread_yield()`를 호출해서는 안된다. 왜냐하면, 인터럽트는 CPU의 제어권을 뺏는 행위인데,
-제어권을 뺐은 상태에서 yield 를 부르게 된다면, 다양한 사이드 이펙트 등이 생긴다. 예를 들자면, yield 중에 timer interrupt 가
-걸리고, scheduler 도 yield 가 필요하다 판단해 `intr_yield_on_return`을 통해 또 yield 하게 되면, 다른 로직 버그들을
-일으킨다. 이 경우에는 `thread` 와 외부 하드웨어 모듈간의 레이스 컨디션이기 때문에, 세마포어나 락을 통해 synchronization 확보가
-불가능해, 인터럽트를 사용한다. 따라서 다음과 같이 구현이 변경되었다. `sema_up()`에서 preempt 해야한다 판단이 되면,
-만약에 인터럽트 컨택스트 안이라면 `intr_yield_on_return`, 아니라면 `thread_yield()` 를 호출한다. preempt 에 대한 판단중
-`TIME_SLICE` 로 `thread_yield` 가 이뤄진다면, `ready_list` 에서 레이스 컨디션이 발생할 수 있다. 디자인 리포트에서
-언급했던, preemptive yield 로직이 들어가야하는 곳에 적절하게 인터럽트에 따라서 yield 전 준비를 하는 로직을 추가해 해결했습니다.
+이번 프로젝트에서는 특정 스레드의 우선순위가 변경, `ready_list` 에 새로운 스레드가 추가 될 때 (by thread create, unblock with sema up),
+스레드가 대기 리스트에 있다면, cpu 를 뺏거나, 현재 스레드가 cpu 를 가지고 있는데, 우선순위가 낮다면, cpu 를 양보해야한다.
+이에 대한 해결책으로써 `preemptive_yield()` 함수를 설계했지만,`alarm_clock`과 병합하는 과정에서 문제가 생겼다.
+`alarm_clock` 의 구현에서는 스레드를 직접적으로 관리하는 것이 아니라, 세마포어를 통해 간접적으로 관리한다.
+그래서 `sema_up()` 에서 `preemptive_yield()` 를 호출할 때 만약에`sema_up()` 이 interrupt context 에서 불린거라면,
+`thread_yield()`를 호출해서는 안된다.
+왜냐하면, 인터럽트는 CPU의 제어권을 뺏는 행위인데,
+제어권을 뺏은 상태에서 yield 를 부르게 된다면, 다양한 사이드 이펙트 등이 생긴다. 예를 들자면, yield 중에 timer interrupt 가
+걸리고, scheduler 도 yield 가 필요하다 판단해 `intr_yield_on_return`을 통해 또 yield 하게 되면, `ready_list` 에
+동일 스레드가 두번 들어가거나, `ready_list` 안에 정상적으로 들어가지 못하는 등의 문제가 생길 수 있다.
+또는, external interrupt 진행중에는 interrupts 가 disable 되어있는데, yield 를 부르게 되면,
+context switching 이 벌어져 다시 interrupt 가 enable 되지 못할 수 있다.
+
+타이머에서 문제가 생긴 것은 타이머는 인터럽트 context에서 사용가능한 synchronization method인 semaphore를 사용하고 있는데, sema_up 과정에서 불리는 preemptive
+yield가 인터럽트 context에서는 불려서는 안되는 함수였기 때문입니다. 이를 해결하기 위해서는 yield를 하기전에 인터럽트 context인지 검사하는 것이 필요하고, 인터럽트 context라면 이런 경우를
+핸들하기 위해 미리 구현된 `intr_yield_on_return을`, 아니라면 `thread_yield`를 호출하는 것으로 해결했습니다.
+
+`ready_list` 와 관련된 레이스 컨디션 문제도 해결을 했다. preempt 에 대한 판단중 `TIME_SLICE` 로
+`thread_yield` 가 이뤄진다면, `ready_list` 에서 레이스 컨디션이 발생할 수 있다.
+preemptive yield 로직이 들어가야하는 곳에 적절하게 인터럽트를 disable 하여 yield 전 준비를 하는 로직을 추가했다.
 
 ```c
 // thread_create
@@ -415,14 +423,12 @@ intr_set_level(old_level);
 
 # Advanced Scheduler
 
+개선된 스케쥴러인 MLFQS를 구현해야 합니다.
+
 ## Solution
 
-### Fixed-point arithmetic
-
-MLFQS 구현하기 위해서는 `recent_cpu`, `load_avg`를 계산하는 데 필요한 실수 연산이 있어야 한다.
+MLFQS 구현하기 위해서는 `recent_cpu`, `load_avg`를 계산하는 데 필요한 실수 연산이 있어야 합니다.
 pintos에서 기본적으로 제공하는 부동소수점 연산이 없기 때문에 직접 고정점 연산을 `threads/fixed-point.c`에서 구현했다.
-
-### Calculating priority, recent_cpu, load_avg
 
 MLFQS를 구현하기 위해서 새로운 함수들을 작성했다. 각 함수는 공식 문서에 제시된 계산 식들을 참고했다.
 
