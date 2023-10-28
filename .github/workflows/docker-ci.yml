@@ -31,7 +31,7 @@ jobs:
 
     - name: Get test results
       run: |
-        docker cp  pintos:/pintos/src/threads/build/results $PWD
+        docker cp  pintos:/pintos/src/userprog/build/results $PWD
         {
           echo 'TEST_RESULT<<EOF'
           cat $PWD/results
