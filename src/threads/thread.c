@@ -760,3 +760,9 @@ struct pcb *init_pcb(void) {
   sema_init(&pcb->exit_sema, 0);
   return pcb;
 }
+
+void free_pcb(struct pcb *pcb) {
+  /* free all opened files including self executing file here */
+  palloc_free_page(pcb->fd_list);
+  palloc_free_page(pcb);
+}

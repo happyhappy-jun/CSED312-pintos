@@ -197,6 +197,7 @@ struct pcb {
 };
 
 struct pcb *init_pcb(void);
+void free_pcb(struct pcb *);
 #endif
 
 #endif /* threads/thread.h */
