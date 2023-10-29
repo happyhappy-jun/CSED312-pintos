@@ -25,13 +25,13 @@ jobs:
     - name: Run Pintos test
       continue-on-error: true
       run: |
-        docker run --name pintos --workdir /pintos/src/threads \
+        docker run --name pintos --workdir /pintos/src/userprog \
           --entrypoint '/bin/bash' -v ${{ github.workspace }}:/pintos \
           loeper/stanford-cs212-pintos:latest -c "make && make check --ignore-errors"
 
     - name: Get test results
       run: |
-        docker cp  pintos:/pintos/src/threads/build/results $PWD
+        docker cp  pintos:/pintos/src/userprog/build/results $PWD
         {
           echo 'TEST_RESULT<<EOF'
           cat $PWD/results
