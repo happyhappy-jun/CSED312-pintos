@@ -227,6 +227,7 @@ void push_arg_stack(const char *argv[], int argc, void **esp) {
   *esp -= sizeof(void *);
   memset(*esp, 0, sizeof (void *));
 
+  // TODO: remove this after process wait is implemented
   hex_dump((uintptr_t) *esp , *esp, PHYS_BASE - *esp, true);
 }
 
