@@ -737,6 +737,17 @@ pid_t allocate_pid(void) {
   return pid;
 }
 
+struct thread *get_thread_by_pid(pid_t pid) {
+  struct thread *t;
+  struct list_elem *e;
+  for (e = list_begin(&all_list); e != list_end(&all_list); e = list_next(e)) {
+    t = list_entry(e, struct thread, elem);
+    if (t->pcb->pid == pid)
+      return t;
+  }
+  return NULL;
+}
+
 struct thread *get_thread_by_tid(tid_t tid) {
   struct thread *t;
   struct list_elem *e;

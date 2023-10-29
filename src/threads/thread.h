@@ -187,6 +187,8 @@ typedef int pid_t;
 pid_t allocate_pid(void);
 struct lock pid_lock;
 
+struct thread *get_thread_by_pid(pid_t pid);
+
 struct pcb {
   pid_t pid;
   tid_t parent_tid;

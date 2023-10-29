@@ -108,3 +108,10 @@ pid_t sys_exec(const char *cmd_line) {
 
   return pid;
 }
+
+int sys_wait(pid_t pid) {
+  struct thread *t = get_thread_by_pid(pid);
+  if (t == NULL)
+    return -1;
+  return process_wait(t->tid);
+}
