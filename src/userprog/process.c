@@ -41,6 +41,9 @@ tid_t process_execute(const char *file_name) {
   tid = thread_create(file_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page(fn_copy);
+
+  /* wait until load() of the new thread finish */
+  sema_down(&get_thread_by_tid(tid)->pcb->load_sema);
   return tid;
 }
 
@@ -58,9 +61,12 @@ start_process(void *file_name_) {
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load(file_name, &if_.eip, &if_.esp);
+  palloc_free_page(file_name);
+
+  /* Let the parent thread/process know the load() is finished */
+  sema_up(&thread_current()->pcb->load_sema);
 
   /* If load failed, quit. */
-  palloc_free_page(file_name);
   if (!success)
     thread_exit();
 
