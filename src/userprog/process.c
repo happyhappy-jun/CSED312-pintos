@@ -92,8 +92,21 @@ start_process(void *file_name_) {
 
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
-int process_wait(tid_t child_tid UNUSED) {
-  return -1;
+int process_wait(tid_t child_tid) {
+  struct thread *current = thread_current();
+  struct thread *child = get_thread_by_tid(child_tid);
+
+  // invalid tid
+  if (child == NULL)
+    return -1;
+  // not child
+  if (child->pcb->parent_tid != current->tid)
+    return -1;
+
+  // else, wait for the child;
+  // wait_sema of the child only up when the child exit
+  sema_down(&child->pcb->wait_sema);
+  return child->pcb->exit_code;
 }
 
 /* Free the current process's resources. */
@@ -116,6 +129,7 @@ void process_exit(void) {
     pagedir_activate(NULL);
     pagedir_destroy(pd);
   }
+  sema_up(&cur->pcb->wait_sema);
 }
 
 /* Sets up the CPU for running user code in the current
