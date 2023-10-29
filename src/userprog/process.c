@@ -87,6 +87,7 @@ start_process(void *file_name_) {
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int process_wait(tid_t child_tid UNUSED) {
+  while(1);
   return -1;
 }
 
@@ -193,6 +194,42 @@ static bool load_segment(struct file *file, off_t ofs, uint8_t *upage,
                          uint32_t read_bytes, uint32_t zero_bytes,
                          bool writable);
 
+void push_arg_stack(const char *argv[], int argc, void **esp) {
+  for (int i = argc - 1; i >= 0; i--) {
+    int len = strlen(argv[i]) + 1;
+    *esp -= len;
+    memcpy(*esp, argv[i], len);
+    argv[i] = *esp;
+  }
+
+  // align to word size
+  int padding = (size_t) *esp % 4;
+  *esp -= padding;
+  memset(*esp, 0, padding);
+
+
+  argv[argc] = 0;
+  for (int i = argc; i >= 0; i--) {
+    *esp -= sizeof (char *);
+    memcpy(*esp, &argv[i], sizeof (char *));
+  }
+
+  // push argv
+  void *argv_ptr = *esp;
+  *esp -= sizeof(char **);
+  memcpy(*esp, &argv_ptr, sizeof (char **));
+
+  // push argc
+  *esp -= sizeof(int);
+  memcpy(*esp, &argc, sizeof (int));
+
+  // push fake return address
+  *esp -= sizeof(void *);
+  memset(*esp, 0, sizeof (void *));
+
+  hex_dump((uintptr_t) *esp , *esp, PHYS_BASE - *esp, true);
+}
+
 /* Loads an ELF executable from FILE_NAME into the current thread.
    Stores the executable's entry point into *EIP
    and its initial stack pointer into *ESP.
@@ -205,6 +242,17 @@ bool load(const char *file_name, void (**eip)(void), void **esp) {
   bool success = false;
   int i;
 
+  /* parse arguments */
+  const char *argv[64];
+  char *temp_ptr;
+  int argc = 0;
+  char *token = strtok_r(file_name, " ", &temp_ptr);
+  while (token != NULL) {
+    argv[argc] = token;
+    argc++;
+    token = strtok_r(NULL, " ", &temp_ptr);
+  }
+
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create();
   if (t->pagedir == NULL)
@@ -212,9 +260,9 @@ bool load(const char *file_name, void (**eip)(void), void **esp) {
   process_activate();
 
   /* Open executable file. */
-  file = filesys_open(file_name);
+  file = filesys_open(argv[0]);
   if (file == NULL) {
-    printf("load: %s: open failed\n", file_name);
+    printf("load: %s: open failed\n", argv[0]);
     goto done;
   }
 
@@ -226,7 +274,7 @@ bool load(const char *file_name, void (**eip)(void), void **esp) {
       || ehdr.e_version != 1
       || ehdr.e_phentsize != sizeof(struct Elf32_Phdr)
       || ehdr.e_phnum > 1024) {
-    printf("load: %s: error loading executable\n", file_name);
+    printf("load: %s: error loading executable\n", argv[0]);
     goto done;
   }
 
@@ -288,6 +336,7 @@ bool load(const char *file_name, void (**eip)(void), void **esp) {
   /* Start address. */
   *eip = (void (*)(void)) ehdr.e_entry;
 
+  push_arg_stack(argv, argc, esp);
   success = true;
 
 done:
