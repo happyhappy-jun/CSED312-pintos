@@ -101,10 +101,11 @@ void sys_exit(int status) {
 
 pid_t sys_exec(const char *cmd_line) {
   struct thread *cur = thread_current();
+  tid_t tid = process_execute(cmd_line);
+  if (tid == TID_ERROR)
+    return PID_ERROR;
   pid_t pid = allocate_pid();
   cur->pcb->pid = pid;
-
-  process_execute(cmd_line);
 
   return pid;
 }
