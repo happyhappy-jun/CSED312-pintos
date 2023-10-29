@@ -89,3 +89,12 @@ static void syscall_handler(struct intr_frame *f) {
     break;
   }
 }
+
+void sys_exit(int status) {
+  struct thread *cur = thread_current();
+  cur->pcb->exit_code = status;
+
+  // exit message here
+
+  thread_exit();
+}
