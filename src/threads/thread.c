@@ -181,6 +181,10 @@ tid_t thread_create(const char *name, int priority,
   init_thread(t, name, priority);
   tid = t->tid = allocate_tid();
 
+#ifdef USERPROG
+  t->pcb = init_pcb();
+#endif
+
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame(t, sizeof *kf);
   kf->eip = NULL;
@@ -720,3 +724,15 @@ void sort_ready_list() {
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof(
 struct thread, stack);
+
+struct pcb *init_pcb(void) {
+  struct pcb *pcb = palloc_get_page(0);
+  pcb->pid = PID_ERROR;
+  pcb->parent_tid = thread_current()->tid;
+  pcb->file = NULL;
+  pcb->fd_list = palloc_get_page(0);
+  pcb->exit_code = 0;
+  sema_init(&pcb->wait_sema, 0);
+  sema_init(&pcb->load_sema, 0);
+  return pcb;
+}

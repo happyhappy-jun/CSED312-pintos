@@ -108,6 +108,7 @@ struct thread {
 #ifdef USERPROG
   /* Owned by userprog/process.c. */
   uint32_t *pagedir; /* Page directory. */
+  struct pcb *pcb;
 #endif
 
   int original_priority;          /* Original priority of the thread */
@@ -176,5 +177,22 @@ void calculate_recent_cpu(struct thread *t);
 void calculate_load_avg(void);
 
 void sort_ready_list(void);
+
+#ifdef USERPROG
+typedef int pid_t;
+#define PID_ERROR ((pid_t) -1)
+
+struct pcb {
+  pid_t pid;
+  tid_t parent_tid;
+  struct file *file;
+  struct file **fd_list;
+  int exit_code;
+  struct semaphore wait_sema;
+  struct semaphore load_sema;
+};
+
+struct pcb *init_pcb(void);
+#endif
 
 #endif /* threads/thread.h */
