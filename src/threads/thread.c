@@ -92,6 +92,7 @@ static bool is_thread(struct thread *)UNUSED;
   ASSERT(intr_get_level() == INTR_OFF);
 
   lock_init(&tid_lock);
+  lock_init(&pid_lock);
   list_init(&ready_list);
   list_init(&all_list);
   list_init(&sleep_list);
@@ -724,6 +725,17 @@ void sort_ready_list() {
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof(
 struct thread, stack);
+
+pid_t allocate_pid(void) {
+  static pid_t next_pid = 1;
+  pid_t pid;
+
+  lock_acquire(&pid_lock);
+  pid = next_pid++;
+  lock_release(&pid_lock);
+
+  return pid;
+}
 
 struct thread *get_thread_by_tid(tid_t tid) {
   struct thread *t;

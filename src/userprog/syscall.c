@@ -98,3 +98,13 @@ void sys_exit(int status) {
 
   thread_exit();
 }
+
+pid_t sys_exec(const char *cmd_line) {
+  struct thread *cur = thread_current();
+  pid_t pid = allocate_pid();
+  cur->pcb->pid = pid;
+
+  process_execute(cmd_line);
+
+  return pid;
+}
