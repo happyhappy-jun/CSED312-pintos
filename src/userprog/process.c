@@ -129,7 +129,10 @@ void process_exit(void) {
     pagedir_activate(NULL);
     pagedir_destroy(pd);
   }
-  sema_up(&cur->pcb->wait_sema);
+  sema_up(&cur->pcb->wait_sema);  // sema up wait_sema for waiting parent
+  sig_children_parent_exit();     // sema up exit_sema for children to free their resources
+  sema_down(&cur->pcb->exit_sema);// exit_sema up only when the parent exit
+  /* free all thread resources here */
 }
 
 /* Sets up the CPU for running user code in the current

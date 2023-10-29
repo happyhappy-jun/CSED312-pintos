@@ -179,6 +179,7 @@ void calculate_load_avg(void);
 void sort_ready_list(void);
 
 struct thread *get_thread_by_tid(tid_t tid);
+void sig_children_parent_exit(void);
 
 #ifdef USERPROG
 typedef int pid_t;
@@ -192,6 +193,7 @@ struct pcb {
   int exit_code;
   struct semaphore wait_sema;
   struct semaphore load_sema;
+  struct semaphore exit_sema;
 };
 
 struct pcb *init_pcb(void);

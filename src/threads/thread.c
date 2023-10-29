@@ -736,6 +736,18 @@ struct thread *get_thread_by_tid(tid_t tid) {
   return NULL;
 }
 
+void sig_children_parent_exit(void) {
+  struct thread *t;
+  struct list_elem *e;
+  struct thread *cur = thread_current();
+  for (e = list_begin(&all_list); e != list_end(&all_list); e = list_next(e)) {
+    t = list_entry(e, struct thread, elem);
+    if (t->pcb->parent_tid == cur->tid) {
+      sema_up(&t->pcb->exit_sema);
+    }
+  }
+}
+
 struct pcb *init_pcb(void) {
   struct pcb *pcb = palloc_get_page(0);
   pcb->pid = PID_ERROR;
@@ -745,5 +757,6 @@ struct pcb *init_pcb(void) {
   pcb->exit_code = 0;
   sema_init(&pcb->wait_sema, 0);
   sema_init(&pcb->load_sema, 0);
+  sema_init(&pcb->exit_sema, 0);
   return pcb;
 }
