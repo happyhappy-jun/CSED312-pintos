@@ -178,6 +178,8 @@ void calculate_load_avg(void);
 
 void sort_ready_list(void);
 
+struct thread *get_thread_by_tid(tid_t tid);
+
 #ifdef USERPROG
 typedef int pid_t;
 #define PID_ERROR ((pid_t) -1)

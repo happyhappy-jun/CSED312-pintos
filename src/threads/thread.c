@@ -725,6 +725,17 @@ void sort_ready_list() {
 uint32_t thread_stack_ofs = offsetof(
 struct thread, stack);
 
+struct thread *get_thread_by_tid(tid_t tid) {
+  struct thread *t;
+  struct list_elem *e;
+  for (e = list_begin(&all_list); e != list_end(&all_list); e = list_next(e)) {
+    t = list_entry(e, struct thread, elem);
+    if (t->tid == tid)
+      return t;
+  }
+  return NULL;
+}
+
 struct pcb *init_pcb(void) {
   struct pcb *pcb = palloc_get_page(0);
   pcb->pid = PID_ERROR;
