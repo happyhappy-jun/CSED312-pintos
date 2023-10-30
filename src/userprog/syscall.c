@@ -9,21 +9,35 @@
 
 static void syscall_handler(struct intr_frame *);
 
-int get_from_user_stack(const int *, int);
-int get_syscall_n(void *);
-void get_syscall_args(void *, int, int *);
+static void sys_exit(int);
+static pid_t sys_exec(const char *);
+static int sys_wait(pid_t);
 
-int get_from_user_stack(const int *esp, int offset) {
+static bool sys_create(const char *, unsigned initial_size);
+static bool sys_remove(const char *);
+static int sys_open(const char *);
+static int sys_filesize(int);
+static int sys_read(int, void *, unsigned);
+static int sys_write(int, void *, unsigned);
+static void sys_seek(int, unsigned);
+static unsigned sys_tell(int);
+static void sys_close(int);
+
+static int get_from_user_stack(const int *, int);
+static int get_syscall_n(void *);
+static void get_syscall_args(void *, int, int *);
+
+static int get_from_user_stack(const int *esp, int offset) {
   int value;
   safe_memcpy_from_user(&value, esp + offset, sizeof(int));
   return value;
 }
 
-int get_syscall_n(void *esp) {
+static int get_syscall_n(void *esp) {
   return get_from_user_stack(esp, 1);
 }
 
-void get_syscall_args(void *esp, int n, int *syscall_args) {
+static void get_syscall_args(void *esp, int n, int *syscall_args) {
   for (int i = 0; i < n; i++)
     syscall_args[i] = get_from_user_stack(esp, 1 + i);
 }
@@ -93,7 +107,7 @@ static void syscall_handler(struct intr_frame *f) {
   }
 }
 
-void sys_exit(int status) {
+static void sys_exit(int status) {
   struct thread *cur = thread_current();
   cur->pcb->exit_code = status;
 
@@ -102,7 +116,7 @@ void sys_exit(int status) {
   thread_exit();
 }
 
-pid_t sys_exec(const char *cmd_line) {
+static pid_t sys_exec(const char *cmd_line) {
   struct thread *new_process;
   char *cmd_line_copy = palloc_get_page(0);
 
@@ -119,7 +133,7 @@ pid_t sys_exec(const char *cmd_line) {
   return pid;
 }
 
-int sys_wait(pid_t pid) {
+static int sys_wait(pid_t pid) {
   struct thread *t = get_thread_by_pid(pid);
   if (t == NULL)
     return -1;
