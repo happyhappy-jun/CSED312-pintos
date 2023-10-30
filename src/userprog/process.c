@@ -27,7 +27,7 @@ static bool load(const char *cmdline, void (**eip)(void), void **esp);
    before process_execute() returns.  Returns the new process's
    thread id, or TID_ERROR if the thread cannot be created. */
 tid_t process_execute(const char *file_name) {
-  char *fn_copy;
+  char *fn_copy, *command;
   tid_t tid;
 
   /* Make a copy of FILE_NAME.
@@ -37,10 +37,18 @@ tid_t process_execute(const char *file_name) {
     return TID_ERROR;
   strlcpy(fn_copy, file_name, PGSIZE);
 
+  command = palloc_get_page(0);
+  if (command == NULL)
+    return TID_ERROR;
+  strlcpy(command, file_name, PGSIZE);
+
+  parse_command(command);
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create(file_name, PRI_DEFAULT, start_process, fn_copy);
-  if (tid == TID_ERROR)
+  tid = thread_create(command, PRI_DEFAULT, start_process, fn_copy);
+  if (tid == TID_ERROR) {
+    palloc_free_page(command);
     palloc_free_page(fn_copy);
+  }
   else {
     sema_down(&get_thread_by_tid(tid)->pcb->load_sema);
   }
@@ -505,4 +513,17 @@ install_page(void *upage, void *kpage, bool writable) {
      address, then map our page there. */
   return (pagedir_get_page(t->pagedir, upage) == NULL
           && pagedir_set_page(t->pagedir, upage, kpage, writable));
+}
+
+static char *parse_command(char *input) {
+  char *token;
+  char *save_ptr;
+
+  token = strtok_r(input, " ", &save_ptr);
+
+  if (token != NULL) {
+    return token;
+  } else {
+    return NULL;
+  }
 }
