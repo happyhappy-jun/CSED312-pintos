@@ -768,6 +768,8 @@ void sig_children_parent_exit(void) {
   struct thread *cur = thread_current();
   for (e = list_begin(&all_list); e != list_end(&all_list); e = list_next(e)) {
     t = list_entry(e, struct thread, allelem);
+    if (t->pcb == NULL)
+      continue;
     if (t->pcb->parent_tid == cur->tid) {
       sema_up(&t->pcb->exit_sema);
     }
