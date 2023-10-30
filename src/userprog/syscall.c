@@ -1,7 +1,9 @@
 #include "userprog/syscall.h"
 #include "devices/shutdown.h"
 #include "threads/interrupt.h"
+#include "threads/palloc.h"
 #include "threads/thread.h"
+#include "userprog/user-memory-access.h"
 #include <stdio.h>
 #include <syscall-nr.h>
 
@@ -12,8 +14,9 @@ int get_syscall_n(void *);
 void get_syscall_args(void *, int, int *);
 
 int get_from_user_stack(const int *esp, int offset) {
-  // need check for accessing user memory
-  return *(esp + offset);
+  int value;
+  safe_memcpy_from_user(&value, esp + offset, sizeof(int));
+  return value;
 }
 
 int get_syscall_n(void *esp) {
@@ -101,12 +104,15 @@ void sys_exit(int status) {
 
 pid_t sys_exec(const char *cmd_line) {
   struct thread *cur = thread_current();
-  tid_t tid = process_execute(cmd_line);
+  char *cmd_line_copy = palloc_get_page(0);
+
+  safe_strcpy_from_user(cmd_line_copy, cmd_line);
+  tid_t tid = process_execute(cmd_line_copy);
+  palloc_free_page(cmd_line_copy);
   if (tid == TID_ERROR)
     return PID_ERROR;
   pid_t pid = allocate_pid();
   cur->pcb->pid = pid;
-
   return pid;
 }
 
