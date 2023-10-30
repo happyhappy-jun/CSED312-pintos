@@ -103,7 +103,7 @@ void sys_exit(int status) {
 }
 
 pid_t sys_exec(const char *cmd_line) {
-  struct thread *cur = thread_current();
+  struct thread *new_process;
   char *cmd_line_copy = palloc_get_page(0);
 
   safe_strcpy_from_user(cmd_line_copy, cmd_line);
@@ -112,7 +112,7 @@ pid_t sys_exec(const char *cmd_line) {
   if (tid == TID_ERROR)
     return PID_ERROR;
   pid_t pid = allocate_pid();
-  cur->pcb->pid = pid;
+  new_process->pcb->pid = pid;
   return pid;
 }
 
