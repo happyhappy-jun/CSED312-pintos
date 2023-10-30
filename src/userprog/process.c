@@ -232,28 +232,24 @@ void push_arg_stack(const char *argv[], int argc, void **esp) {
   *esp -= padding;
   memset(*esp, 0, padding);
 
-
   argv[argc] = 0;
   for (int i = argc; i >= 0; i--) {
-    *esp -= sizeof (char *);
-    memcpy(*esp, &argv[i], sizeof (char *));
+    *esp -= sizeof(char *);
+    memcpy(*esp, &argv[i], sizeof(char *));
   }
 
   // push argv
   void *argv_ptr = *esp;
   *esp -= sizeof(char **);
-  memcpy(*esp, &argv_ptr, sizeof (char **));
+  memcpy(*esp, &argv_ptr, sizeof(char **));
 
   // push argc
   *esp -= sizeof(int);
-  memcpy(*esp, &argc, sizeof (int));
+  memcpy(*esp, &argc, sizeof(int));
 
   // push fake return address
   *esp -= sizeof(void *);
-  memset(*esp, 0, sizeof (void *));
-
-  // TODO: remove this after process wait is implemented
-  hex_dump((uintptr_t) *esp , *esp, PHYS_BASE - *esp, true);
+  memset(*esp, 0, sizeof(void *));
 }
 
 /* Loads an ELF executable from FILE_NAME into the current thread.
