@@ -65,6 +65,8 @@ start_process(void *file_name_) {
 
   /* Let the parent thread/process know the load() is finished and its result */
   thread_current()->pcb->load_success = success;
+  if (success)
+    thread_current()->pcb->pid = allocate_pid();
   sema_up(&thread_current()->pcb->load_sema);
 
   /* If load failed, quit. */

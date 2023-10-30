@@ -117,7 +117,6 @@ static void sys_exit(int status) {
 }
 
 static pid_t sys_exec(const char *cmd_line) {
-  struct thread *new_process;
   char *cmd_line_copy = palloc_get_page(0);
 
   safe_strcpy_from_user(cmd_line_copy, cmd_line);
@@ -125,12 +124,8 @@ static pid_t sys_exec(const char *cmd_line) {
   palloc_free_page(cmd_line_copy);
   if (tid == TID_ERROR)
     return PID_ERROR;
-  new_process = get_thread_by_tid(tid);
-  if (!new_process->pcb->load_success)
-    return PID_ERROR;
-  pid_t pid = allocate_pid();
-  new_process->pcb->pid = pid;
-  return pid;
+  // pid is PID_ERROR, unless load() has succeed and start_process() has allocated pid
+  return get_thread_by_tid(tid)->pcb->pid;
 }
 
 static int sys_wait(pid_t pid) {
