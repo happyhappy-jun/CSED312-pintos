@@ -185,7 +185,6 @@ void sig_children_parent_exit(void);
 typedef int pid_t;
 #define PID_ERROR ((pid_t) -1)
 pid_t allocate_pid(void);
-struct lock pid_lock;
 
 struct thread *get_thread_by_pid(pid_t pid);
 
