@@ -95,6 +95,8 @@ void process_exit(void) {
   struct thread *cur = thread_current();
   uint32_t *pd;
 
+  // TODO: close file when exit
+
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
@@ -335,6 +337,10 @@ bool load(const char *file_name, void (**eip)(void), void **esp) {
 
   /* Start address. */
   *eip = (void (*)(void)) ehdr.e_entry;
+
+  /* Deny write to executable file. */
+  file_deny_write(file);
+  // TODO: log file to pcb
 
   push_arg_stack(argv, argc, esp);
   success = true;
