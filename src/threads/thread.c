@@ -783,6 +783,7 @@ struct pcb *init_pcb(void) {
   pcb->exit_code = 0;
   sema_init(&pcb->wait_sema, 0);
   sema_init(&pcb->load_sema, 0);
+  pcb->load_success = false;
   sema_init(&pcb->exit_sema, 0);
   return pcb;
 }

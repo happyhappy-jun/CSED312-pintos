@@ -111,6 +111,9 @@ pid_t sys_exec(const char *cmd_line) {
   palloc_free_page(cmd_line_copy);
   if (tid == TID_ERROR)
     return PID_ERROR;
+  new_process = get_thread_by_tid(tid);
+  if (!new_process->pcb->load_success)
+    return PID_ERROR;
   pid_t pid = allocate_pid();
   new_process->pcb->pid = pid;
   return pid;

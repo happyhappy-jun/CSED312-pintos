@@ -196,6 +196,7 @@ struct pcb {
   int exit_code;
   struct semaphore wait_sema;
   struct semaphore load_sema;
+  bool load_success;
   struct semaphore exit_sema;
 };
 
