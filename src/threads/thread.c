@@ -40,6 +40,9 @@ static struct thread *initial_thread;
 /* Lock used by allocate_tid(). */
 static struct lock tid_lock;
 
+/* Lock used by allocate_pid(). */
+struct lock pid_lock;
+
 /* Stack frame for kernel_thread(). */
 struct kernel_thread_frame {
   void *eip;             /* Return address. */
@@ -92,6 +95,7 @@ static bool is_thread(struct thread *)UNUSED;
   ASSERT(intr_get_level() == INTR_OFF);
 
   lock_init(&tid_lock);
+  lock_init(&pid_lock);
   list_init(&ready_list);
   list_init(&all_list);
   list_init(&sleep_list);
@@ -180,6 +184,10 @@ tid_t thread_create(const char *name, int priority,
   /* Initialize thread. */
   init_thread(t, name, priority);
   tid = t->tid = allocate_tid();
+
+#ifdef USERPROG
+  t->pcb = init_pcb();
+#endif
 
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame(t, sizeof *kf);
@@ -720,3 +728,69 @@ void sort_ready_list() {
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof(
 struct thread, stack);
+
+pid_t allocate_pid(void) {
+  static pid_t next_pid = 1;
+  pid_t pid;
+
+  lock_acquire(&pid_lock);
+  pid = next_pid++;
+  lock_release(&pid_lock);
+
+  return pid;
+}
+
+struct thread *get_thread_by_pid(pid_t pid) {
+  struct thread *t;
+  struct list_elem *e;
+  for (e = list_begin(&all_list); e != list_end(&all_list); e = list_next(e)) {
+    t = list_entry(e, struct thread, allelem);
+    if (t->pcb->pid == pid)
+      return t;
+  }
+  return NULL;
+}
+
+struct thread *get_thread_by_tid(tid_t tid) {
+  struct thread *t;
+  struct list_elem *e;
+  for (e = list_begin(&all_list); e != list_end(&all_list); e = list_next(e)) {
+    t = list_entry(e, struct thread, allelem);
+    if (t->tid == tid)
+      return t;
+  }
+  return NULL;
+}
+
+void sig_children_parent_exit(void) {
+  struct thread *t;
+  struct list_elem *e;
+  struct thread *cur = thread_current();
+  for (e = list_begin(&all_list); e != list_end(&all_list); e = list_next(e)) {
+    t = list_entry(e, struct thread, allelem);
+    if (t->pcb == NULL)
+      continue;
+    if (t->pcb->parent_tid == cur->tid) {
+      sema_up(&t->pcb->exit_sema);
+    }
+  }
+}
+
+struct pcb *init_pcb(void) {
+  struct pcb *pcb = palloc_get_page(0);
+  pcb->pid = PID_ERROR;
+  pcb->parent_tid = thread_current()->tid;
+  pcb->file = NULL;
+  pcb->fd_list = palloc_get_page(0);
+  pcb->exit_code = 0;
+  sema_init(&pcb->wait_sema, 0);
+  sema_init(&pcb->load_sema, 0);
+  sema_init(&pcb->exit_sema, 0);
+  return pcb;
+}
+
+void free_pcb(struct pcb *pcb) {
+  /* free all opened files including self executing file here */
+  palloc_free_page(pcb->fd_list);
+  palloc_free_page(pcb);
+}
