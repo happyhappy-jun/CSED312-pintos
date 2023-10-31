@@ -1,8 +1,9 @@
 //
-// Created by ±èÄ¡Çå on 2023/10/30.
+// Created by ï¿½ï¿½Ä¡ï¿½ï¿½ on 2023/10/30.
 //
 
 #include "userprog/user-memory-access.h"
+#include "syscall.h"
 #include "threads/vaddr.h"
 #include <stdbool.h>
 #include <stdint.h>
@@ -34,8 +35,8 @@ static bool put_user(uint8_t *udst, uint8_t byte) {
   return error_code != -1;
 }
 
-static bool validate_uaddr(const void *uaddr) {
-  return uaddr < PHYS_BASE;
+bool validate_uaddr(const void *uaddr) {
+  return (uaddr >= STACK_BOTTOM && uaddr < PHYS_BASE && uaddr != 0);
 }
 
 void *safe_memcpy_from_user(void *kdst, const void *usrc, size_t n) {
@@ -46,12 +47,12 @@ void *safe_memcpy_from_user(void *kdst, const void *usrc, size_t n) {
   ASSERT(kdst != NULL)
 
   if (!validate_uaddr(usrc) || !validate_uaddr(usrc + n - 1))
-    return NULL;
+    sys_exit(-1);
 
   for (size_t i = 0; i < n; i++) {
     byte = get_user(src + i);
     if (byte == -1)
-      return NULL;
+      sys_exit(-1);
     dst[i] = byte;
   }
   return kdst;
@@ -63,12 +64,12 @@ void *safe_memcpy_to_user(void *udst, const void *ksrc, size_t n) {
   int byte;
 
   if (!validate_uaddr(udst) || !validate_uaddr(udst + n - 1))
-    return NULL;
+    sys_exit(-1);
 
   for (size_t i = 0; i < n; i++) {
     byte = src[i];
     if (!put_user(dst + i, byte))
-      return NULL;
+      sys_exit(-1);
   }
   return udst;
 }
@@ -80,11 +81,11 @@ int safe_strcpy_from_user(char *kdst, const char *usrc) {
 
   for (int i = 0;; i++) {
     if (!validate_uaddr(usrc + i))
-      return -1;
+      sys_exit(-1);
 
     byte = get_user((const unsigned char *) usrc + i);
     if (byte == -1)
-      return -1;
+      sys_exit(-1);
 
     kdst[i] = (char) byte;
 
