@@ -140,16 +140,16 @@ static int sys_open(const char *file_name) {
 
   if (safe_strcpy_from_user(file_name_copy, file_name) == -1)
     return -1;
+
   file = filesys_open(file_name_copy);
   palloc_free_page(file_name_copy);
 
   if (file == NULL)
-    fd = -1;
-  else {
-    fd = cur->pcb->file_cnt;
-    cur->pcb->file_cnt++;
-    cur->pcb->fd_list[fd] = file;
-  }
+    return -1;
+
+  fd = cur->pcb->file_cnt;
+  cur->pcb->file_cnt++;
+  cur->pcb->fd_list[fd] = file;
   return fd;
 }
 
