@@ -81,8 +81,8 @@ static void syscall_handler(struct intr_frame *f) {
     break;
   case SYS_FILESIZE:
     get_syscall_args(f->esp, 1, syscall_arg);
-    // f->eax = sys_filesize(syscall_arg[0]);
-      break;
+    f->eax = sys_filesize(syscall_arg[0]);
+    break;
   case SYS_READ:
     get_syscall_args(f->esp, 3, syscall_arg);
     // f->eax = sys_read(syscall_arg[0], (void *) syscall_arg[1], syscall_arg[2]);
@@ -151,6 +151,17 @@ static int sys_open(const char *file_name) {
   cur->pcb->file_cnt++;
   cur->pcb->fd_list[fd] = file;
   return fd;
+}
+
+static int sys_filesize(int fd) {
+  struct thread *cur = thread_current();
+  struct file *file;
+
+  if (fd == 0 || fd == 1 || fd >= cur->pcb->file_cnt)
+    return 0;
+  file = cur->pcb->fd_list[fd];
+
+  return file_length(file);
 }
 
 int sys_write(int fd, void *buffer, unsigned int size) {
