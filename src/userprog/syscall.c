@@ -98,7 +98,7 @@ static void syscall_handler(struct intr_frame *f) {
       break;
   case SYS_TELL:
     get_syscall_args(f->esp, 1, syscall_arg);
-    // f->eax = sys_tell(syscall_arg[0]);
+      f->eax = sys_tell(syscall_arg[0]);
       break;
   case SYS_CLOSE:
     get_syscall_args(f->esp, 3, syscall_arg);
@@ -229,4 +229,14 @@ static void sys_seek(int fd, unsigned position) {
 
   file = cur->pcb->fd_list[fd];
   file_seek(file, (int) position);
+}
+
+static unsigned sys_tell(int fd) {
+  struct thread *cur = thread_current();
+  struct file *file;
+  if (fd == 0 || fd == 1 || fd >= cur->pcb->file_cnt)
+    return 0;
+
+  file = cur->pcb->fd_list[fd];
+  return (unsigned) file_tell(file);
 }
