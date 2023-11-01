@@ -140,8 +140,9 @@ static int sys_open(const char *file_name) {
   struct file *file;
   int fd;
 
-  if (safe_strcpy_from_user(file_name_copy, file_name) == -1)
-    return -1;
+  if (safe_strcpy_from_user(file_name_copy, file_name) == -1) {
+    sys_exit(-1);
+  }
 
   file = filesys_open(file_name_copy);
   palloc_free_page(file_name_copy);
@@ -188,8 +189,9 @@ static int sys_read(int fd, void *buffer, unsigned size) {
 
   void *ptr = safe_memcpy_to_user(buffer, kbuffer, read_bytes);
   palloc_free_page(kbuffer);
-  if (ptr == NULL)
-    return -1;
+  if (ptr == NULL) {
+    sys_exit(-1);
+  }
   return read_bytes;
 }
 
@@ -206,7 +208,7 @@ int sys_write(int fd, void *buffer, unsigned int size) {
   void *ptr = safe_memcpy_from_user(kbuffer, buffer, size);
   if (ptr == NULL) {
     palloc_free_page(kbuffer);
-    return -1;
+    sys_exit(-1);
   }
 
   if (fd == 1) {
