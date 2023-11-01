@@ -94,7 +94,7 @@ static void syscall_handler(struct intr_frame *f) {
       break;
   case SYS_SEEK:
     get_syscall_args(f->esp, 2, syscall_arg);
-    // sys_seek(syscall_arg[0], syscall_arg[1]);
+      sys_seek(syscall_arg[0], syscall_arg[1]);
       break;
   case SYS_TELL:
     get_syscall_args(f->esp, 1, syscall_arg);
@@ -218,4 +218,15 @@ int sys_write(int fd, void *buffer, unsigned int size) {
 
   palloc_free_page(kbuffer);
   return write_bytes;
+}
+
+static void sys_seek(int fd, unsigned position) {
+  struct thread *cur = thread_current();
+  struct file *file;
+
+  if (fd == 0 || fd == 1 || fd >= cur->pcb->file_cnt)
+    return;
+
+  file = cur->pcb->fd_list[fd];
+  file_seek(file, (int) position);
 }
