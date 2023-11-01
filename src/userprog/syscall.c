@@ -193,10 +193,29 @@ static int sys_read(int fd, void *buffer, unsigned size) {
 }
 
 int sys_write(int fd, void *buffer, unsigned int size) {
-  if (fd == 1) {
-    putbuf(buffer, size);
-    return size;
+  struct thread *cur = thread_current();
+  unsigned char *kbuffer;
+  struct file *file;
+  int write_bytes;
+
+  if (fd == 0 || fd >= cur->pcb->file_cnt)
+    return -1;
+
+  kbuffer = palloc_get_page(0);
+  void *ptr = safe_memcpy_from_user(kbuffer, buffer, size);
+  if (ptr == NULL) {
+    palloc_free_page(kbuffer);
+    return -1;
   }
 
-  return -1;
+  if (fd == 1) {
+    putbuf((const char *) kbuffer, size);
+    write_bytes = (int) size;
+  } else {
+    file = cur->pcb->fd_list[fd];
+    write_bytes = file_write(file, kbuffer, (off_t) size);
+  }
+
+  palloc_free_page(kbuffer);
+  return write_bytes;
 }
