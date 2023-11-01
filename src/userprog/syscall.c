@@ -1,4 +1,5 @@
 #include "userprog/syscall.h"
+#include "devices/input.h"
 #include "devices/shutdown.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
@@ -162,6 +163,33 @@ static int sys_filesize(int fd) {
   file = cur->pcb->fd_list[fd];
 
   return file_length(file);
+}
+
+static int sys_read(int fd, void *buffer, unsigned size) {
+  struct thread *cur = thread_current();
+  unsigned char *kbuffer = palloc_get_page(0);
+  struct file *file;
+  int read_bytes;
+
+  if (fd == 1 || fd >= cur->pcb->file_cnt)
+    return -1;
+
+  if (fd == 0) {
+    for (unsigned i = 0; i < size; i++) {
+      kbuffer[i] = input_getc();
+    }
+    read_bytes = (int) size;
+  } else {
+    file = cur->pcb->fd_list[fd];
+    read_bytes = file_read(file, kbuffer, (off_t) size);
+  }
+
+  if (safe_memcpy_to_user(buffer, kbuffer, read_bytes) == NULL) {
+    read_bytes = -1;
+  }
+
+  palloc_free_page(kbuffer);
+  return read_bytes;
 }
 
 int sys_write(int fd, void *buffer, unsigned int size) {
