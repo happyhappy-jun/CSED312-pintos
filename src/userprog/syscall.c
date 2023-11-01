@@ -86,8 +86,8 @@ static void syscall_handler(struct intr_frame *f) {
     break;
   case SYS_READ:
     get_syscall_args(f->esp, 3, syscall_arg);
-    // f->eax = sys_read(syscall_arg[0], (void *) syscall_arg[1], syscall_arg[2]);
-      break;
+    f->eax = sys_read(syscall_arg[0], (void *) syscall_arg[1], syscall_arg[2]);
+    break;
   case SYS_WRITE:
     get_syscall_args(f->esp, 3, syscall_arg);
     f->eax = sys_write(syscall_arg[0], (void *) syscall_arg[1], syscall_arg[2]);
@@ -167,13 +167,14 @@ static int sys_filesize(int fd) {
 
 static int sys_read(int fd, void *buffer, unsigned size) {
   struct thread *cur = thread_current();
-  unsigned char *kbuffer = palloc_get_page(0);
+  unsigned char *kbuffer;
   struct file *file;
   int read_bytes;
 
   if (fd == 1 || fd >= cur->pcb->file_cnt)
     return -1;
 
+  kbuffer = palloc_get_page(0);
   if (fd == 0) {
     for (unsigned i = 0; i < size; i++) {
       kbuffer[i] = input_getc();
@@ -184,11 +185,10 @@ static int sys_read(int fd, void *buffer, unsigned size) {
     read_bytes = file_read(file, kbuffer, (off_t) size);
   }
 
-  if (safe_memcpy_to_user(buffer, kbuffer, read_bytes) == NULL) {
-    read_bytes = -1;
-  }
-
+  void *ptr = safe_memcpy_to_user(buffer, kbuffer, read_bytes);
   palloc_free_page(kbuffer);
+  if (ptr == NULL)
+    return -1;
   return read_bytes;
 }
 
