@@ -138,7 +138,8 @@ static int sys_open(const char *file_name) {
   struct file *file;
   int fd;
 
-  safe_strcpy_from_user(file_name_copy, file_name);
+  if (safe_strcpy_from_user(file_name_copy, file_name) == -1)
+    return -1;
   file = filesys_open(file_name_copy);
   palloc_free_page(file_name_copy);
 
