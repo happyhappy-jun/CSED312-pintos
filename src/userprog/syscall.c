@@ -26,9 +26,29 @@ static void sys_seek(int, unsigned);
 static unsigned sys_tell(int);
 static void sys_close(int);
 
+enum fd_check_mode {
+  FD_CHECK_READ,
+  FD_CHECK_WRITE,
+  FD_CHECK_DEFAULT
+};
+
+static bool valid_fd(int, enum fd_check_mode);
+
 static int get_from_user_stack(const int *, int);
 static int get_syscall_n(void *);
 static void get_syscall_args(void *, int, int *);
+
+static bool valid_fd(int fd, enum fd_check_mode mode) {
+  struct thread *cur = thread_current();
+  switch (mode) {
+  case FD_CHECK_READ:
+    return fd >= 0 && fd < cur->pcb->file_cnt && fd != 1;
+  case FD_CHECK_WRITE:
+    return fd >= 0 && fd < cur->pcb->file_cnt && fd != 0;
+  case FD_CHECK_DEFAULT:
+    return fd >= 2 && fd < cur->pcb->file_cnt;
+  }
+}
 
 static int get_from_user_stack(const int *esp, int offset) {
   int value;
@@ -160,7 +180,7 @@ static int sys_filesize(int fd) {
   struct thread *cur = thread_current();
   struct file *file;
 
-  if (fd == 0 || fd == 1 || fd >= cur->pcb->file_cnt)
+  if (!valid_fd(fd, FD_CHECK_DEFAULT))
     return 0;
   file = cur->pcb->fd_list[fd];
 
@@ -173,7 +193,7 @@ static int sys_read(int fd, void *buffer, unsigned size) {
   struct file *file;
   int read_bytes;
 
-  if (fd == 1 || fd >= cur->pcb->file_cnt)
+  if (!valid_fd(fd, FD_CHECK_READ))
     return -1;
 
   kbuffer = palloc_get_page(0);
@@ -201,7 +221,7 @@ int sys_write(int fd, void *buffer, unsigned int size) {
   struct file *file;
   int write_bytes;
 
-  if (fd == 0 || fd >= cur->pcb->file_cnt)
+  if (!valid_fd(fd, FD_CHECK_WRITE))
     return -1;
 
   kbuffer = palloc_get_page(0);
@@ -227,7 +247,7 @@ static void sys_seek(int fd, unsigned position) {
   struct thread *cur = thread_current();
   struct file *file;
 
-  if (fd == 0 || fd == 1 || fd >= cur->pcb->file_cnt)
+  if (!valid_fd(fd, FD_CHECK_DEFAULT))
     return;
 
   file = cur->pcb->fd_list[fd];
@@ -237,7 +257,7 @@ static void sys_seek(int fd, unsigned position) {
 static unsigned sys_tell(int fd) {
   struct thread *cur = thread_current();
   struct file *file;
-  if (fd == 0 || fd == 1 || fd >= cur->pcb->file_cnt)
+  if (!valid_fd(fd, FD_CHECK_DEFAULT))
     return 0;
 
   file = cur->pcb->fd_list[fd];
@@ -248,7 +268,7 @@ static void sys_close(int fd) {
   struct thread *cur = thread_current();
   struct file *file;
 
-  if (fd == 0 || fd == 1 || fd >= cur->pcb->file_cnt)
+  if (!valid_fd(fd, FD_CHECK_DEFAULT))
     return;
 
   file = cur->pcb->fd_list[fd];
