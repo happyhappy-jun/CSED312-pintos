@@ -24,6 +24,7 @@ static int sys_read(int, void *, unsigned);
 static int sys_write(int, void *, unsigned);
 static void sys_seek(int, unsigned);
 static unsigned sys_tell(int);
+static void sys_close(int);
 
 static int get_from_user_stack(const int *, int);
 static int get_syscall_n(void *);
@@ -101,9 +102,9 @@ static void syscall_handler(struct intr_frame *f) {
       f->eax = sys_tell(syscall_arg[0]);
       break;
   case SYS_CLOSE:
-    get_syscall_args(f->esp, 3, syscall_arg);
-    // f->eax = sys_read(syscall_arg[0], (void *) syscall_arg[1], syscall_arg[2]);
-    default:break;
+      get_syscall_args(f->esp, 1, syscall_arg);
+      sys_close(syscall_arg[0]);
+  default: break;
   }
 }
 
@@ -239,4 +240,17 @@ static unsigned sys_tell(int fd) {
 
   file = cur->pcb->fd_list[fd];
   return (unsigned) file_tell(file);
+}
+
+static void sys_close(int fd) {
+  struct thread *cur = thread_current();
+  struct file *file;
+
+  if (fd == 0 || fd == 1 || fd >= cur->pcb->file_cnt)
+    return;
+
+  file = cur->pcb->fd_list[fd];
+  file_close(file);
+  cur->pcb->fd_list[fd] = NULL;
+  cur->pcb->file_cnt--;
 }
