@@ -192,6 +192,7 @@ struct pcb {
   pid_t pid;
   tid_t parent_tid;
   struct file *file;
+  int file_cnt;
   struct file **fd_list;
   int exit_code;
   struct semaphore wait_sema;

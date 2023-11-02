@@ -781,6 +781,7 @@ struct pcb *init_pcb(void) {
   pcb->pid = PID_ERROR;
   pcb->parent_tid = thread_current()->tid;
   pcb->file = NULL;
+  pcb->file_cnt = 2;// STDIN and STDOUT
   pcb->fd_list = palloc_get_page(0);
   pcb->exit_code = 0;
   sema_init(&pcb->wait_sema, 0);

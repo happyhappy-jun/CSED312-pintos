@@ -1,5 +1,5 @@
 //
-// Created by ��ġ�� on 2023/10/30.
+// Created by 김치헌 on 2023/10/30.
 //
 
 #ifndef PINTOS_SRC_USERPROG_USER_MEMORY_ACCESS_H_
