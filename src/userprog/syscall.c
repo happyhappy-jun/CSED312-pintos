@@ -137,9 +137,7 @@ static int sys_open(const char *file_name) {
     sys_exit(-1);
   }
 
-  lock_acquire(&file_lock);
   file = filesys_open(file_name_copy);
-  lock_release(&file_lock);
   palloc_free_page(file_name_copy);
 
   if (file == NULL)
@@ -207,15 +205,11 @@ int sys_write(int fd, void *buffer, unsigned int size) {
   }
 
   if (fd == 1) {
-    lock_acquire(&file_lock);
     putbuf((const char *) kbuffer, size);
-    lock_release(&file_lock);
     write_bytes = (int) size;
   } else {
     file = cur->pcb->fd_list[fd];
-    lock_acquire(&file_lock);
     write_bytes = file_write(file, kbuffer, (off_t) size);
-    lock_release(&file_lock);
   }
 
   palloc_free_page(kbuffer);
