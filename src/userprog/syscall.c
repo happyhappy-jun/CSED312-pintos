@@ -3,40 +3,12 @@
 #include "devices/shutdown.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
-#include "threads/interrupt.h"
 #include "threads/palloc.h"
-#include "threads/thread.h"
 #include "userprog/user-memory-access.h"
 #include <stdio.h>
 #include <syscall-nr.h>
 
-static void syscall_handler(struct intr_frame *);
-
-static void sys_exit(int);
-static pid_t sys_exec(const char *);
-static int sys_wait(pid_t);
-
-static bool sys_create(const char *, unsigned initial_size);
-static bool sys_remove(const char *);
-static int sys_open(const char *);
-static int sys_filesize(int);
-static int sys_read(int, void *, unsigned);
-static int sys_write(int, void *, unsigned);
-static void sys_seek(int, unsigned);
-static unsigned sys_tell(int);
-static void sys_close(int);
-
-enum fd_check_mode {
-  FD_CHECK_READ,
-  FD_CHECK_WRITE,
-  FD_CHECK_DEFAULT
-};
-
-static bool valid_fd(int, enum fd_check_mode);
-
-static int get_from_user_stack(const int *, int);
-static int get_syscall_n(void *);
-static void get_syscall_args(void *, int, int *);
+struct lock file_lock;
 
 static bool valid_fd(int fd, enum fd_check_mode mode) {
   struct thread *cur = thread_current();
@@ -66,6 +38,7 @@ static void get_syscall_args(void *esp, int n, int *syscall_args) {
 }
 
 void syscall_init(void) {
+  lock_init(&file_lock);
   intr_register_int(0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
@@ -80,23 +53,23 @@ static void syscall_handler(struct intr_frame *f) {
   case SYS_EXIT:
     get_syscall_args(f->esp, 1, syscall_arg);
     sys_exit(syscall_arg[0]);
-      break;
+    break;
   case SYS_EXEC:
     get_syscall_args(f->esp, 1, syscall_arg);
     f->eax = sys_exec((const char *) syscall_arg[0]);
-      break;
+    break;
   case SYS_WAIT:
     get_syscall_args(f->esp, 1, syscall_arg);
     f->eax = sys_wait(syscall_arg[0]);
-      break;
+    break;
   case SYS_CREATE:
     get_syscall_args(f->esp, 2, syscall_arg);
-    // f->eax = sys_create((const char *) syscall_arg[0], syscall_arg[1]);
-      break;
+    f->eax = sys_create((const char *) syscall_arg[0], syscall_arg[1]);
+    break;
   case SYS_REMOVE:
     get_syscall_args(f->esp, 1, syscall_arg);
-    // f->eax = sys_remove((const char *) syscall_arg[0]);
-      break;
+    f->eax = sys_remove((const char *) syscall_arg[0]);
+    break;
   case SYS_OPEN:
     get_syscall_args(f->esp, 1, syscall_arg);
     f->eax = sys_open((const char *) syscall_arg[0]);
@@ -112,23 +85,23 @@ static void syscall_handler(struct intr_frame *f) {
   case SYS_WRITE:
     get_syscall_args(f->esp, 3, syscall_arg);
     f->eax = sys_write(syscall_arg[0], (void *) syscall_arg[1], syscall_arg[2]);
-      break;
+    break;
   case SYS_SEEK:
     get_syscall_args(f->esp, 2, syscall_arg);
-      sys_seek(syscall_arg[0], syscall_arg[1]);
-      break;
+    sys_seek(syscall_arg[0], syscall_arg[1]);
+    break;
   case SYS_TELL:
     get_syscall_args(f->esp, 1, syscall_arg);
-      f->eax = sys_tell(syscall_arg[0]);
-      break;
+    f->eax = sys_tell(syscall_arg[0]);
+    break;
   case SYS_CLOSE:
-      get_syscall_args(f->esp, 1, syscall_arg);
-      sys_close(syscall_arg[0]);
+    get_syscall_args(f->esp, 1, syscall_arg);
+    sys_close(syscall_arg[0]);
   default: break;
   }
 }
 
-static void sys_exit(int status) {
+void sys_exit(int status) {
   struct thread *cur = thread_current();
   cur->pcb->exit_code = status;
   printf("%s: exit(%d)\n", cur->name, status);
@@ -275,4 +248,28 @@ static void sys_close(int fd) {
   file_close(file);
   cur->pcb->fd_list[fd] = NULL;
   cur->pcb->file_cnt--;
+}
+
+static bool sys_create(const char *file, unsigned initial_size) {
+  char *kfile = palloc_get_page(0);
+  safe_strcpy_from_user(kfile, file);
+
+  lock_acquire(&file_lock);
+  bool success = filesys_create(kfile, (off_t) initial_size);
+  lock_release(&file_lock);
+
+  palloc_free_page(kfile);
+  return success;
+}
+
+static bool sys_remove(const char *file) {
+  char *kfile = palloc_get_page(0);
+  safe_strcpy_from_user(kfile, file);
+
+  lock_acquire(&file_lock);
+  bool success = filesys_remove(kfile);
+  lock_release(&file_lock);
+
+  palloc_free_page(kfile);
+  return success;
 }
