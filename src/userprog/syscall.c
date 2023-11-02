@@ -3,6 +3,7 @@
 #include "devices/shutdown.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
+#include "pagedir.h"
 #include "threads/palloc.h"
 #include "userprog/user-memory-access.h"
 #include <stdio.h>
@@ -110,7 +111,7 @@ void sys_exit(int status) {
 }
 
 static pid_t sys_exec(const char *cmd_line) {
-  char *cmd_line_copy = palloc_get_page(0);
+  char *cmd_line_copy = palloc_get_multiple(0, 10);
 
   if (safe_strcpy_from_user(cmd_line_copy, cmd_line) == -1) {
     palloc_free_page(cmd_line_copy);
@@ -138,17 +139,14 @@ static int sys_wait(pid_t pid) {
 
 static int sys_open(const char *file_name) {
   struct thread *cur = thread_current();
-  char *file_name_copy = palloc_get_page(0);
   struct file *file;
   int fd;
 
-  if (safe_strcpy_from_user(file_name_copy, file_name) == -1) {
-    palloc_free_page(file_name_copy);
+  void *kernel_ptr = pagedir_get_page(cur->pagedir, file_name);
+  if (kernel_ptr == NULL)
     sys_exit(-1);
-  }
 
-  file = filesys_open(file_name_copy);
-  palloc_free_page(file_name_copy);
+  file = filesys_open(file_name);
 
   if (file == NULL)
     return -1;
@@ -257,6 +255,11 @@ static void sys_close(int fd) {
   file = cur->pcb->fd_list[fd];
   file_close(file);
   cur->pcb->fd_list[fd] = NULL;
+
+  for (int i = fd; i < cur->pcb->file_cnt; i++) {
+    cur->pcb->fd_list[i] = cur->pcb->fd_list[i + 1];
+  }
+
   cur->pcb->file_cnt--;
 }
 
