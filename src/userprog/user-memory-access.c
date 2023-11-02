@@ -36,7 +36,7 @@ static bool put_user(uint8_t *udst, uint8_t byte) {
 }
 
 bool validate_uaddr(const void *uaddr) {
-  return (uaddr >= STACK_BOTTOM && uaddr < PHYS_BASE && uaddr != 0);
+  return uaddr < PHYS_BASE;
 }
 
 void *safe_memcpy_from_user(void *kdst, const void *usrc, size_t n) {

@@ -7,8 +7,6 @@
 
 #include <stdbool.h>
 #include <stddef.h>
-#define PHYS_BASE ((void *) 0xc0000000)
-#define STACK_BOTTOM ((void *) 0x0048000)
 
 bool validate_uaddr(const void *);
 void *safe_memcpy_from_user(void *, const void *, size_t);
