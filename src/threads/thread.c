@@ -788,6 +788,7 @@ struct pcb *init_pcb(void) {
   pcb->file_cnt = 2;// STDIN and STDOUT
   pcb->fd_list = palloc_get_page(0);
   pcb->exit_code = 0;
+  pcb->can_wait = true;
   sema_init(&pcb->wait_sema, 0);
   sema_init(&pcb->load_sema, 0);
   sema_init(&pcb->exit_sema, 0);

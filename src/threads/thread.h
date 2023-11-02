@@ -195,6 +195,7 @@ struct pcb {
   int file_cnt;
   struct file **fd_list;
   int exit_code;
+  bool can_wait;
   struct semaphore wait_sema;
   struct semaphore load_sema;
   struct semaphore exit_sema;
