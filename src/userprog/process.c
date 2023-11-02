@@ -298,6 +298,8 @@ bool load(const char *file_name, void (**eip)(void), void **esp) {
     printf("load: %s: open failed\n", argv[0]);
     goto done;
   }
+  file_deny_write(file);
+  t->pcb->file = file;
 
   /* Read and verify executable header. */
   if (file_read(file, &ehdr, sizeof ehdr) != sizeof ehdr
@@ -368,7 +370,6 @@ bool load(const char *file_name, void (**eip)(void), void **esp) {
 
   /* Start address. */
   *eip = (void (*)(void)) ehdr.e_entry;
-
 
   push_arg_stack(argv, argc, esp);
   success = true;
