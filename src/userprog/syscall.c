@@ -112,7 +112,7 @@ void sys_exit(int status) {
 static pid_t sys_exec(const char *cmd_line) {
   char *cmd_line_copy = palloc_get_page(0);
 
-  if (!safe_strcpy_from_user(cmd_line_copy, cmd_line)) {
+  if (safe_strcpy_from_user(cmd_line_copy, cmd_line) == -1) {
     palloc_free_page(cmd_line_copy);
     sys_exit(-1);
   }
