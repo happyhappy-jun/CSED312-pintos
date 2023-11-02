@@ -27,7 +27,7 @@ static bool load(const char *cmdline, void (**eip)(void), void **esp);
    before process_execute() returns.  Returns the new process's
    thread id, or TID_ERROR if the thread cannot be created. */
 tid_t process_execute(const char *file_name) {
-  char *fn_copy;
+  char *fn_copy, *command;
   tid_t tid;
 
   /* Make a copy of FILE_NAME.
@@ -37,10 +37,21 @@ tid_t process_execute(const char *file_name) {
     return TID_ERROR;
   strlcpy(fn_copy, file_name, PGSIZE);
 
+  command = palloc_get_page(0);
+  if (command == NULL)
+    return TID_ERROR;
+  strlcpy(command, file_name, PGSIZE);
+
+  parse_command(command);
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create(file_name, PRI_DEFAULT, start_process, fn_copy);
-  if (tid == TID_ERROR)
+  tid = thread_create(command, PRI_DEFAULT, start_process, fn_copy);
+  if (tid == TID_ERROR) {
+    palloc_free_page(command);
     palloc_free_page(fn_copy);
+  }
+  else {
+    sema_down(&get_thread_by_tid(tid)->pcb->load_sema);
+  }
   return tid;
 }
 
@@ -58,9 +69,15 @@ start_process(void *file_name_) {
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load(file_name, &if_.eip, &if_.esp);
+  palloc_free_page(file_name);
+
+  /* allocate pid when the load() succeed */
+  if (success)
+    thread_current()->pcb->pid = allocate_pid();
+  /* Let the parent thread/process know the load() is finished */
+  sema_up(&thread_current()->pcb->load_sema);
 
   /* If load failed, quit. */
-  palloc_free_page(file_name);
   if (!success)
     thread_exit();
 
@@ -86,8 +103,21 @@ start_process(void *file_name_) {
 
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
-int process_wait(tid_t child_tid UNUSED) {
-  return -1;
+int process_wait(tid_t child_tid) {
+  struct thread *current = thread_current();
+  struct thread *child = get_thread_by_tid(child_tid);
+
+  // invalid tid
+  if (child == NULL)
+    return -1;
+  // not child
+  if (child->pcb->parent_tid != current->tid)
+    return -1;
+
+  // else, wait for the child;
+  // wait_sema of the child only up when the child exit
+  sema_down(&child->pcb->wait_sema);
+  return child->pcb->exit_code;
 }
 
 /* Free the current process's resources. */
@@ -112,6 +142,10 @@ void process_exit(void) {
     pagedir_activate(NULL);
     pagedir_destroy(pd);
   }
+  sema_up(&cur->pcb->wait_sema);  // sema up wait_sema for waiting parent
+  sig_children_parent_exit();     // sema up exit_sema for children to free their resources
+  sema_down(&cur->pcb->exit_sema);// exit_sema up only when the parent exit
+  free_pcb(cur->pcb);
 }
 
 /* Sets up the CPU for running user code in the current
@@ -208,28 +242,24 @@ void push_arg_stack(const char *argv[], int argc, void **esp) {
   *esp -= padding;
   memset(*esp, 0, padding);
 
-
   argv[argc] = 0;
   for (int i = argc; i >= 0; i--) {
-    *esp -= sizeof (char *);
-    memcpy(*esp, &argv[i], sizeof (char *));
+    *esp -= sizeof(char *);
+    memcpy(*esp, &argv[i], sizeof(char *));
   }
 
   // push argv
   void *argv_ptr = *esp;
   *esp -= sizeof(char **);
-  memcpy(*esp, &argv_ptr, sizeof (char **));
+  memcpy(*esp, &argv_ptr, sizeof(char **));
 
   // push argc
   *esp -= sizeof(int);
-  memcpy(*esp, &argc, sizeof (int));
+  memcpy(*esp, &argc, sizeof(int));
 
   // push fake return address
   *esp -= sizeof(void *);
-  memset(*esp, 0, sizeof (void *));
-
-  // TODO: remove this after process wait is implemented
-  hex_dump((uintptr_t) *esp , *esp, PHYS_BASE - *esp, true);
+  memset(*esp, 0, sizeof(void *));
 }
 
 /* Loads an ELF executable from FILE_NAME into the current thread.
@@ -489,4 +519,17 @@ install_page(void *upage, void *kpage, bool writable) {
      address, then map our page there. */
   return (pagedir_get_page(t->pagedir, upage) == NULL
           && pagedir_set_page(t->pagedir, upage, kpage, writable));
+}
+
+static char *parse_command(char *input) {
+  char *token;
+  char *save_ptr;
+
+  token = strtok_r(input, " ", &save_ptr);
+
+  if (token != NULL) {
+    return token;
+  } else {
+    return NULL;
+  }
 }
