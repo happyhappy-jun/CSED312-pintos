@@ -245,7 +245,7 @@ static unsigned sys_tell(int fd) {
   return (unsigned) file_tell(file);
 }
 
-static void sys_close(int fd) {
+void sys_close(int fd) {
   struct thread *cur = thread_current();
   struct file *file;
 

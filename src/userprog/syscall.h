@@ -27,7 +27,7 @@ static int sys_read(int, void *, unsigned);
 static int sys_write(int, void *, unsigned);
 static void sys_seek(int, unsigned);
 static unsigned sys_tell(int);
-static void sys_close(int);
+void sys_close(int);
 
 static int get_from_user_stack(const int *, int);
 static int get_syscall_n(void *);

@@ -2,6 +2,7 @@
 #include "filesys/directory.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
+#include "syscall.h"
 #include "threads/flags.h"
 #include "threads/init.h"
 #include "threads/interrupt.h"
@@ -79,7 +80,7 @@ start_process(void *file_name_) {
 
   /* If load failed, quit. */
   if (!success)
-    thread_exit();
+    sys_exit(-1);
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
