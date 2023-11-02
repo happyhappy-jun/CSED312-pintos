@@ -125,10 +125,8 @@ void process_exit(void) {
   struct thread *cur = thread_current();
   uint32_t *pd;
 
-  if (cur->pcb->file != NULL) {
-      file_allow_write(cur->pcb->file);
-      file_close(cur->pcb->file);
-  }
+  /* allow write and close the executable file */
+  file_close(cur->pcb->file);
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -371,16 +369,12 @@ bool load(const char *file_name, void (**eip)(void), void **esp) {
   /* Start address. */
   *eip = (void (*)(void)) ehdr.e_entry;
 
-  /* Deny write to executable file. */
-  file_deny_write(file);
-  t->pcb->file = file;
 
   push_arg_stack(argv, argc, esp);
   success = true;
 
 done:
   /* We arrive here whether the load is successful or not. */
-  file_close(file);
   return success;
 }
 
