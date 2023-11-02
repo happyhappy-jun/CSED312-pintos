@@ -745,6 +745,8 @@ struct thread *get_thread_by_pid(pid_t pid) {
   struct list_elem *e;
   for (e = list_begin(&all_list); e != list_end(&all_list); e = list_next(e)) {
     t = list_entry(e, struct thread, allelem);
+    if (t->pcb == NULL)
+      continue;
     if (t->pcb->pid == pid)
       return t;
   }
@@ -756,6 +758,8 @@ struct thread *get_thread_by_tid(tid_t tid) {
   struct list_elem *e;
   for (e = list_begin(&all_list); e != list_end(&all_list); e = list_next(e)) {
     t = list_entry(e, struct thread, allelem);
+    if (t->pcb == NULL)
+      continue;
     if (t->tid == tid)
       return t;
   }
