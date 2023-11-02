@@ -255,9 +255,10 @@ static bool sys_create(const char *file, unsigned initial_size) {
   safe_strcpy_from_user(kfile, file);
 
   lock_acquire(&file_lock);
-  bool success = filesys_create(file, (off_t) initial_size);
+  bool success = filesys_create(kfile, (off_t) initial_size);
   lock_release(&file_lock);
 
+  palloc_free_page(kfile);
   return success;
 }
 
@@ -266,8 +267,9 @@ static bool sys_remove(const char *file) {
   safe_strcpy_from_user(kfile, file);
 
   lock_acquire(&file_lock);
-  bool success = filesys_remove(file);
+  bool success = filesys_remove(kfile);
   lock_release(&file_lock);
 
+  palloc_free_page(kfile);
   return success;
 }
