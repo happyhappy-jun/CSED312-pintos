@@ -47,12 +47,12 @@ void *safe_memcpy_from_user(void *kdst, const void *usrc, size_t n) {
   ASSERT(kdst != NULL)
 
   if (!validate_uaddr(usrc) || !validate_uaddr(usrc + n - 1))
-    sys_exit(-1);
+    return NULL;
 
   for (size_t i = 0; i < n; i++) {
     byte = get_user(src + i);
     if (byte == -1)
-      sys_exit(-1);
+      return NULL;
     dst[i] = byte;
   }
   return kdst;
@@ -64,12 +64,12 @@ void *safe_memcpy_to_user(void *udst, const void *ksrc, size_t n) {
   int byte;
 
   if (!validate_uaddr(udst) || !validate_uaddr(udst + n - 1))
-    sys_exit(-1);
+    return NULL;
 
   for (size_t i = 0; i < n; i++) {
     byte = src[i];
     if (!put_user(dst + i, byte))
-      sys_exit(-1);
+      return NULL;
   }
   return udst;
 }
@@ -81,11 +81,11 @@ int safe_strcpy_from_user(char *kdst, const char *usrc) {
 
   for (int i = 0;; i++) {
     if (!validate_uaddr(usrc + i))
-      sys_exit(-1);
+      return -1;
 
     byte = get_user((const unsigned char *) usrc + i);
     if (byte == -1)
-      sys_exit(-1);
+      return -1;
 
     kdst[i] = (char) byte;
 

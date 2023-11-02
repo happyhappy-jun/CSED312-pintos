@@ -24,7 +24,8 @@ static bool valid_fd(int fd, enum fd_check_mode mode) {
 
 static int get_from_user_stack(const int *esp, int offset) {
   int value;
-  safe_memcpy_from_user(&value, esp + offset, sizeof(int));
+  if (!safe_memcpy_from_user(&value, esp + offset, sizeof(int)))
+    sys_exit(-1);
   return value;
 }
 
@@ -111,7 +112,11 @@ void sys_exit(int status) {
 static pid_t sys_exec(const char *cmd_line) {
   char *cmd_line_copy = palloc_get_page(0);
 
-  safe_strcpy_from_user(cmd_line_copy, cmd_line);
+  if (!safe_strcpy_from_user(cmd_line_copy, cmd_line)) {
+    palloc_free_page(cmd_line_copy);
+    sys_exit(-1);
+  }
+
   tid_t tid = process_execute(cmd_line_copy);
   palloc_free_page(cmd_line_copy);
   if (tid == TID_ERROR)
@@ -134,6 +139,7 @@ static int sys_open(const char *file_name) {
   int fd;
 
   if (safe_strcpy_from_user(file_name_copy, file_name) == -1) {
+    palloc_free_page(file_name_copy);
     sys_exit(-1);
   }
 
@@ -252,7 +258,10 @@ static void sys_close(int fd) {
 
 static bool sys_create(const char *file, unsigned initial_size) {
   char *kfile = palloc_get_page(0);
-  safe_strcpy_from_user(kfile, file);
+  if (safe_strcpy_from_user(kfile, file) == -1) {
+    palloc_free_page(kfile);
+    sys_exit(-1);
+  }
 
   lock_acquire(&file_lock);
   bool success = filesys_create(kfile, (off_t) initial_size);
@@ -264,7 +273,10 @@ static bool sys_create(const char *file, unsigned initial_size) {
 
 static bool sys_remove(const char *file) {
   char *kfile = palloc_get_page(0);
-  safe_strcpy_from_user(kfile, file);
+  if (safe_strcpy_from_user(kfile, file) == -1) {
+    palloc_free_page(kfile);
+    sys_exit(-1);
+  }
 
   lock_acquire(&file_lock);
   bool success = filesys_remove(kfile);
