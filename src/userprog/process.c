@@ -125,6 +125,9 @@ void process_exit(void) {
   struct thread *cur = thread_current();
   uint32_t *pd;
 
+  /* allow write and close the executable file */
+  file_close(cur->pcb->file);
+
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
@@ -366,12 +369,12 @@ bool load(const char *file_name, void (**eip)(void), void **esp) {
   /* Start address. */
   *eip = (void (*)(void)) ehdr.e_entry;
 
+
   push_arg_stack(argv, argc, esp);
   success = true;
 
 done:
   /* We arrive here whether the load is successful or not. */
-  file_close(file);
   return success;
 }
 
