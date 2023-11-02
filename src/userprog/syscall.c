@@ -127,9 +127,8 @@ int sys_write(int fd, void *buffer, unsigned int size) {
 }
 
 static bool sys_create(const char *file, unsigned initial_size) {
-  if (file == NULL || !validate_uaddr(file)) {
-    sys_exit(-1);
-  }
+  char *kfile = palloc_get_page(0);
+  safe_strcpy_from_user(kfile, file);
 
   lock_acquire(&file_lock);
   bool success = filesys_create(file, (off_t) initial_size);
@@ -139,9 +138,8 @@ static bool sys_create(const char *file, unsigned initial_size) {
 }
 
 static bool sys_remove(const char *file) {
-  if (file == NULL || !validate_uaddr(file)) {
-    sys_exit(-1);
-  }
+  char *kfile = palloc_get_page(0);
+  safe_strcpy_from_user(kfile, file);
 
   lock_acquire(&file_lock);
   bool success = filesys_remove(file);
