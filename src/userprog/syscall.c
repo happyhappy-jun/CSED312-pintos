@@ -191,7 +191,7 @@ static int sys_read(int fd, void *buffer, unsigned size) {
   return read_bytes;
 }
 
-int sys_write(int fd, void *buffer, unsigned int size) {
+static int sys_write(int fd, void *buffer, unsigned int size) {
   unsigned char *kbuffer;
   struct file *file;
   int write_bytes;
