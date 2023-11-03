@@ -132,7 +132,7 @@ void process_exit(void) {
   struct thread *cur = thread_current();
   uint32_t *pd;
 
-  //printf("%s: exit(%d)\n", cur->name, cur->pcb->exit_code);
+  printf("%s: exit(%d)\n", cur->name, cur->pcb->exit_code);
 
   /* allow write and close the executable file */
   file_close(cur->pcb->file);
