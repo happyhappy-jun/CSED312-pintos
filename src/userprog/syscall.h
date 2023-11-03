@@ -4,14 +4,6 @@
 #include "threads/interrupt.h"
 #include "userprog/process.h"
 
-enum fd_check_mode {
-  FD_CHECK_READ,
-  FD_CHECK_WRITE,
-  FD_CHECK_DEFAULT
-};
-
-static bool valid_fd(int, enum fd_check_mode);
-
 void syscall_init(void);
 static void syscall_handler(struct intr_frame *);
 

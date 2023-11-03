@@ -785,7 +785,6 @@ struct pcb *init_pcb(void) {
   pcb->pid = PID_ERROR;
   pcb->parent_tid = thread_current()->tid;
   pcb->file = NULL;
-  pcb->file_cnt = 2;// STDIN and STDOUT
   pcb->fd_list = palloc_get_page(0);
   pcb->exit_code = 0;
   pcb->can_wait = true;
@@ -799,4 +798,39 @@ void free_pcb(struct pcb *pcb) {
   /* free all opened files including self executing file here */
   palloc_free_page(pcb->fd_list);
   palloc_free_page(pcb);
+}
+
+static struct file *get_fd_list_entry(int fd) {
+  return thread_current()->pcb->fd_list[fd - 2];
+}
+
+static void set_fd_list_entry(int fd, struct file *file) {
+  thread_current()->pcb->fd_list[fd - 2] = file;
+}
+
+static bool valid_fd(int fd) {
+  return fd >= 2 && fd < FD_MAX && get_fd_list_entry(fd) != NULL;
+}
+
+int allocate_fd(struct file *file) {
+  int fd = -1;
+  struct pcb *pcb = thread_current()->pcb;
+  for (int i = 0; i < FD_MAX; i++) {
+    if (pcb->fd_list[i] == NULL) {
+      fd = i + 2;
+      pcb->fd_list[i] = file;
+      break;
+    }
+  }
+  return fd;
+}
+
+void free_fd(int fd) {
+  set_fd_list_entry(fd, NULL);
+}
+
+struct file *get_file_by_fd(int fd) {
+  if (!valid_fd(fd))
+    return NULL;
+  return get_fd_list_entry(fd);
 }

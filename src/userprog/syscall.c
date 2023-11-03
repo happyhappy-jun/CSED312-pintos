@@ -11,16 +11,9 @@
 
 struct lock file_lock;
 
-static bool valid_fd(int fd, enum fd_check_mode mode) {
-  struct thread *cur = thread_current();
-  switch (mode) {
-  case FD_CHECK_READ:
-    return fd >= 0 && fd < cur->pcb->file_cnt && fd != 1;
-  case FD_CHECK_WRITE:
-    return fd >= 0 && fd < cur->pcb->file_cnt && fd != 0;
-  case FD_CHECK_DEFAULT:
-    return fd >= 2 && fd < cur->pcb->file_cnt;
-  }
+void syscall_init(void) {
+  lock_init(&file_lock);
+  intr_register_int(0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
 static int get_from_user_stack(const int *esp, int offset) {
@@ -37,11 +30,6 @@ static int get_syscall_n(void *esp) {
 static void get_syscall_args(void *esp, int n, int *syscall_args) {
   for (int i = 0; i < n; i++)
     syscall_args[i] = get_from_user_stack(esp, 1 + i);
-}
-
-void syscall_init(void) {
-  lock_init(&file_lock);
-  intr_register_int(0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
 static void syscall_handler(struct intr_frame *f) {
@@ -140,7 +128,6 @@ static int sys_wait(pid_t pid) {
 static int sys_open(const char *file_name) {
   struct thread *cur = thread_current();
   struct file *file;
-  int fd;
 
   void *kernel_ptr = pagedir_get_page(cur->pagedir, file_name);
   if (kernel_ptr == NULL)
@@ -151,40 +138,35 @@ static int sys_open(const char *file_name) {
   if (file == NULL)
     return -1;
 
-  fd = cur->pcb->file_cnt;
-  cur->pcb->file_cnt++;
-  cur->pcb->fd_list[fd] = file;
-  return fd;
+  return allocate_fd(file);
 }
 
 static int sys_filesize(int fd) {
-  struct thread *cur = thread_current();
   struct file *file;
 
-  if (!valid_fd(fd, FD_CHECK_DEFAULT))
+  file = get_file_by_fd(fd);
+  if (file == NULL)
     return 0;
-  file = cur->pcb->fd_list[fd];
 
   return file_length(file);
 }
 
 static int sys_read(int fd, void *buffer, unsigned size) {
-  struct thread *cur = thread_current();
   unsigned char *kbuffer;
   struct file *file;
   int read_bytes;
 
-  if (!valid_fd(fd, FD_CHECK_READ))
+  file = get_file_by_fd(fd);
+  if (file == NULL && fd != STDIN_FILENO)
     return -1;
 
   kbuffer = palloc_get_page(0);
-  if (fd == 0) {
+  if (fd == STDIN_FILENO) {
     for (unsigned i = 0; i < size; i++) {
       kbuffer[i] = input_getc();
     }
     read_bytes = (int) size;
   } else {
-    file = cur->pcb->fd_list[fd];
     read_bytes = file_read(file, kbuffer, (off_t) size);
   }
 
@@ -197,12 +179,12 @@ static int sys_read(int fd, void *buffer, unsigned size) {
 }
 
 int sys_write(int fd, void *buffer, unsigned int size) {
-  struct thread *cur = thread_current();
   unsigned char *kbuffer;
   struct file *file;
   int write_bytes;
 
-  if (!valid_fd(fd, FD_CHECK_WRITE))
+  file = get_file_by_fd(fd);
+  if (file == NULL && fd != STDOUT_FILENO)
     return -1;
 
   kbuffer = palloc_get_page(0);
@@ -212,11 +194,10 @@ int sys_write(int fd, void *buffer, unsigned int size) {
     sys_exit(-1);
   }
 
-  if (fd == 1) {
+  if (fd == STDOUT_FILENO) {
     putbuf((const char *) kbuffer, size);
     write_bytes = (int) size;
   } else {
-    file = cur->pcb->fd_list[fd];
     write_bytes = file_write(file, kbuffer, (off_t) size);
   }
 
@@ -225,42 +206,34 @@ int sys_write(int fd, void *buffer, unsigned int size) {
 }
 
 static void sys_seek(int fd, unsigned position) {
-  struct thread *cur = thread_current();
   struct file *file;
 
-  if (!valid_fd(fd, FD_CHECK_DEFAULT))
+  file = get_file_by_fd(fd);
+  if (file == NULL)
     return;
 
-  file = cur->pcb->fd_list[fd];
   file_seek(file, (int) position);
 }
 
 static unsigned sys_tell(int fd) {
-  struct thread *cur = thread_current();
   struct file *file;
-  if (!valid_fd(fd, FD_CHECK_DEFAULT))
+
+  file = get_file_by_fd(fd);
+  if (file == NULL)
     return 0;
 
-  file = cur->pcb->fd_list[fd];
   return (unsigned) file_tell(file);
 }
 
 void sys_close(int fd) {
-  struct thread *cur = thread_current();
   struct file *file;
 
-  if (!valid_fd(fd, FD_CHECK_DEFAULT))
+  file = get_file_by_fd(fd);
+  if (file == NULL)
     return;
 
-  file = cur->pcb->fd_list[fd];
   file_close(file);
-  cur->pcb->fd_list[fd] = NULL;
-
-  for (int i = fd; i < cur->pcb->file_cnt; i++) {
-    cur->pcb->fd_list[i] = cur->pcb->fd_list[i + 1];
-  }
-
-  cur->pcb->file_cnt--;
+  free_fd(fd);
 }
 
 static bool sys_create(const char *file, unsigned initial_size) {
