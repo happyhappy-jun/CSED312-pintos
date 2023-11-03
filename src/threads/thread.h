@@ -181,6 +181,7 @@ void sort_ready_list(void);
 
 struct thread *get_thread_by_tid(tid_t tid);
 void sig_children_parent_exit(void);
+void sig_child_can_exit(int);
 
 #ifdef USERPROG
 typedef int pid_t;

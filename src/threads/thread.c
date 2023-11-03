@@ -783,6 +783,13 @@ void sig_children_parent_exit(void) {
   }
 }
 
+void sig_child_can_exit(pid_t pid) {
+  struct thread *child = get_thread_by_pid(pid);
+  if (child == NULL)
+    return;
+  sema_up(&child->pcb->exit_sema);
+}
+
 struct pcb *init_pcb(void) {
   struct pcb *pcb = palloc_get_page(PAL_ZERO);
   if (pcb == NULL)

@@ -131,13 +131,16 @@ static pid_t sys_exec(const char *cmd_line) {
 
 static int sys_wait(pid_t pid) {
   struct thread *child = get_thread_by_pid(pid);
+  int result;
   if (child == NULL)
     return -1;
   if (child->pcb->can_wait)
     child->pcb->can_wait = false;
   else
     return -1;
-  return process_wait(child->tid);
+  result = process_wait(child->tid);
+  sig_child_can_exit(pid);
+  return result;
 }
 
 static int sys_open(const char *file_name) {
