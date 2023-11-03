@@ -142,6 +142,9 @@ static int sys_open(const char *file_name) {
   struct thread *cur = thread_current();
   struct file *file;
 
+  if (file_name >= PHYS_BASE)
+    sys_exit(-1);
+
   void *kernel_ptr = pagedir_get_page(cur->pagedir, file_name);
   if (kernel_ptr == NULL)
     sys_exit(-1);
