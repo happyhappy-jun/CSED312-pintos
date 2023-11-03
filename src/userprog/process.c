@@ -133,6 +133,13 @@ void process_exit(void) {
   /* allow write and close the executable file */
   file_close(cur->pcb->file);
 
+  /* close all opened files */
+  for (int i = 0; i < FD_MAX; i++) {
+    if (cur->pcb->fd_list[i] != NULL) {
+      file_close(cur->pcb->fd_list[i]);
+    }
+  }
+
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
