@@ -79,8 +79,10 @@ start_process(void *file_name_) {
   sema_up(&thread_current()->pcb->load_sema);
 
   /* If load failed, quit. */
-  if (!success)
+  if (!success) {
+    thread_current()->pcb->exit_code = -1;
     thread_exit();
+  }
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -125,6 +127,8 @@ int process_wait(tid_t child_tid) {
 void process_exit(void) {
   struct thread *cur = thread_current();
   uint32_t *pd;
+
+  printf("%s: exit(%d)\n", cur->name, cur->pcb->exit_code);
 
   /* allow write and close the executable file */
   file_close(cur->pcb->file);

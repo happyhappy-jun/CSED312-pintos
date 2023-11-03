@@ -153,6 +153,7 @@ page_fault(struct intr_frame *f) {
   }
   // other userspace page fault => exit(-1)
   else if (user) {
+    thread_current()->pcb->exit_code = -1;
     thread_exit();
   }
 
