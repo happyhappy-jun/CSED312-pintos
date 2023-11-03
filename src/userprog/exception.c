@@ -153,7 +153,7 @@ page_fault(struct intr_frame *f) {
   }
   // other userspace page fault => exit(-1)
   else if (user) {
-    sys_exit(-1);
+    thread_exit();
   }
 
   /* To implement virtual memory, delete the rest of the function

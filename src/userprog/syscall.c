@@ -11,6 +11,20 @@
 
 struct lock file_lock;
 
+static void syscall_handler(struct intr_frame *);
+static void sys_exit(int);
+static pid_t sys_exec(const char *);
+static int sys_wait(pid_t);
+static bool sys_create(const char *, unsigned initial_size);
+static bool sys_remove(const char *);
+static int sys_open(const char *);
+static int sys_filesize(int);
+static int sys_read(int, void *, unsigned);
+static int sys_write(int, void *, unsigned);
+static void sys_seek(int, unsigned);
+static unsigned sys_tell(int);
+static void sys_close(int);
+
 void syscall_init(void) {
   lock_init(&file_lock);
   intr_register_int(0x30, 3, INTR_ON, syscall_handler, "syscall");
@@ -91,7 +105,7 @@ static void syscall_handler(struct intr_frame *f) {
   }
 }
 
-void sys_exit(int status) {
+static void sys_exit(int status) {
   struct thread *cur = thread_current();
   cur->pcb->exit_code = status;
   printf("%s: exit(%d)\n", cur->name, status);
@@ -225,7 +239,7 @@ static unsigned sys_tell(int fd) {
   return (unsigned) file_tell(file);
 }
 
-void sys_close(int fd) {
+static void sys_close(int fd) {
   struct file *file;
 
   file = get_file_by_fd(fd);
