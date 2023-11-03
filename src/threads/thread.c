@@ -187,6 +187,9 @@ tid_t thread_create(const char *name, int priority,
 
 #ifdef USERPROG
   t->pcb = init_pcb();
+  if (t->pcb == NULL)
+    return TID_ERROR;
+
 #endif
 
   /* Stack frame for kernel_thread(). */
@@ -782,10 +785,16 @@ void sig_children_parent_exit(void) {
 
 struct pcb *init_pcb(void) {
   struct pcb *pcb = palloc_get_page(PAL_ZERO);
+  if (pcb == NULL)
+    return NULL;
+  pcb->fd_list = palloc_get_page(PAL_ZERO);
+  if (pcb->fd_list == NULL) {
+    palloc_free_page(pcb);
+    return NULL;
+  }
   pcb->pid = PID_ERROR;
   pcb->parent_tid = thread_current()->tid;
   pcb->file = NULL;
-  pcb->fd_list = palloc_get_page(PAL_ZERO);
   pcb->exit_code = 0;
   pcb->can_wait = true;
   sema_init(&pcb->wait_sema, 0);
