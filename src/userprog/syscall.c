@@ -112,7 +112,7 @@ static void sys_exit(int status) {
 }
 
 static pid_t sys_exec(const char *cmd_line) {
-  char *cmd_line_copy = palloc_get_multiple(0, 10);
+  char *cmd_line_copy = palloc_get_page(PAL_ZERO);
 
   if (safe_strcpy_from_user(cmd_line_copy, cmd_line) == -1) {
     palloc_free_page(cmd_line_copy);
@@ -173,7 +173,7 @@ static int sys_read(int fd, void *buffer, unsigned size) {
   if (file == NULL && fd != STDIN_FILENO)
     return -1;
 
-  kbuffer = palloc_get_page(0);
+  kbuffer = palloc_get_page(PAL_ZERO);
   if (fd == STDIN_FILENO) {
     for (unsigned i = 0; i < size; i++) {
       kbuffer[i] = input_getc();
@@ -200,7 +200,7 @@ static int sys_write(int fd, void *buffer, unsigned int size) {
   if (file == NULL && fd != STDOUT_FILENO)
     return -1;
 
-  kbuffer = palloc_get_page(0);
+  kbuffer = palloc_get_page(PAL_ZERO);
   void *ptr = safe_memcpy_from_user(kbuffer, buffer, size);
   if (ptr == NULL) {
     palloc_free_page(kbuffer);
@@ -250,7 +250,7 @@ static void sys_close(int fd) {
 }
 
 static bool sys_create(const char *file, unsigned initial_size) {
-  char *kfile = palloc_get_page(0);
+  char *kfile = palloc_get_page(PAL_ZERO);
   if (safe_strcpy_from_user(kfile, file) == -1) {
     palloc_free_page(kfile);
     sys_exit(-1);
@@ -265,7 +265,7 @@ static bool sys_create(const char *file, unsigned initial_size) {
 }
 
 static bool sys_remove(const char *file) {
-  char *kfile = palloc_get_page(0);
+  char *kfile = palloc_get_page(PAL_ZERO);
   if (safe_strcpy_from_user(kfile, file) == -1) {
     palloc_free_page(kfile);
     sys_exit(-1);
