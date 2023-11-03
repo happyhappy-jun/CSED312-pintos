@@ -781,11 +781,11 @@ void sig_children_parent_exit(void) {
 }
 
 struct pcb *init_pcb(void) {
-  struct pcb *pcb = palloc_get_page(0);
+  struct pcb *pcb = palloc_get_page(PAL_ZERO);
   pcb->pid = PID_ERROR;
   pcb->parent_tid = thread_current()->tid;
   pcb->file = NULL;
-  pcb->fd_list = palloc_get_page(0);
+  pcb->fd_list = palloc_get_page(PAL_ZERO);
   pcb->exit_code = 0;
   pcb->can_wait = true;
   sema_init(&pcb->wait_sema, 0);
