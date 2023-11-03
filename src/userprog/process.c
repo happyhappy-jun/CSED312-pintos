@@ -138,14 +138,11 @@ void process_exit(void) {
   file_close(cur->pcb->file);
 
   /* close all opened files */
-  int close_cnt = 0;
   for (int i = 0; i < FD_MAX; i++) {
     if (cur->pcb->fd_list[i] != NULL) {
       file_close(cur->pcb->fd_list[i]);
-      close_cnt++;
     }
   }
-  printf("%s(%d): close %d files\n", cur->name, cur->pcb->pid, close_cnt);
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
