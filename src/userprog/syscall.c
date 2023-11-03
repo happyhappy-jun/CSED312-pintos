@@ -139,17 +139,15 @@ static int sys_wait(pid_t pid) {
 }
 
 static int sys_open(const char *file_name) {
-  struct thread *cur = thread_current();
   struct file *file;
 
-  if (file_name >= PHYS_BASE)
+  char *kfile = palloc_get_page(PAL_ZERO);
+  if (safe_strcpy_from_user(kfile, file_name) == -1) {
+    palloc_free_page(kfile);
     sys_exit(-1);
-
-  void *kernel_ptr = pagedir_get_page(cur->pagedir, file_name);
-  if (kernel_ptr == NULL)
-    sys_exit(-1);
-
-  file = filesys_open(file_name);
+  }
+  file = filesys_open(kfile);
+  palloc_free_page(kfile);
 
   if (file == NULL)
     return -1;
@@ -171,12 +169,13 @@ static int sys_read(int fd, void *buffer, unsigned size) {
   unsigned char *kbuffer;
   struct file *file;
   int read_bytes;
+  int page_cnt = (int) size / PGSIZE + 1;
 
   file = get_file_by_fd(fd);
   if (file == NULL && fd != STDIN_FILENO)
     return -1;
 
-  kbuffer = palloc_get_page(PAL_ZERO);
+  kbuffer = palloc_get_multiple(PAL_ZERO, page_cnt);
   if (fd == STDIN_FILENO) {
     for (unsigned i = 0; i < size; i++) {
       kbuffer[i] = input_getc();
@@ -187,7 +186,7 @@ static int sys_read(int fd, void *buffer, unsigned size) {
   }
 
   void *ptr = safe_memcpy_to_user(buffer, kbuffer, read_bytes);
-  palloc_free_page(kbuffer);
+  palloc_free_multiple(kbuffer, page_cnt);
   if (ptr == NULL) {
     sys_exit(-1);
   }
@@ -198,15 +197,16 @@ static int sys_write(int fd, void *buffer, unsigned int size) {
   unsigned char *kbuffer;
   struct file *file;
   int write_bytes;
+  int page_cnt = (int) size / PGSIZE + 1;
 
   file = get_file_by_fd(fd);
   if (file == NULL && fd != STDOUT_FILENO)
     return -1;
 
-  kbuffer = palloc_get_page(PAL_ZERO);
+  kbuffer = palloc_get_multiple(PAL_ZERO, page_cnt);
   void *ptr = safe_memcpy_from_user(kbuffer, buffer, size);
   if (ptr == NULL) {
-    palloc_free_page(kbuffer);
+    palloc_free_multiple(kbuffer, page_cnt);
     sys_exit(-1);
   }
 
@@ -217,7 +217,7 @@ static int sys_write(int fd, void *buffer, unsigned int size) {
     write_bytes = file_write(file, kbuffer, (off_t) size);
   }
 
-  palloc_free_page(kbuffer);
+  palloc_free_multiple(kbuffer, page_cnt);
   return write_bytes;
 }
 
