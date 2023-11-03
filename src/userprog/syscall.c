@@ -124,6 +124,7 @@ static pid_t sys_exec(const char *cmd_line) {
   if (tid == TID_ERROR)
     return PID_ERROR;
   // pid is PID_ERROR, unless load() has succeed and start_process() has allocated pid
+  printf("executed %s, pid: %d\n", cmd_line, get_thread_by_tid(tid)->pcb->pid);
   return get_thread_by_tid(tid)->pcb->pid;
 }
 
