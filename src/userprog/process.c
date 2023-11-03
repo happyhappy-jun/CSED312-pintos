@@ -39,18 +39,22 @@ tid_t process_execute(const char *file_name) {
   strlcpy(fn_copy, file_name, PGSIZE);
 
   command = palloc_get_page(0);
-  if (command == NULL)
+  if (command == NULL) {
+    palloc_free_page(fn_copy);
     return TID_ERROR;
+  }
   strlcpy(command, file_name, PGSIZE);
 
   parse_command(command);
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create(command, PRI_DEFAULT, start_process, fn_copy);
+  palloc_free_page(command);
   if (tid == TID_ERROR) {
-    palloc_free_page(command);
     palloc_free_page(fn_copy);
   }
   else {
+    // if the load() is not finished, wait for it
+    // fn_copy will be freed in start_process()
     sema_down(&get_thread_by_tid(tid)->pcb->load_sema);
   }
   return tid;
