@@ -140,6 +140,153 @@ pcb를 구성하는 이외의 멤버와 이를 사용하는 알고리즘 및 구
 
 # System Calls
 
+## Accessing User Memory
+
+시스템 콜을 구현하기에 앞서 유저 메모리에 안전하게 접근하기 위한 방법을 고안해야했다.
+시스템 콜에서는 우선 시스템 콜 인자를 유저 스택에서 가져와야하고, 포인터를 인자로 받는 시스템 콜은 포인터를 이용해 유저 메모리를 참고해야한다.
+핀토스 공식 문서의 3.1.5 Accessing User Memory에서 제안하는 두 가지 방법 중 두 번째 방법을 채택하여 구현하였다.
+
+두 번째 방법은 유저 메모리에 접근하기 전에 PHYS_BASE보다 작다는 것만을 확인한 후 바로 접근을 하는 것이다.
+이후, 접근에 문제가 생겨 page fault가 발생하면 이를 userprog/exception.c의 page_fault()에서 처리한다.
+
+### Algorithms and Implementation
+
+먼저, PHYS_BASE보다 큰 주소에 접근하는 것을 막기 위해 `validate_uaddr()`를 구현했다.
+
+```c
+bool validate_uaddr(const void *uaddr) {
+  return uaddr < PHYS_BASE;
+}
+```
+
+userprog/exception.c의 page_fault()에서는 kernel이 PHYS_BASE 이하의 주소를 참고하는 중에 page fault가 발생하는 경우를 처리하였다.
+이외의 유저 영역에서 발생하는 page fault는 해당 프로세스의 exit_code를 -1로 설정하고 thread_exit()를 호출하여 프로세스를 종료한다.
+
+```c
+static void
+page_fault(struct intr_frame *f) {
+  bool not_present; /* True: not-present page, false: writing r/o page. */
+  bool write;       /* True: access was write, false: access was read. */
+  bool user;        /* True: access by user, false: access by kernel. */
+  void *fault_addr; /* Fault address. */
+  
+  ...
+  
+  // fault under PHYS_BASE access by kernel
+  // => fault while accessing user memory
+  if (fault_addr < PHYS_BASE && !user) {
+    f->eip = (void (*)(void))(f->eax);
+    f->eax = 0xffffffff;
+    return;
+  }
+  // other userspace page fault => exit(-1)
+  else if (user) {
+    thread_current()->pcb->exit_code = -1;
+    thread_exit();
+  }
+  
+  ...
+  
+}
+```
+
+위와 같이 page fault에 대한 처리가 된다면 핀토스 공식 문서에서 제공한 다음과 같은 예제 코드를 이용하여 유저 메모리에 안전하게 접근할 수 있다.
+
+```c
+/* Reads a byte at user virtual address UADDR.
+   UADDR must be below PHYS_BASE.
+   Returns the byte value if successful, -1 if a segfault
+   occurred. */
+static int get_user(const uint8_t *uaddr) {
+  int result;
+  asm("movl $1f, %0; movzbl %1, %0; 1:"
+      : "=&a"(result)
+      : "m"(*uaddr));
+  return result;
+}
+
+/* Writes BYTE to user address UDST.
+   UDST must be below PHYS_BASE.
+   Returns true if successful, false if a segfault occurred. */
+static bool put_user(uint8_t *udst, uint8_t byte) {
+  int error_code;
+  asm("movl $1f, %0; movb %b2, %1; 1:"
+      : "=&a"(error_code), "=m"(*udst)
+      : "q"(byte));
+  return error_code != -1;
+}
+```
+
+`get_user()`, `put_user()` 모두 하나의 바이트에 대해 동작하기 떄문에, 좀 더 편하게 이용하기 위해 다음과 같은 함수를 추가로 구현하였다.
+`get_user()`와 `put_user()` 모두 각자의 방법으로 `page_fault()`에서 설정한 값을 이용해 에러 여부를 반환하는데 이를 적절하게 처리해주어야 한다.
+
+```c
+void *safe_memcpy_from_user(void *kdst, const void *usrc, size_t n) {
+  uint8_t *dst = kdst;
+  const uint8_t *src = usrc;
+  int byte;
+
+  ASSERT(kdst != NULL)
+
+  if (!validate_uaddr(usrc) || !validate_uaddr(usrc + n - 1))
+    return NULL;
+
+  for (size_t i = 0; i < n; i++) {
+    byte = get_user(src + i);
+    if (byte == -1)
+      return NULL;
+    dst[i] = byte;
+  }
+  return kdst;
+}
+
+void *safe_memcpy_to_user(void *udst, const void *ksrc, size_t n) {
+  uint8_t *dst = udst;
+  const uint8_t *src = ksrc;
+  int byte;
+
+  if (!validate_uaddr(udst) || !validate_uaddr(udst + n - 1))
+    return NULL;
+
+  for (size_t i = 0; i < n; i++) {
+    byte = src[i];
+    if (!put_user(dst + i, byte))
+      return NULL;
+  }
+  return udst;
+}
+
+int safe_strcpy_from_user(char *kdst, const char *usrc) {
+  int byte;
+
+  ASSERT(kdst != NULL)
+
+  for (int i = 0;; i++) {
+    if (!validate_uaddr(usrc + i))
+      return -1;
+
+    byte = get_user((const unsigned char *) usrc + i);
+    if (byte == -1)
+      return -1;
+
+    kdst[i] = (char) byte;
+
+    if (byte == '\0')
+      return i;
+  }
+}
+```
+
+커널이 유저 메모리에 값을 작성하는 경우와 커널이 유저 메모리에서 값을 읽어오는 경우에 대해 각각 `safe_memcpy_to_user()`, `safe_memcpy_from_user()`를 구현하였다.
+이때 접근하게 되는 유저 메모리의 시작과 끝 모두 `validate_uaddr()`를 통해 PHYS_BASE보다 작은지 확인한다.
+이후 반복문으로 유저 메모리의 값을 하나씩 읽어오거나 작성한다.
+
+`safe_strcpy_from_user()`는 null이 나올 때까지 유저 메모리에서 값을 읽어와 커널 메모리에 작성한다.
+
+세 함수 모두 에러가 발생한 경우, 에러에 대응하는 값을 반환하여 호출자가 할당받은 메모리 해제 등의 에러에 대한 처리를 하도록 구현하였다.
+
+## System Call Handlers
+
 ## User Process Manipulation
 
 ## File Manipulation
