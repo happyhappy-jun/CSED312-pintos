@@ -484,6 +484,73 @@ static void start_process(void *file_name_) {
 따라서 이 시점에 C의 `load()`는 완료된 것이며, C의 `pid`가 적절하게 설정된 것이다.
 이후 C는 자신의 본 기능을 수행하거나, `load()`가 실패했다면, `exit_code`를 -1로 설정하고 `thread_exit()`을 통해 종료할 수 있다.
 
+### System call `exit`
+
+`exit` 시스템 콜을 위한 `sys_exit()`은 다음과 같이 구현하였다.
+
+```c
+static void sys_exit(int status) {
+  struct thread *cur = thread_current();
+  cur->pcb->exit_code = status;
+  thread_exit();
+}
+```
+
+단순히 `status`을 인자로 받아서 현재 `pcb`의 `exit_code`에 설정해 준 후, `thread_exit()`를 호출하여 프로세스를 종료한다.
+`thread_exit()`은 `USERPROG`일 때 `process_exit()`를 호출하기 때문에 실질적인 프로세스의 종료 과정은 `process_exit()`에 구현하였다.
+
+수정된 `process_exit()`은 다음과 같다.
+
+```c
+void process_exit(void) {
+  struct thread *cur = thread_current();
+  uint32_t *pd;
+
+  printf("%s: exit(%d)\n", cur->name, cur->pcb->exit_code);
+
+  /* allow write and close the executable file */
+  file_close(cur->pcb->file);
+
+  /* close all opened files */
+  for (int i = 0; i < FD_MAX; i++) {
+    if (cur->pcb->fd_list[i] != NULL) {
+      file_close(cur->pcb->fd_list[i]);
+    }
+  }
+
+  /* Destroy the current process's page directory and switch back
+     to the kernel-only page directory. */
+  pd = cur->pagedir;
+  if (pd != NULL) {
+    /* Correct ordering here is crucial.  We must set
+       cur->pagedir to NULL before switching page directories,
+       so that a timer interrupt can't switch back to the
+       process page directory.  We must activate the base page
+       directory before destroying the process's page
+       directory, or our active page directory will be one
+       that's been freed (and cleared). */
+    cur->pagedir = NULL;
+    pagedir_activate(NULL);
+    pagedir_destroy(pd);
+  }
+  sema_up(&cur->pcb->wait_sema);  // sema up wait_sema for waiting parent
+  sig_children_parent_exit();     // sema up exit_sema for children to free their resources
+  sema_down(&cur->pcb->exit_sema);// exit_sema up only when the parent exit
+  free_pcb(cur->pcb);
+}
+```
+
+우선, 프로세스 종료 메시지를 출력한다. 이후 프로세스의 자원들을 해제하는 작업을 한다.
+`pcb`에 저장된 `file`과 `fd_list`에 남아있는 파일을 모두 닫아주며 프로세스 가상 주소를 위한 `pagedir`에 대한 후처리를 한다.
+중요한 부분은 프로세스 종료를 위해 관계된 프로세스 사이의 싱크를 맞추는 것이다.
+현재 `exit` 시스템 콜을 발생시킨 프로세스를 A라고 하자. A는 가장 먼저 자신의 `wait_sema`를 `sema_up` 해준다.
+만약 A를 `wait`하고 있는 부모 프로세스가 있다면, 이때 `wait`을 종료한다. `wait`에 대해 자세한 내용은 이후에 다룬다.
+다음으로 `sig_children_parent_exit()`을 통해 자식 프로세스들에게 부모인 A가 `exit` 함을 알린다.
+마지막으로 남은 자원인 `pcb`를 해제하기 위해 `exit_sema`를 `sema_down()`한다.
+
+`exit_sema`의 초기값이 0이기 때문에 `exit_sema`에 대해 다른 프로세스가 `sema_up()`을 해준 적이 없다면 `sema_up()`을 기다리게 된다.
+이는 자식 프로세스인 A가 종료된 후에도 A의 부모 프로세스(P라고 하겠다)가 A에 대해 `wait`을 할 수 있기 때문에 필요한 장치이다.
+
 ## File Manipulation
 
 # Denying Writes to Executables
