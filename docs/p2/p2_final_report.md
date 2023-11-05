@@ -348,6 +348,142 @@ static void syscall_handler(struct intr_frame *f) {
 
 ## User Process Manipulation
 
+User Process Manipulation을 위해 필요한 시스템 콜은 `halt`, `exit`, `exec`과 `wait`이다.
+각각의 시스템 콜을 위해 `sys_exit()`, `sys_exec()`, `sys_wait()`을 구현하였다.
+`halt`의 경우, `shutdown_power_off()`를 호출하면 되기 때문에 별도의 구현이 필요하지 않다.
+
+또한, 각 시스템 콜의 동작을 위해 `process_exec()`, `process_exit()`, `process_wait()`을 수정했다.
+
+### Algorithms and Implementation
+
+### System call `exec`
+
+`exec` 시스템 콜을 위한 `sys_exec()`은 다음과 같이 구현하였다.
+
+```c
+static pid_t sys_exec(const char *cmd_line) {
+  char *cmd_line_copy = palloc_get_page(PAL_ZERO);
+  if (cmd_line_copy == NULL)
+    return PID_ERROR;
+
+  if (safe_strcpy_from_user(cmd_line_copy, cmd_line) == -1) {
+    palloc_free_page(cmd_line_copy);
+    sys_exit(-1);
+  }
+
+  tid_t tid = process_execute(cmd_line_copy);
+  palloc_free_page(cmd_line_copy);
+  if (tid == TID_ERROR)
+    return PID_ERROR;
+  // pid is PID_ERROR, unless load() has succeed and start_process() has allocated pid
+  return get_thread_by_tid(tid)->pcb->pid;
+}
+```
+
+우선 유저 메모리에서 인자를 복사해오기 위한 메모리를 할당받는다. 할당받을 수 없는 경우에는 PID_ERROR를 반환한다.
+`safe_strcpy_from_user()`를 통해 유저 메모리에서 인자를 복사해오는데, 이때 에러가 발생한 경우 할당받은 메모리를 해제하고 -1을 반환한다.
+
+이후, `process_execute()`를 통해 새로운 프로세스를 생성한다.
+`exec` 시스템 콜을 호출한 프로세스를 A, 새로 생성한 자식(Child) 프로세스를 C라고 하자.
+`process_execute()`의 반환값인 C의 `tid`가 `TID_ERROR`인 경우 `PID_ERROR`를 반환한다.
+아닌 경우, `get_thread_by_tid()`를 통해 C의 `pcb`를 찾아 `pid`를 반환한다.
+C의 `pid`는 `start_process()`에서 `load()` 성공 시에 설정되고, 초기에는 `PID_ERROR`로 설정된다.
+`process_execute()`는 반환하는 시점에 C의 `load()`가 종료되고 그 성공 여부에 따라 `pid`가 설정되었음이 보장되도록 구현하였다.
+따라서, `sys_exec()`은 C의 `load()`가 성공했는지 따로 확인하지 않고 `pid`를 반환해도 문제없다.
+
+실제 프로세스 생성과 실행 준비가 이루어지는 `process_execute()`의 수정된 구현을 살펴보겠다.
+
+```c
+tid_t process_execute(const char *file_name) {
+  char *fn_copy, *command;
+  tid_t tid;
+
+  /* Make a copy of FILE_NAME.
+     Otherwise there's a race between the caller and load(). */
+  fn_copy = palloc_get_page(0);
+  if (fn_copy == NULL)
+    return TID_ERROR;
+  strlcpy(fn_copy, file_name, PGSIZE);
+
+  command = palloc_get_page(0);
+  if (command == NULL) {
+    palloc_free_page(fn_copy);
+    return TID_ERROR;
+  }
+  strlcpy(command, file_name, PGSIZE);
+
+  parse_command(command);
+  /* Create a new thread to execute FILE_NAME. */
+  tid = thread_create(command, PRI_DEFAULT, start_process, fn_copy);
+  palloc_free_page(command);
+  if (tid == TID_ERROR) {
+    palloc_free_page(fn_copy);
+  }
+  else {
+    // if the load() is not finished, wait for it
+    // fn_copy will be freed in start_process()
+    sema_down(&get_thread_by_tid(tid)->pcb->load_sema);
+  }
+  return tid;
+}
+```
+
+우선 C의 이름을 명령줄 인자를 제외하여 파싱한 결과로 사용하기 위해 `parse_command()`를 호출한다.
+이후, `thread_create()`를 통해 새로운 스레드를 생성한다.
+`thread_create()`가 실패한다면, `fn_copy`를 해제하고 `TID_ERROR`를 반환한다.
+`thread_create()`는 새로 생성한 스레드의 `tid`를 반환하는데, A는 이를 통해 C의 `pcb`를 찾을 수 있다.
+A는 C의 `pcb`의 `load_sema`를 통해 C의 `load()`가 완료될 때까지 대기한다.
+C는 최초로 `start_process()`를 실행하는데, `start_process()`에서 적절하게 `load_sema`를 `sema_up()`한다면,
+A의 `process_execute()` 반환 시 C의 `load()` 종료와 성공 여부에 따른 pid 설정이 완료되었음을 보장받을 수 있다.
+
+이제 `start_process()`의 구현을 살펴보겠다.
+
+```c
+static void start_process(void *file_name_) {
+  char *file_name = file_name_;
+  struct intr_frame if_;
+  bool success;
+
+  /* Initialize interrupt frame and load executable. */
+  memset(&if_, 0, sizeof if_);
+  if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
+  if_.cs = SEL_UCSEG;
+  if_.eflags = FLAG_IF | FLAG_MBS;
+  success = load(file_name, &if_.eip, &if_.esp);
+  palloc_free_page(file_name);
+
+  /* allocate pid when the load() succeed */
+  if (success)
+    thread_current()->pcb->pid = allocate_pid();
+  /* Let the parent thread/process know the load() is finished */
+  sema_up(&thread_current()->pcb->load_sema);
+
+  /* If load failed, quit. */
+  if (!success) {
+    thread_current()->pcb->exit_code = -1;
+    thread_exit();
+  }
+
+  /* Start the user process by simulating a return from an
+     interrupt, implemented by intr_exit (in
+     threads/intr-stubs.S).  Because intr_exit takes all of its
+     arguments on the stack in the form of a `struct intr_frame',
+     we just point the stack pointer (%esp) to our stack frame
+     and jump to it. */
+  asm volatile("movl %0, %%esp; jmp intr_exit"
+               :
+               : "g"(&if_)
+               : "memory");
+  NOT_REACHED();
+}
+```
+
+`start_process()`는 `load()`를 통해 C의 실행 파일을 메모리에 로드한다.
+`load()`가 성공한 경우, C의 `pcb`의 `pid`를 설정한다.
+이후, `load()`가 완료되었으므로, 성공 여부와는 관계없이 `load_sema`를 `sema_up()`하여 A가 `process_execute()`에서 대기를 종료하도록 한다.
+따라서 이 시점에 C의 `load()`는 완료된 것이며, C의 `pid`가 적절하게 설정된 것이다.
+이후 C는 자신의 본 기능을 수행하거나, `load()`가 실패했다면, `exit_code`를 -1로 설정하고 `thread_exit()`을 통해 종료할 수 있다.
+
 ## File Manipulation
 
 # Denying Writes to Executables
