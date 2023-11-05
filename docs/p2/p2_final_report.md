@@ -576,6 +576,72 @@ void sig_children_parent_exit(void) {
   }
 }
 ```
+
+### System call `wait`
+
+`wait` 시스템 콜을 위한 `sys_wait()`은 다음과 같이 구현하였다.
+
+```c
+static int sys_wait(pid_t pid) {
+  struct thread *child = get_thread_by_pid(pid);
+  int result;
+  if (child == NULL)
+    return -1;
+  if (child->pcb->can_wait)
+    child->pcb->can_wait = false;
+  else
+    return -1;
+  result = process_wait(child->tid);
+  sig_child_can_exit(pid);
+  return result;
+}
+```
+
+먼저 `pid`에 해당하는 자식 프로세스(C라고 하겠다)를 찾는다. pid에 해당하는 프로세스가 없는 경우 `-1`을 반환한다.
+이후, C에 대해 `wait`을 할 수 있는지 C의 `pcb`의 `can_wait`을 이용해 확인한다.
+`can_wait`이 참이라면 `can_wait`을 거짓으로 설정하고 `process_wait()`을 호출한다.
+`can_wait`이 거짓이라면 `-1`을 반환한다. `can_wait`이 거짓이라는 것은 이미 한 번 C에 대한 `wait`이 이루어졌음을 의미한다.
+`can_wait`을 통해 한 번 이상의 `wait`에 대해 -1을 반환하는 처리가 가능하다.
+실제 대기는 `process_wait()`을 통해 이루어진다.
+`process_wait()`이 종료되면 C가 자신의 pcb를 해제해도 문제없기 때문에, `sig_child_can_exit()`을 통해 C의 `exit_sema`를 `sema_up()`한다.
+
+`sig_child_can_exit()`의 구현은 다음과 같다.
+
+```c
+void sig_child_can_exit(pid_t pid) {
+  struct thread *child = get_thread_by_pid(pid);
+  if (child == NULL)
+    return;
+  sema_up(&child->pcb->exit_sema);
+}
+```
+
+이제 실제 대기가 이루어지는 `process_wait()`을 살펴보겠다.
+
+```c
+int process_wait(tid_t child_tid) {
+  struct thread *current = thread_current();
+  struct thread *child = get_thread_by_tid(child_tid);
+
+  // invalid tid
+  if (child == NULL)
+    return -1;
+  // not child
+  if (child->pcb->parent_tid != current->tid)
+    return -1;
+
+  // else, wait for the child;
+  // wait_sema of the child only up when the child exit
+  sema_down(&child->pcb->wait_sema);
+  return child->pcb->exit_code;
+}
+```
+
+우선 인자로 받은 `tid`에 대한 자식 프로세스(C라고 하겠다)를 찾는다. 자식 프로세스가 없는 경우 `-1`을 반환한다.
+또한, C가 자식 프로세스가 맞는지 확인하기 위해 `parent_tid`를 이용해 확인한다. C가 자식 프로세스가 아닌 경우 `-1`을 반환한다.
+이후, C의 `wait_sema`를 `sema_down()`하여 C가 종료될 때까지 대기한다.
+C가 종료하면서 `wait_sema`를 `sema_up()`해주면 이후에 `exit_code`를 반환한다.
+
 ## File Manipulation
 
 # Denying Writes to Executables
