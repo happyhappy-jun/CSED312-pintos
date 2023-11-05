@@ -3,6 +3,7 @@
 #include "devices/shutdown.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
+#include "pagedir.h"
 #include "threads/palloc.h"
 #include "userprog/user-memory-access.h"
 #include <stdio.h>
@@ -10,21 +11,29 @@
 
 struct lock file_lock;
 
-static bool valid_fd(int fd, enum fd_check_mode mode) {
-  struct thread *cur = thread_current();
-  switch (mode) {
-  case FD_CHECK_READ:
-    return fd >= 0 && fd < cur->pcb->file_cnt && fd != 1;
-  case FD_CHECK_WRITE:
-    return fd >= 0 && fd < cur->pcb->file_cnt && fd != 0;
-  case FD_CHECK_DEFAULT:
-    return fd >= 2 && fd < cur->pcb->file_cnt;
-  }
+static void syscall_handler(struct intr_frame *);
+static void sys_exit(int);
+static pid_t sys_exec(const char *);
+static int sys_wait(pid_t);
+static bool sys_create(const char *, unsigned initial_size);
+static bool sys_remove(const char *);
+static int sys_open(const char *);
+static int sys_filesize(int);
+static int sys_read(int, void *, unsigned);
+static int sys_write(int, void *, unsigned);
+static void sys_seek(int, unsigned);
+static unsigned sys_tell(int);
+static void sys_close(int);
+
+void syscall_init(void) {
+  lock_init(&file_lock);
+  intr_register_int(0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
 static int get_from_user_stack(const int *esp, int offset) {
   int value;
-  safe_memcpy_from_user(&value, esp + offset, sizeof(int));
+  if (!safe_memcpy_from_user(&value, esp + offset, sizeof(int)))
+    sys_exit(-1);
   return value;
 }
 
@@ -35,11 +44,6 @@ static int get_syscall_n(void *esp) {
 static void get_syscall_args(void *esp, int n, int *syscall_args) {
   for (int i = 0; i < n; i++)
     syscall_args[i] = get_from_user_stack(esp, 1 + i);
-}
-
-void syscall_init(void) {
-  lock_init(&file_lock);
-  intr_register_int(0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
 static void syscall_handler(struct intr_frame *f) {
@@ -101,17 +105,22 @@ static void syscall_handler(struct intr_frame *f) {
   }
 }
 
-void sys_exit(int status) {
+static void sys_exit(int status) {
   struct thread *cur = thread_current();
   cur->pcb->exit_code = status;
-  printf("%s: exit(%d)\n", cur->name, status);
   thread_exit();
 }
 
 static pid_t sys_exec(const char *cmd_line) {
-  char *cmd_line_copy = palloc_get_page(0);
+  char *cmd_line_copy = palloc_get_page(PAL_ZERO);
+  if (cmd_line_copy == NULL)
+    return PID_ERROR;
 
-  safe_strcpy_from_user(cmd_line_copy, cmd_line);
+  if (safe_strcpy_from_user(cmd_line_copy, cmd_line) == -1) {
+    palloc_free_page(cmd_line_copy);
+    sys_exit(-1);
+  }
+
   tid_t tid = process_execute(cmd_line_copy);
   palloc_free_page(cmd_line_copy);
   if (tid == TID_ERROR)
@@ -121,138 +130,148 @@ static pid_t sys_exec(const char *cmd_line) {
 }
 
 static int sys_wait(pid_t pid) {
-  struct thread *t = get_thread_by_pid(pid);
-  if (t == NULL)
+  struct thread *child = get_thread_by_pid(pid);
+  int result;
+  if (child == NULL)
     return -1;
-  return process_wait(t->tid);
+  if (child->pcb->can_wait)
+    child->pcb->can_wait = false;
+  else
+    return -1;
+  result = process_wait(child->tid);
+  sig_child_can_exit(pid);
+  return result;
 }
 
 static int sys_open(const char *file_name) {
-  struct thread *cur = thread_current();
-  char *file_name_copy = palloc_get_page(0);
   struct file *file;
-  int fd;
 
-  if (safe_strcpy_from_user(file_name_copy, file_name) == -1) {
+  char *kfile = palloc_get_page(PAL_ZERO);
+  if (kfile == NULL)
+    return -1;
+  if (safe_strcpy_from_user(kfile, file_name) == -1) {
+    palloc_free_page(kfile);
     sys_exit(-1);
   }
-
-  file = filesys_open(file_name_copy);
-  palloc_free_page(file_name_copy);
+  file = filesys_open(kfile);
+  palloc_free_page(kfile);
 
   if (file == NULL)
     return -1;
 
-  fd = cur->pcb->file_cnt;
-  cur->pcb->file_cnt++;
-  cur->pcb->fd_list[fd] = file;
-  return fd;
+  return allocate_fd(file);
 }
 
 static int sys_filesize(int fd) {
-  struct thread *cur = thread_current();
   struct file *file;
 
-  if (!valid_fd(fd, FD_CHECK_DEFAULT))
+  file = get_file_by_fd(fd);
+  if (file == NULL)
     return 0;
-  file = cur->pcb->fd_list[fd];
 
   return file_length(file);
 }
 
 static int sys_read(int fd, void *buffer, unsigned size) {
-  struct thread *cur = thread_current();
   unsigned char *kbuffer;
   struct file *file;
   int read_bytes;
+  int page_cnt = (int) size / PGSIZE + 1;
 
-  if (!valid_fd(fd, FD_CHECK_READ))
+  file = get_file_by_fd(fd);
+  if (file == NULL && fd != STDIN_FILENO)
     return -1;
 
-  kbuffer = palloc_get_page(0);
-  if (fd == 0) {
+  kbuffer = palloc_get_multiple(PAL_ZERO, page_cnt);
+  if (kbuffer == NULL)
+    return -1;
+  if (fd == STDIN_FILENO) {
     for (unsigned i = 0; i < size; i++) {
       kbuffer[i] = input_getc();
     }
     read_bytes = (int) size;
   } else {
-    file = cur->pcb->fd_list[fd];
     read_bytes = file_read(file, kbuffer, (off_t) size);
   }
 
   void *ptr = safe_memcpy_to_user(buffer, kbuffer, read_bytes);
-  palloc_free_page(kbuffer);
+  palloc_free_multiple(kbuffer, page_cnt);
   if (ptr == NULL) {
     sys_exit(-1);
   }
   return read_bytes;
 }
 
-int sys_write(int fd, void *buffer, unsigned int size) {
-  struct thread *cur = thread_current();
+static int sys_write(int fd, void *buffer, unsigned int size) {
   unsigned char *kbuffer;
   struct file *file;
   int write_bytes;
+  int page_cnt = (int) size / PGSIZE + 1;
 
-  if (!valid_fd(fd, FD_CHECK_WRITE))
+  file = get_file_by_fd(fd);
+  if (file == NULL && fd != STDOUT_FILENO)
     return -1;
 
-  kbuffer = palloc_get_page(0);
+  kbuffer = palloc_get_multiple(PAL_ZERO, page_cnt);
+  if (kbuffer == NULL)
+    return -1;
   void *ptr = safe_memcpy_from_user(kbuffer, buffer, size);
   if (ptr == NULL) {
-    palloc_free_page(kbuffer);
+    palloc_free_multiple(kbuffer, page_cnt);
     sys_exit(-1);
   }
 
-  if (fd == 1) {
+  if (fd == STDOUT_FILENO) {
     putbuf((const char *) kbuffer, size);
     write_bytes = (int) size;
   } else {
-    file = cur->pcb->fd_list[fd];
     write_bytes = file_write(file, kbuffer, (off_t) size);
   }
 
-  palloc_free_page(kbuffer);
+  palloc_free_multiple(kbuffer, page_cnt);
   return write_bytes;
 }
 
 static void sys_seek(int fd, unsigned position) {
-  struct thread *cur = thread_current();
   struct file *file;
 
-  if (!valid_fd(fd, FD_CHECK_DEFAULT))
+  file = get_file_by_fd(fd);
+  if (file == NULL)
     return;
 
-  file = cur->pcb->fd_list[fd];
   file_seek(file, (int) position);
 }
 
 static unsigned sys_tell(int fd) {
-  struct thread *cur = thread_current();
   struct file *file;
-  if (!valid_fd(fd, FD_CHECK_DEFAULT))
+
+  file = get_file_by_fd(fd);
+  if (file == NULL)
     return 0;
 
-  file = cur->pcb->fd_list[fd];
   return (unsigned) file_tell(file);
 }
 
 static void sys_close(int fd) {
-  struct thread *cur = thread_current();
   struct file *file;
 
-  if (!valid_fd(fd, FD_CHECK_DEFAULT))
+  file = get_file_by_fd(fd);
+  if (file == NULL)
     return;
 
-  file = cur->pcb->fd_list[fd];
   file_close(file);
-  cur->pcb->fd_list[fd] = NULL;
-  cur->pcb->file_cnt--;
+  free_fd(fd);
 }
 
 static bool sys_create(const char *file, unsigned initial_size) {
-  char *kfile = palloc_get_page(0);
-  safe_strcpy_from_user(kfile, file);
+  char *kfile = palloc_get_page(PAL_ZERO);
+  if (kfile == NULL)
+    return false;
+
+  if (safe_strcpy_from_user(kfile, file) == -1) {
+    palloc_free_page(kfile);
+    sys_exit(-1);
+  }
 
   lock_acquire(&file_lock);
   bool success = filesys_create(kfile, (off_t) initial_size);
@@ -263,8 +282,14 @@ static bool sys_create(const char *file, unsigned initial_size) {
 }
 
 static bool sys_remove(const char *file) {
-  char *kfile = palloc_get_page(0);
-  safe_strcpy_from_user(kfile, file);
+  char *kfile = palloc_get_page(PAL_ZERO);
+  if (kfile == NULL)
+    return false;
+
+  if (safe_strcpy_from_user(kfile, file) == -1) {
+    palloc_free_page(kfile);
+    sys_exit(-1);
+  }
 
   lock_acquire(&file_lock);
   bool success = filesys_remove(kfile);

@@ -3,6 +3,7 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "userprog/gdt.h"
+#include "userprog/syscall.h"
 #include <inttypes.h>
 #include <stdio.h>
 
@@ -149,6 +150,11 @@ page_fault(struct intr_frame *f) {
     f->eip = (void (*)(void))(f->eax);
     f->eax = 0xffffffff;
     return;
+  }
+  // other userspace page fault => exit(-1)
+  else if (user) {
+    thread_current()->pcb->exit_code = -1;
+    thread_exit();
   }
 
   /* To implement virtual memory, delete the rest of the function
