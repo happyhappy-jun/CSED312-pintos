@@ -644,4 +644,75 @@ C가 종료하면서 `wait_sema`를 `sema_up()`해주면 이후에 `exit_code`�
 
 ## File Manipulation
 
+파일 입출력을 위한 시스템 콜은 `create`, `remove`, `open`, `filesize`, `read`, `write`, `seek`, `tell`, `close`이다.
+
+각각의 시스템 콜을 위해 `sys_create()`, `sys_remove()`, `sys_open()`, `sys_filesize()`, `sys_read()`, `sys_write()`,
+`sys_seek()`, `sys_tell()`, `sys_close()`를 구현하였다.
+
+또한, create와 remove를 제외한 시스템 콜은 file descriptor를 이용해 파일을 참조하기 때문에 이를 위한 구현이 필요하다.
+
+### Data Structures
+
+File Descriptor를 위해 `pcb`에 `fd_list`를 추가했다.
+`fd_list`는 `file *`을 저장하는 배열이다. `fd_list`는 `init_pcb()`에서 `palloc_get_page()`을 통해 할당받는다.
+고정된 크기이므로 `FD_MAX`가 존재하며 이 크기는 `PGSIZE / sizeof(struct file *)`로 설정하였다.
+핀토스에서 `PGSIZE`는 4096이고 32비트 주소를 사용하므로 `FD_MAX`는 1024가 된다.
+이는 핀토스 공식 문서에서 언급한 프로세스가 최대로 여는 파일이 128개를 넘지 않는다는 가정을 만족한다.
+
+fd 0과 1은 각각 `STDIN_FILENO`, `STDOUT_FILENO`로 사용된다.
+따라서, 해당 fd에 대한 처리와 유효한 fd에 대한 검증 등을 위해 `fd_list`와 상호작용하는 함수들을 따로 작성하였다.
+실제로 `fd_list`에는 fd 2에 해당하는 파일의 `struct file *`부터 저장되도록 하였다.
+
+### Algorithms and Implementation
+
+#### File Descriptor System
+
+File descriptor 사용을 위해 `fd_list`에 접근하는 함수들은 다음과 같이 구현하였다.
+
+```c
+static struct file *get_fd_list_entry(int fd) {
+  return thread_current()->pcb->fd_list[fd - 2];
+}
+
+static void set_fd_list_entry(int fd, struct file *file) {
+  thread_current()->pcb->fd_list[fd - 2] = file;
+}
+
+static bool valid_fd(int fd) {
+  return fd >= 2 && fd < FD_MAX && get_fd_list_entry(fd) != NULL;
+}
+
+int allocate_fd(struct file *file) {
+  int fd;
+  struct pcb *pcb = thread_current()->pcb;
+  for (fd = 2; fd < FD_MAX; fd++) {
+    if (get_fd_list_entry(fd) == NULL) {
+      set_fd_list_entry(fd, file);
+      break;
+    }
+  }
+  return fd;
+}
+
+void free_fd(int fd) {
+  set_fd_list_entry(fd, NULL);
+}
+
+struct file *get_file_by_fd(int fd) {
+  if (!valid_fd(fd))
+    return NULL;
+  return get_fd_list_entry(fd);
+}
+```
+
+먼저 static 함수로 `fd_list`에 접근하는 함수들을 구현하였다.
+`get_fd_list_entry()`은 `fd_list`의 `fd`에 해당하는 `file *`을 반환한다.
+`set_fd_list_entry()`은 `fd_list`의 `fd`에 `file *`을 저장한다.
+`valid_fd()`는 `fd`가 유효한지 확인한다.
+
+이후로 시스템 콜에서 직접 사용하기 위한 함수들을 위의 함수들을 이용해 구현하였다.
+`allocate_fd()`는 `fd_list`에서 비어있는 공간에 `file *`을 저장하고 해당 `fd`를 반환한다.
+`free_fd()`는 `fd_list`의 `fd`에 저장된 `file *`을 해제한다.
+`get_file_by_fd()`는 `fd`에 해당하는 `file *`을 반환한다.
+
 # Denying Writes to Executables
