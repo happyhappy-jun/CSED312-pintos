@@ -551,6 +551,14 @@ void process_exit(void) {
 `exit_sema`의 초기값이 0이기 때문에 `exit_sema`에 대해 다른 프로세스가 `sema_up()`을 해준 적이 없다면 `sema_up()`을 기다리게 된다.
 이는 자식 프로세스인 A가 종료된 후에도 A의 부모 프로세스(P라고 하겠다)가 A에 대해 `wait`을 할 수 있기 때문에 필요한 장치이다.
 
+`exit_sema`는 두 가지 상황에 `sema_up()`된다.
+첫 번째는 P가 A에 대해 `wait`을 호출한 경우다. P는 `wait`을 위해 A의 `wait_sema`를 `sema_down()`한다.
+A가 `exit`을 하고 `wait_sema`를 `sema_up()`하면 P는 `wait`을 종료하고 A의 `exit_sema`를 `sema_up()`한다.
+두 번째는 P가 `exit`하는 경우다.
+이때 P는 `exit`을 하고 `sig_children_parent_exit()`을 통해 A의 `exit_sema`를 `sema_up()`한다.
+
+두 상황 모두 A가 더 이상 P의 `wait`을 고려하지 않아도 되는 상황임을 의미하며 이 시점부터 A는 자신의 `pcb`를 해제할 수 있다.
+
 ## File Manipulation
 
 # Denying Writes to Executables
