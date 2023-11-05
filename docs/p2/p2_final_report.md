@@ -715,4 +715,175 @@ struct file *get_file_by_fd(int fd) {
 `free_fd()`는 `fd_list`의 `fd`에 저장된 `file *`을 해제한다.
 `get_file_by_fd()`는 `fd`에 해당하는 `file *`을 반환한다.
 
+#### File Descriptor System Calls
+
+File descriptor를 사용하는 시스템 콜은 `open`, `filesize`, `read`, `write`, `seek`, `tell`, `close`이다.
+
+먼저 `open`과 `close`, 다음으로 `filesize`, `seek`, `tell`, 마지막으로 `read`, `write` 순서로 나눠서 살펴보겠다.
+
+```c
+static int sys_open(const char *file_name) {
+  struct file *file;
+
+  char *kfile = palloc_get_page(PAL_ZERO);
+  if (kfile == NULL)
+    return -1;
+  if (safe_strcpy_from_user(kfile, file_name) == -1) {
+    palloc_free_page(kfile);
+    sys_exit(-1);
+  }
+  file = filesys_open(kfile);
+  palloc_free_page(kfile);
+
+  if (file == NULL)
+    return -1;
+
+  return allocate_fd(file);
+}
+
+static void sys_close(int fd) {
+  struct file *file;
+
+  file = get_file_by_fd(fd);
+  if (file == NULL)
+    return;
+
+  file_close(file);
+  free_fd(fd);
+}
+```
+
+`sys_open()`은 우선 유저 메모리에서 인자를 복사해오기 위한 메모리를 할당받는다. 메모리 할당을 실패한 경우 `-1`을 반환한다.
+`safe_strcpy_from_user()`를 통해 유저 메모리에서 인자를 복사해온다.
+이때 에러가 발생한 경우 할당받은 메모리를 해제하고 `sys_exit(-1)`을 통해 프로세스를 종료한다.
+여기까지 문제가 없다면 `filesys_open()`을 통해 파일을 열고, 인자를 위해 할당받은 메모리를 해제한다.
+`filesys_open()`이 실패한 경우 `-1`을 반환한다.
+이후 `allocate_fd()`를 통해 `file *`을 `fd_list`에 저장하고 `fd`를 반환한다.
+
+`sys_close()`는 먼저 `fd`에 해당하는 `file *`을 `get_file_by_fd()`를 통해 찾는다.
+이때 `get_file_by_fd()`를 통해 `fd`에 해당하는 `file *`을 찾고 찾을 수 없는 경우에는 아무 동작도 하지 않고 리턴한다.
+아니라면 `file_close()`를 호출하고, `free_fd()`를 사용해 `fd`에 해당하는 `file *`을 `fd_list`에서 해제한다.
+
+```c
+static int sys_filesize(int fd) {
+  struct file *file;
+
+  file = get_file_by_fd(fd);
+  if (file == NULL)
+    return 0;
+
+  return file_length(file);
+}
+
+static void sys_seek(int fd, unsigned position) {
+  struct file *file;
+
+  file = get_file_by_fd(fd);
+  if (file == NULL)
+    return;
+
+  file_seek(file, (int) position);
+}
+
+static unsigned sys_tell(int fd) {
+  struct file *file;
+
+  file = get_file_by_fd(fd);
+  if (file == NULL)
+    return 0;
+
+  return (unsigned) file_tell(file);
+}
+```
+
+`sys_filesize()`, `sys_seek()`, `sys_tell()`은 fd를 이용해 파일을 참조하므로 `get_file_by_fd()`로 `fd`에 해당하는 `file *`을 찾는다.
+찾을 수 없다면 각 시스템 콜에 맞게 적절한 값을 반환하고 다른 동작을 취하지 않는다.
+아니라면 각 시스템 콜에 맞게 `file *`을 인자로 `file_length()`, `file_seek()`, `file_tell()`을 호출하고 필요한 경우 그 결과를 반환한다.
+
+```c
+static int sys_read(int fd, void *buffer, unsigned size) {
+  unsigned char *kbuffer;
+  struct file *file;
+  int read_bytes;
+  int page_cnt = (int) size / PGSIZE + 1;
+
+  file = get_file_by_fd(fd);
+  if (file == NULL && fd != STDIN_FILENO)
+    return -1;
+
+  kbuffer = palloc_get_multiple(PAL_ZERO, page_cnt);
+  if (kbuffer == NULL)
+    return -1;
+  if (fd == STDIN_FILENO) {
+    for (unsigned i = 0; i < size; i++) {
+      kbuffer[i] = input_getc();
+    }
+    read_bytes = (int) size;
+  } else {
+    read_bytes = file_read(file, kbuffer, (off_t) size);
+  }
+
+  void *ptr = safe_memcpy_to_user(buffer, kbuffer, read_bytes);
+  palloc_free_multiple(kbuffer, page_cnt);
+  if (ptr == NULL) {
+    sys_exit(-1);
+  }
+  return read_bytes;
+}
+
+static int sys_write(int fd, void *buffer, unsigned int size) {
+  unsigned char *kbuffer;
+  struct file *file;
+  int write_bytes;
+  int page_cnt = (int) size / PGSIZE + 1;
+
+  file = get_file_by_fd(fd);
+  if (file == NULL && fd != STDOUT_FILENO)
+    return -1;
+
+  kbuffer = palloc_get_multiple(PAL_ZERO, page_cnt);
+  if (kbuffer == NULL)
+    return -1;
+  void *ptr = safe_memcpy_from_user(kbuffer, buffer, size);
+  if (ptr == NULL) {
+    palloc_free_multiple(kbuffer, page_cnt);
+    sys_exit(-1);
+  }
+
+  if (fd == STDOUT_FILENO) {
+    putbuf((const char *) kbuffer, size);
+    write_bytes = (int) size;
+  } else {
+    write_bytes = file_write(file, kbuffer, (off_t) size);
+  }
+
+  palloc_free_multiple(kbuffer, page_cnt);
+  return write_bytes;
+}
+```
+
+`sys_read()`와 `sys_write()`는 우선 `get_file_by_fd()`를 통해 `fd`에 해당하는 `file *`을 찾는다.
+이때 두 함수는 각각 특수한 fd인 `STDIN_FILENO`, `STDOUT_FILENO`에 대해서도 고려해야 한다.
+특수한 fd가 아니면서 `file *`을 찾을 수 없다면 `-1`을 반환한다.
+
+이후 유저 메모리에서 값을 읽어오거나 쓰기 위해 메모리를 할당받는다.
+`size`가 얼마나 큰지에 따라 하나 이상의 page를 할당받아야 할 수도 있으므로 `palloc_get_multiple()`을 사용한다.
+할당받아야 하는 page의 개수는 `size`를 `PGSIZE`로 나눈 몫에 1을 더한 값으로, 코드에서 이 값은 `page_cnt`에 저장된다.
+메모리 할당 실패 시 `-1`을 반환한다. 이후` sys_read()`와 `sys_write()`의 동작이 다르므로 각각의 동작을 살펴보겠다.
+
+우선, `sys_read()`는 `STDIN_FILENO`인 경우, `input_getc()`를 이용해 `size`만큼의 값을 할당받은 커널 메모리에 읽어온다.
+혹은 일반적인 파일의 경우, `file_read()`를 이용해 `size`만큼의 값을 할당받은 커널 메모리에 읽어온다.
+실제 읽어온 바이트 수를 `read_bytes`에 저장한다.
+이후, `safe_memcpy_to_user()`를 통해 커널 메모리에서 유저 메모리로 읽어온 값을 복사한다.
+복사한 후에는 할당받은 커널 메모리를 해제한다.
+`safe_memcpy_to_user()`가 실패한 경우 `sys_exit(-1)`을 통해 프로세스를 종료하고, 성공한 경우 `read_bytes`를 반환한다.
+
+`sys_write()`는 먼저 파일에 써야할 값을 `safe_memcpy_from_user()`를 통해 유저 메모리에서 `size`만큼 할당받은 커널 메모리에 복사한다.
+`safe_memcpy_from_user()`가 실패한 경우 할당받은 커널 메모리를 해제하고 `sys_exit(-1)`을 통해 프로세스를 종료한다.
+성공한다면 fd에 맞는 동작을 수행한다.
+`STDOUT_FILENO`인 경우 `putbuf()`를 통해 커널 메모리의 값을 `size`만큼 터미널에 출력하고, `size`를 `write_bytes`에 저장한다.
+일반적인 파일의 경우 `file_write()`를 통해 커널 메모리의 값을 `size`만큼 파일에 쓰고, 실제 작성한 바이트 수를 `write_bytes`에 저장한다.
+이후 할당받은 커널 메모리를 해제하고 `write_bytes`를 반환한다.
+
+
 # Denying Writes to Executables
