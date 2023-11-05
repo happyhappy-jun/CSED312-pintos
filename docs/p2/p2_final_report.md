@@ -287,6 +287,65 @@ int safe_strcpy_from_user(char *kdst, const char *usrc) {
 
 ## System Call Handlers
 
+기존의 syscall_handler()이 적절히 동작하도록 추가 구현해주었다.
+
+### Algorithms and Implementation
+
+우선 시스템 콜 번호와 인자를 유저 스택에서 가져오기 위한 헬퍼 함수를 작성하였다.
+
+```c
+static int get_from_user_stack(const int *esp, int offset) {
+  int value;
+  if (!safe_memcpy_from_user(&value, esp + offset, sizeof(int)))
+    sys_exit(-1);
+  return value;
+}
+
+static int get_syscall_n(void *esp) {
+  return get_from_user_stack(esp, 0);
+}
+
+static void get_syscall_args(void *esp, int n, int *syscall_args) {
+  for (int i = 0; i < n; i++)
+    syscall_args[i] = get_from_user_stack(esp, 1 + i);
+}
+```
+
+`syscall_handler()`는 `get_syscall_n()`을 이용해 시스템 콜 번호를 확인한다.
+이후, `switch` 문을 이용해 각 시스템 콜에 따라 필요한 인자를 `get_syscall_args()`를 통해 받아온다.
+받아온 인자를 시스템 콜의 각 동작을 수행하기 위해 따로 구현한 함수를 호출한다.
+반환값이 존재하는 시스템 콜의 경우 인자로 받은 `intr_frame`의 `eax`에 이를 저장한다.
+
+```c
+static void syscall_handler(struct intr_frame *f) {
+  int syscall_n;
+  int syscall_arg[3];
+
+  syscall_n = get_syscall_n(f->esp);
+  switch (syscall_n) {
+  case SYS_HALT:
+    shutdown_power_off();
+  case SYS_EXIT:
+    get_syscall_args(f->esp, 1, syscall_arg);
+    sys_exit(syscall_arg[0]);
+    break;
+  case SYS_EXEC:
+    get_syscall_args(f->esp, 1, syscall_arg);
+    f->eax = sys_exec((const char *) syscall_arg[0]);
+    break;
+    
+  ...
+  
+  case SYS_CLOSE:
+    get_syscall_args(f->esp, 1, syscall_arg);
+    sys_close(syscall_arg[0]);
+  default: break;
+  }
+}
+```
+
+각 시스템 콜 구현을 위한 함수들은 이후에 설명한다.
+
 ## User Process Manipulation
 
 ## File Manipulation
