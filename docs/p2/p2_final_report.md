@@ -559,6 +559,23 @@ A가 `exit`을 하고 `wait_sema`를 `sema_up()`하면 P는 `wait`을 종료하�
 
 두 상황 모두 A가 더 이상 P의 `wait`을 고려하지 않아도 되는 상황임을 의미하며 이 시점부터 A는 자신의 `pcb`를 해제할 수 있다.
 
+`sig_children_parent_exit()`의 구현은 아래와 같다.
+
+```c
+void sig_children_parent_exit(void) {
+  struct thread *t;
+  struct list_elem *e;
+  struct thread *cur = thread_current();
+  for (e = list_begin(&all_list); e != list_end(&all_list); e = list_next(e)) {
+    t = list_entry(e, struct thread, allelem);
+    if (t->pcb == NULL)
+      continue;
+    if (t->pcb->parent_tid == cur->tid) {
+      sema_up(&t->pcb->exit_sema);
+    }
+  }
+}
+```
 ## File Manipulation
 
 # Denying Writes to Executables
