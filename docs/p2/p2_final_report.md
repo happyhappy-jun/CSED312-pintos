@@ -356,7 +356,7 @@ User Process Manipulation을 위해 필요한 시스템 콜은 `halt`, `exit`, `
 
 ### Algorithms and Implementation
 
-### System call `exec`
+#### System call `exec`
 
 `exec` 시스템 콜을 위한 `sys_exec()`은 다음과 같이 구현하였다.
 
@@ -484,7 +484,7 @@ static void start_process(void *file_name_) {
 따라서 이 시점에 C의 `load()`는 완료된 것이며, C의 `pid`가 적절하게 설정된 것이다.
 이후 C는 자신의 본 기능을 수행하거나, `load()`가 실패했다면, `exit_code`를 -1로 설정하고 `thread_exit()`을 통해 종료할 수 있다.
 
-### System call `exit`
+#### System call `exit`
 
 `exit` 시스템 콜을 위한 `sys_exit()`은 다음과 같이 구현하였다.
 
@@ -577,7 +577,7 @@ void sig_children_parent_exit(void) {
 }
 ```
 
-### System call `wait`
+#### System call `wait`
 
 `wait` 시스템 콜을 위한 `sys_wait()`은 다음과 같이 구현하였다.
 
