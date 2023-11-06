@@ -1021,3 +1021,44 @@ static int sys_write(int fd, void *buffer, unsigned int size) {
 
 
 # Denying Writes to Executables
+
+프로그램을 실행 중일 때는데, 실행 파일은 수정되지 않아야 한다.
+이 기능은 `file.h` 의
+
+- `void file_deny_write(struct file *);`
+- `void file_allow_write(struct file *);`
+
+을 통해서 구현할 수 있다. 프로그램을 메모리에 로드하는 시점에 로드에 성공 한다면, 그 즉시 파일에 대한 쓰기를 막아서, 오류를 방지한다.
+또한, 프로세스가 종료될때는 이 파일에 대한 쓰기를 다시 허용해줘야한다. 이를 `load()`, `process_exit()` 에 구현해주었다.
+프로세스를 열때, 파일에 대한 쓰기를 막고, pcb 에 파일을 저장해준다. 나중에 프로세스를 종료할 때 해당 pcb 를 참조해서
+파일을 닫아준다. `file_close` 함수는 내부적으로 쓰기를 허용해주고, 닫기 때문에 이 함수를 사용하면 된다.
+
+```c
+  /* Open executable file. */
+  file = filesys_open(argv[0]);
+  if (file == NULL) {
+    printf("load: %s: open failed\n", argv[0]);
+    goto done;
+  }
+  file_deny_write(file);
+  t->pcb->file = file;
+```
+
+```c
+void process_exit(void) {
+  struct thread *cur = thread_current();
+  uint32_t *pd;
+
+  printf("%s: exit(%d)\n", cur->name, cur->pcb->exit_code);
+
+  /* allow write and close the executable file */
+  file_close(cur->pcb->file);
+  
+void file_close(struct file *file) {
+  if (file != NULL) {
+    file_allow_write(file);
+    inode_close(file->inode);
+    free(file);
+  }
+}
+```
