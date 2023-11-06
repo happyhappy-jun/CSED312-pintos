@@ -828,10 +828,10 @@ static bool valid_fd(int fd) {
 int allocate_fd(struct file *file) {
   int fd = -1;
   struct pcb *pcb = thread_current()->pcb;
-  for (int i = 0; i < FD_MAX; i++) {
-    if (pcb->fd_list[i] == NULL) {
-      fd = i + 2;
-      pcb->fd_list[i] = file;
+  for (int i = 2; i < FD_MAX; i++) {
+    if (get_fd_list_entry(i) == NULL) {
+      fd = i;
+      set_fd_list_entry(i, file);
       break;
     }
   }
