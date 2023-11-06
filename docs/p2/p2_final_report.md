@@ -646,9 +646,11 @@ void process_exit(void) {
   file_close(cur->pcb->file);
 
   /* close all opened files */
-  for (int i = 0; i < FD_MAX; i++) {
-    if (cur->pcb->fd_list[i] != NULL) {
-      file_close(cur->pcb->fd_list[i]);
+  for (int fd = 2; fd < FD_MAX; fd++) {
+    struct file *file = get_file_by_fd(fd);
+    if (file != NULL) {
+      file_close(file);
+      free_fd(fd);
     }
   }
 
