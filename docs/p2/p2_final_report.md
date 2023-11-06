@@ -817,11 +817,12 @@ static bool valid_fd(int fd) {
 }
 
 int allocate_fd(struct file *file) {
-  int fd;
+  int fd = -1;
   struct pcb *pcb = thread_current()->pcb;
-  for (fd = 2; fd < FD_MAX; fd++) {
-    if (get_fd_list_entry(fd) == NULL) {
-      set_fd_list_entry(fd, file);
+  for (int i = 2; i < FD_MAX; i++) {
+    if (get_fd_list_entry(i) == NULL) {
+      fd = i;
+      set_fd_list_entry(i, file);
       break;
     }
   }
