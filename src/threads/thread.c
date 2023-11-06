@@ -785,6 +785,8 @@ void sig_child_can_exit(pid_t pid) {
   struct thread *child = get_thread_by_pid(pid);
   if (child == NULL)
     return;
+  if (child->pcb->parent_tid != thread_current()->tid)
+    return;
   sema_up(&child->pcb->exit_sema);
 }
 
