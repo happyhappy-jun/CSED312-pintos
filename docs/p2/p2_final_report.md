@@ -1019,6 +1019,56 @@ static int sys_write(int fd, void *buffer, unsigned int size) {
 일반적인 파일의 경우 `file_write()`를 통해 커널 메모리의 값을 `size`만큼 파일에 쓰고, 실제 작성한 바이트 수를 `write_bytes`에 저장한다.
 이후 할당받은 커널 메모리를 해제하고 `write_bytes`를 반환한다.
 
+#### Non-File Descriptor System Calls
+
+`create` 는 파일을 생성하는 시스템 콜이다. `filesys` 에 미리 구현된 `filesys_create()` 를 통해 파일을 생성한다.
+유저 메모리 영역에서 파일 이름을 복사해와 커널 메모리에 작성한다.
+파일 시스템에 대한 쓰기 작업이므로, `file_lock` 을 이용해 파일 시스텀에 접근하기 전에 락을 확보하고 create 를 한다.
+그리고 락을 해제한다.
+
+```c
+static bool sys_create(const char *file, unsigned initial_size) {
+  char *kfile = palloc_get_page(PAL_ZERO);
+  if (kfile == NULL)
+    return false;
+
+  if (safe_strcpy_from_user(kfile, file) == -1) {
+    palloc_free_page(kfile);
+    sys_exit(-1);
+  }
+
+  lock_acquire(&file_lock);
+  bool success = filesys_create(kfile, (off_t) initial_size);
+  lock_release(&file_lock);
+
+  palloc_free_page(kfile);
+  return success;
+}
+```
+
+`remove` 는 파일을 삭제하는 시스템 콜이다. `filesys` 에 미리 구현된 `filesys_remove()` 를 통해 파일을 삭제한다. 유저 메모리 영역에서
+파일 이름을 복사해 커널 메모리로 옮긴다. `create` 와 마찬가지로 파일 시스템에 대한 쓰기 작업이므로,
+`file_lock` 을 이용해 파일 시스텀에 접근하기 전에 락을 확보하고 remove 를 한다. 그리고 락을 해제한다.
+
+```c
+static bool sys_remove(const char *file) {
+  char *kfile = palloc_get_page(PAL_ZERO);
+  if (kfile == NULL)
+    return false;
+
+  if (safe_strcpy_from_user(kfile, file) == -1) {
+    palloc_free_page(kfile);
+    sys_exit(-1);
+  }
+
+  lock_acquire(&file_lock);
+  bool success = filesys_remove(kfile);
+  lock_release(&file_lock);
+
+  palloc_free_page(kfile);
+  return success;
+}
+```
 
 # Denying Writes to Executables
 
