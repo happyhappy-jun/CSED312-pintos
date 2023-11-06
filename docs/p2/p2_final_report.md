@@ -849,6 +849,9 @@ struct file *get_file_by_fd(int fd) {
 `free_fd()`는 `fd_list`의 `fd`에 저장된 `file *`을 해제한다.
 `get_file_by_fd()`는 `fd`에 해당하는 `file *`을 반환한다.
 
+`fd_list` 자체의 할당과 해제는 `init_pcb()`와 `free_pcb()`에서 이루어지며, 이는 User Process의 pcb를 설명하는 부분에서 살펴보았다.
+프로세스가 종료될 때 `fd_list`에 남아있는 열린 파일들은 `exit` 시스템 콜에서 언급한대로 `process_exit()`에서 닫아준다.
+
 #### File Descriptor System Calls
 
 File descriptor를 사용하는 시스템 콜은 `open`, `filesize`, `read`, `write`, `seek`, `tell`, `close`이다.
