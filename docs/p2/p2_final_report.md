@@ -136,6 +136,117 @@ pcb를 구성하는 이외의 멤버와 이를 사용하는 알고리즘 및 구
 
 ## Argument Passing
 
+### Parsing arguments
+
+```c
+  const char *argv[64];
+  char *temp_ptr;
+  int argc = 0;
+  char *token = strtok_r(file_name, " ", &temp_ptr);
+  while (token != NULL) {
+    argv[argc] = token;
+    argc++;
+    token = strtok_r(NULL, " ", &temp_ptr);
+  }
+```
+
+argument 의 파싱은 한 번밖에 안하므로 따로 함수로 분리하지 않고, `load()` 내부에 구현을 진행했다. `strtok_r()`을 이용해 공백을 기준으로 문자열을
+자르고, `argv`에 저장한다. `argc`는 `argv`의 인덱스를 나타내는 변수로, `argv`에 저장된 인자의 개수를 나타낸다.
+
+### Parsing filename
+
+```c
+static char *parse_command(char *input) {
+  char *token;
+  char *save_ptr;
+
+  token = strtok_r(input, " ", &save_ptr);
+
+  if (token != NULL) {
+    return token;
+  } else {
+    return NULL;
+  }
+}
+```
+
+첫번째의 인자를 파싱하는 경우는, syscall 에서 사용하는 `process_execute` 등에서 사용하는 경우가 있어 따로 함수로써 분리한다.
+방식은 [Parsing arguments](###Parsing arguments) 와 동일하다.
+
+### Push argument to stack
+
+핀토스 문서에 따라 아래와 같은 형태로 스택에 인자를 저장하도록 로직을 구성한다.
+
+```
+Address	Name	Data	Type
+0xbffffffc	argv[3][...]	bar\0	char[4]
+0xbffffff8	argv[2][...]	foo\0	char[4]
+0xbffffff5	argv[1][...]	-l\0	char[3]
+0xbfffffed	argv[0][...]	/bin/ls\0	char[8]
+0xbfffffec	word-align	0	uint8_t
+0xbfffffe8	argv[4]	0	char *
+0xbfffffe4	argv[3]	0xbffffffc	char *
+0xbfffffe0	argv[2]	0xbffffff8	char *
+0xbfffffdc	argv[1]	0xbffffff5	char *
+0xbfffffd8	argv[0]	0xbfffffed	char *
+0xbfffffd4	argv	0xbfffffd8	char **
+0xbfffffd0	argc	4	int
+0xbfffffcc	return address	0	void (*) ()
+```
+
+1. argv 를 스택에 역순으로 푸쉬하기
+
+```c
+  for (int i = argc - 1; i >= 0; i--) {
+    // 스택 내부에서 차지하는 길이를 계산한다
+    int len = strlen(argv[i]) + 1;
+    // 데이터 + '\0' 이 차지하는 만큼 esp 를 아래로 내린다. 
+    *esp -= len;
+    // esp 에 argv[i] 를 복사한다.
+    memcpy(*esp, argv[i], len);
+    argv[i] = *esp;
+  }
+```
+
+2. esp 를 word 크기로 정렬한다.
+
+```c
+   // align to word size
+   // esp 는 밑으로 자리기 때문에, 4로 나눈 나머지 만큼이 다음 word 까지의 오프셋이다
+  int padding = (size_t) *esp % 4;
+  *esp -= padding;
+  memset(*esp, 0, padding);
+```
+
+3. argv[i] 의 포인터를 스택에 푸쉬한다
+
+```c
+  // argv[argc] 에는 NULL 을 넣어준다
+  argv[argc] = 0;
+  for (int i = argc; i >= 0; i--) {
+    *esp -= sizeof(char *);
+    memcpy(*esp, &argv[i], sizeof(char *));
+  }
+```
+
+4. argv, argc 를 스택에 푸쉬한다.
+5. return address 를 스택에 푸쉬한다.
+
+```c
+  // push argv
+  void *argv_ptr = *esp;
+  *esp -= sizeof(char **);
+  memcpy(*esp, &argv_ptr, sizeof(char **));
+
+  // push argc
+  *esp -= sizeof(int);
+  memcpy(*esp, &argc, sizeof(int));
+
+  // push fake return address
+  *esp -= sizeof(void *);
+  memset(*esp, 0, sizeof(void *));
+```
+
 ## Process Termination Messages
 
 # System Calls
