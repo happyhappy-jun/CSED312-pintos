@@ -2,6 +2,7 @@
 #include "filesys/directory.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
+#include "syscall.h"
 #include "threads/flags.h"
 #include "threads/init.h"
 #include "threads/interrupt.h"
@@ -38,18 +39,22 @@ tid_t process_execute(const char *file_name) {
   strlcpy(fn_copy, file_name, PGSIZE);
 
   command = palloc_get_page(0);
-  if (command == NULL)
+  if (command == NULL) {
+    palloc_free_page(fn_copy);
     return TID_ERROR;
+  }
   strlcpy(command, file_name, PGSIZE);
 
   parse_command(command);
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create(command, PRI_DEFAULT, start_process, fn_copy);
+  palloc_free_page(command);
   if (tid == TID_ERROR) {
-    palloc_free_page(command);
     palloc_free_page(fn_copy);
   }
   else {
+    // if the load() is not finished, wait for it
+    // fn_copy will be freed in start_process()
     sema_down(&get_thread_by_tid(tid)->pcb->load_sema);
   }
   return tid;
@@ -78,8 +83,10 @@ start_process(void *file_name_) {
   sema_up(&thread_current()->pcb->load_sema);
 
   /* If load failed, quit. */
-  if (!success)
+  if (!success) {
+    thread_current()->pcb->exit_code = -1;
     thread_exit();
+  }
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -125,8 +132,17 @@ void process_exit(void) {
   struct thread *cur = thread_current();
   uint32_t *pd;
 
+  printf("%s: exit(%d)\n", cur->name, cur->pcb->exit_code);
+
   /* allow write and close the executable file */
   file_close(cur->pcb->file);
+
+  /* close all opened files */
+  for (int i = 0; i < FD_MAX; i++) {
+    if (cur->pcb->fd_list[i] != NULL) {
+      file_close(cur->pcb->fd_list[i]);
+    }
+  }
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -298,6 +314,8 @@ bool load(const char *file_name, void (**eip)(void), void **esp) {
     printf("load: %s: open failed\n", argv[0]);
     goto done;
   }
+  file_deny_write(file);
+  t->pcb->file = file;
 
   /* Read and verify executable header. */
   if (file_read(file, &ehdr, sizeof ehdr) != sizeof ehdr
@@ -368,7 +386,6 @@ bool load(const char *file_name, void (**eip)(void), void **esp) {
 
   /* Start address. */
   *eip = (void (*)(void)) ehdr.e_entry;
-
 
   push_arg_stack(argv, argc, esp);
   success = true;

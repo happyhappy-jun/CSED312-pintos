@@ -3,6 +3,7 @@
 
 #include "threads/fixed-point.h"
 #include "threads/synch.h"
+#include "threads/vaddr.h"
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
@@ -180,10 +181,12 @@ void sort_ready_list(void);
 
 struct thread *get_thread_by_tid(tid_t tid);
 void sig_children_parent_exit(void);
+void sig_child_can_exit(int);
 
 #ifdef USERPROG
 typedef int pid_t;
 #define PID_ERROR ((pid_t) -1)
+#define FD_MAX (int) (PGSIZE / sizeof(struct file *))
 pid_t allocate_pid(void);
 
 struct thread *get_thread_by_pid(pid_t pid);
@@ -192,9 +195,9 @@ struct pcb {
   pid_t pid;
   tid_t parent_tid;
   struct file *file;
-  int file_cnt;
   struct file **fd_list;
   int exit_code;
+  bool can_wait;
   struct semaphore wait_sema;
   struct semaphore load_sema;
   struct semaphore exit_sema;
@@ -202,6 +205,10 @@ struct pcb {
 
 struct pcb *init_pcb(void);
 void free_pcb(struct pcb *);
+
+void free_fd(int);
+int allocate_fd(struct file *);
+struct file *get_file_by_fd(int);
 #endif
 
 #endif /* threads/thread.h */
