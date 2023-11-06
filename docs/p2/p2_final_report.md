@@ -249,6 +249,29 @@ Address	Name	Data	Type
 
 ## Process Termination Messages
 
+유저 프로세스가 종료될때는, process termination message 를 출력해야한다.
+이를 위해 `process_exit()` 에서 `printf()` 를 이용해 출력하도록 구현한다.
+
+```c
+void process_exit(void) {
+  struct thread *cur = thread_current();
+  uint32_t *pd;
+
+  printf("%s: exit(%d)\n", cur->name, cur->pcb->exit_code);
+```
+
+현재 스레드의 이름은 argument parsed 된 유저 프로세스의 이름이다. 또한, 종료 코드는 `sys_exit()`에서 `pcb` 에 넣어준다.
+
+```c
+static void sys_exit(int status) {
+  struct thread *cur = thread_current();
+  cur->pcb->exit_code = status;
+  thread_exit();
+}
+```
+
+`sys_exit() -> thread_exit() -> process_exit()` 순으로 호출되며, `process_exit()` 에서 `printf()` 를 통해 출력한다.
+
 # System Calls
 
 ## Accessing User Memory
