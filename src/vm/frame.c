@@ -3,6 +3,7 @@
 //
 
 #include "vm/frame.h"
+#include "threads/malloc.h"
 
 void frame_table_init(void) {
   hash_init(&frame_table, frame_table_hash, frame_table_less, NULL);
