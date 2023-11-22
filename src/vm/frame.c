@@ -5,8 +5,10 @@
 #include "vm/frame.h"
 #include "threads/malloc.h"
 
+struct frame_table frame_table;
+
 void frame_table_init(void) {
-  hash_init(&frame_table, frame_table_hash, frame_table_less, NULL);
+  hash_init(&frame_table.table, frame_table_hash, frame_table_less, NULL);
 }
 
 unsigned frame_table_hash(const struct hash_elem *elem, void *aux UNUSED) {
@@ -32,16 +34,16 @@ void *frame_alloc(void *upage, enum palloc_flags flags) {
   f->upage = upage;
   f->thread = thread_current();
 
-  hash_insert(&frame_table, &f->elem);
+  hash_insert(&frame_table.table, &f->elem);
   return kpage;
 }
 
 void frame_free(void *kpage) {
   struct frame f;
   f.kpage = kpage;
-  struct hash_elem *e = hash_find(&frame_table, &f.elem);
+  struct hash_elem *e = hash_find(&frame_table.table, &f.elem);
   if (e != NULL) {
-    hash_delete(&frame_table, e);
+    hash_delete(&frame_table.table, e);
     palloc_free_page(kpage);
     free(hash_entry(e, struct frame, elem));
   }

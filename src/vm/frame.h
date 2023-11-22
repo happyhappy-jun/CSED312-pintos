@@ -9,7 +9,9 @@
 #include "threads/palloc.h"
 #include <hash.h>
 
-struct hash frame_table;
+struct frame_table {
+  struct hash table;
+};
 
 struct frame {
   void *kpage;
