@@ -508,13 +508,14 @@ setup_stack(void **esp) {
   uint8_t *kpage;
   bool success = false;
 
-  kpage = palloc_get_page(PAL_USER | PAL_ZERO);
+  uint8_t *upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
+  kpage = frame_alloc(upage, PAL_USER | PAL_ZERO);
   if (kpage != NULL) {
-    success = install_page(((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
+    success = install_page(upage, kpage, true);
     if (success)
       *esp = PHYS_BASE;
     else
-      palloc_free_page(kpage);
+      frame_free(kpage);
   }
   return success;
 }
