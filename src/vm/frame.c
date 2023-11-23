@@ -4,6 +4,7 @@
 
 #include "vm/frame.h"
 #include "threads/malloc.h"
+#include "userprog/pagedir.h"
 
 struct frame_table frame_table;
 
@@ -50,4 +51,37 @@ void frame_free(void *kpage) {
     palloc_free_page(kpage);
     free(hash_entry(e, struct frame, elem));
   }
+}
+
+void frame_evict(void) {
+  struct frame *target = NULL;
+  struct hash_iterator i;
+  hash_first(&i, &frame_table);
+  while (hash_next(&i)) {
+    struct frame *f = hash_entry(hash_cur(&i), struct frame, elem);
+    if (target != NULL)
+      pagedir_set_accessed(target->thread->pagedir, target->upage, false);
+    if (!pagedir_is_accessed(f->thread->pagedir, f->upage)) {
+      target = f;
+    }
+    pagedir_set_accessed(f->thread->pagedir, target->upage, false);
+  }
+  if (target == NULL) {
+    hash_first(&i, &frame_table);
+    target = hash_entry(hash_cur(&i), struct frame, elem);
+  }
+
+  if (spt_has_entry(target->thread->spt, target->upage) {
+    struct spt_entry *spte = spt_get_entry(target->thread->spt, target->upage);
+    spte->is_loaded = false;
+    /* if dirty,
+         if file, write back to the file
+         if not file, swap out */
+  } else {
+    /* if dirty, swap out and add to spt */
+    /* else, just free */
+  }
+
+  pagedir_clear_page(target->thread->pagedir, target->upage);
+  frame_free(target->kpage);
 }

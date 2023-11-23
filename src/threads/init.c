@@ -39,6 +39,7 @@
 #include "devices/ide.h"
 #include "filesys/filesys.h"
 #include "filesys/fsutil.h"
+#include "vm/swap.h"
 #endif
 
 /* Page directory with kernel mappings only. */
@@ -120,6 +121,7 @@ int main(void) {
 #ifdef VM
   /* Frame Table Initialization */
   frame_table_init();
+  swap_init();
 #endif
 
   /* Start thread scheduler and enable interrupts. */
