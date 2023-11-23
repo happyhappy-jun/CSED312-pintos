@@ -4,6 +4,7 @@
 #include "threads/fixed-point.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "vm/spt.h"
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
@@ -110,6 +111,9 @@ struct thread {
   /* Owned by userprog/process.c. */
   uint32_t *pagedir; /* Page directory. */
   struct pcb *pcb;
+#endif
+#ifdef VM
+  struct spt spt;
 #endif
 
   int original_priority;          /* Original priority of the thread */
