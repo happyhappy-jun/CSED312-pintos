@@ -110,6 +110,9 @@ static void spt_remove_helper(struct hash_elem *elem, void *aux UNUSED) {
   struct spt_entry *spte = hash_entry(elem, struct spt_entry, elem);
   if (spte->is_loaded)
     spt_evict_page_from_frame(spte);
+  if (spte->is_swapped)
+    // Todo: free corresponding swap table entry
+    // in swap free, we may need to check spt_entry and write back to the file
   if (spte->file_info)
     free(spte->file_info);
 
