@@ -142,9 +142,14 @@ void spt_load_page_into_frame(struct spt_entry *spte) {
   ASSERT(spte->kpage == NULL);
   if (spte->is_file) {
     spt_load_page_into_frame_from_file(spte);
-  } else {
+  } else if (spte->is_swapped) {
     spt_load_page_into_frame_from_swap(spte);
+  } else {
+    // Not in file and not in swap disk
+    // => load blank page
+    spte->kpage = frame_alloc(spte->upage, PAL_USER | PAL_ZERO);
   }
+  spte->is_loaded = true;
 }
 
 static void spt_load_page_into_frame_from_file(struct spt_entry *spte) {
@@ -177,8 +182,6 @@ static void spt_load_page_into_frame_from_swap(struct spt_entry *spte) {
   spte->is_swapped = false;
   // vm_swap_in(spte->swap_index, spte->kpage); // maybe?
   // spte->swap_index = SWAP_ERROR;
-
-  spte->is_loaded = true;
 }
 
 void spt_evict_page_from_frame(struct spt_entry *spte) {
