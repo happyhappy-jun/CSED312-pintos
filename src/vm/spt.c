@@ -17,29 +17,34 @@ static struct spt_entry *spt_make_clean_spt_entry(void *, bool, bool);
 static void spt_load_page_into_frame_from_file(struct spt_entry *);
 static void spt_load_page_into_frame_from_swap(struct spt_entry *);
 
-
+// Initialize spt
 void spt_init(struct spt *spt) {
   hash_init(&spt->spt, spt_hash, spt_less, NULL);
 }
 
-
+// Destroy spt
 void spt_destroy(struct spt *spt) {
   // Todo: 7. On process termination
   // spt_remove_helper() will free each spt_entry in spt.
   hash_destroy(&spt->spt, spt_remove_helper);
 }
 
+// hash function for spt
 unsigned spt_hash(const struct hash_elem *elem, void *aux UNUSED) {
   struct spt_entry *spte = hash_entry(elem, struct spt_entry, elem);
   return hash_bytes(spte->upage, sizeof(spte->upage));
 }
 
+// less function for spt
 bool spt_less(const struct hash_elem *a, const struct hash_elem *b, void *aux UNUSED) {
   struct spt_entry *spte_a = hash_entry(a, struct spt_entry, elem);
   struct spt_entry *spte_b = hash_entry(b, struct spt_entry, elem);
   return spte_a->upage < spte_b->upage;
 }
 
+/* Get spt_entry by upage
+ *
+ * Caller should page-align the upage by pg_round_down(). */
 struct spt_entry *spt_get_entry(struct spt *spt, void *upage) {
   struct hash_elem *e = spt_get_hash_elem(spt, upage);
   if (e) {
@@ -48,13 +53,17 @@ struct spt_entry *spt_get_entry(struct spt *spt, void *upage) {
   return NULL;
 }
 
+// Get hash_elem by upage
 static struct hash_elem *spt_get_hash_elem(struct spt *spt, void *upage) {
   struct spt_entry spte;
   spte.upage = upage;
   return hash_find(&spt->spt, &spte.elem);
 }
 
-// return added spt_entry if success, else ...
+/* Add spt_entry into spt hash table
+ *
+ * If added successfully, return original spte which is added.
+ * If spt_entry exists, return existing spt_entry. */
 static struct spt_entry *spt_add(struct spt* spt, struct spt_entry* spte) {
   struct hash_elem *e = hash_insert(&spt->spt, &spte->elem);
   if (e == NULL)
@@ -72,6 +81,7 @@ static struct spt_entry *spt_add(struct spt* spt, struct spt_entry* spte) {
   return existing_spte;
 }
 
+// Make clean spt_entry
 static struct spt_entry *spt_make_clean_spt_entry(void *upage, bool writable, bool is_file) {
   struct spt_entry *spte = malloc(sizeof(struct spt_entry));
   if (spte == NULL)
@@ -87,6 +97,7 @@ static struct spt_entry *spt_make_clean_spt_entry(void *upage, bool writable, bo
   return spte;
 }
 
+// Add file-backed spt_entry
 struct spt_entry *spt_add_file(struct spt *spt, void *upage, bool writable, struct file *file, off_t ofs, uint32_t read_bytes, uint32_t zero_bytes) {
   struct spt_entry* spte = spt_make_clean_spt_entry(upage, writable, true);
   struct spt_entry_file_info *file_info = malloc(sizeof(struct spt_entry_file_info));
@@ -98,14 +109,16 @@ struct spt_entry *spt_add_file(struct spt *spt, void *upage, bool writable, stru
   return spt_add(spt, spte);
 }
 
+// Add non file-backed spt_entry
 struct spt_entry *spt_add_anon(struct spt* spt, void *upage, bool writable) {
   struct spt_entry *spte = spt_make_clean_spt_entry(upage, writable, false);
   spte->file_info = NULL;
   return spt_add(spt, spte);
 }
 
-// Free spt_entry
-// DESTRUCTOR for hash_destroy()
+/* Free spt_entry
+ *
+ * Used as DESTRUCTOR for hash_destroy() */
 static void spt_remove_helper(struct hash_elem *elem, void *aux UNUSED) {
   struct spt_entry *spte = hash_entry(elem, struct spt_entry, elem);
   if (spte->is_loaded)
@@ -135,8 +148,12 @@ void spt_remove_by_entry(struct spt *spt, struct spt_entry *spte) {
   spt_remove_helper(&spte->elem, NULL);
 }
 
-// Load page into frame
-// The caller should install the loaded page by install_page()
+/* Load page into frame
+ *
+ * Caller should install the loaded page by install_page()
+ *
+ * Set kpage, is_loaded
+ * Clear is_swapped, swap_index if swapped in */
 void spt_load_page_into_frame(struct spt_entry *spte) {
   ASSERT(!spte->is_loaded);
   ASSERT(spte->kpage == NULL);
@@ -152,6 +169,7 @@ void spt_load_page_into_frame(struct spt_entry *spte) {
   spte->is_loaded = true;
 }
 
+// Load page from file
 static void spt_load_page_into_frame_from_file(struct spt_entry *spte) {
   ASSERT(spte->is_file);
   if (spte->is_swapped) {
@@ -170,6 +188,7 @@ static void spt_load_page_into_frame_from_file(struct spt_entry *spte) {
   }
 }
 
+// Load page from swap disk
 static void spt_load_page_into_frame_from_swap(struct spt_entry *spte) {
   ASSERT(spte->is_swapped);
   // Todo: swap_index validation check
@@ -184,6 +203,14 @@ static void spt_load_page_into_frame_from_swap(struct spt_entry *spte) {
   // spte->swap_index = SWAP_ERROR;
 }
 
+
+/* Evict spte corresponding frame
+ *
+ * Dirty File-backed Page and Anon Page will be swapped out
+ * Otherwise, Page data in the frame will just be freed
+ *
+ * Set is_swapped, swap_index if swapped out
+ * Clear is_loaded, kpage */
 void spt_evict_page_from_frame(struct spt_entry *spte) {
   ASSERT(spte->is_loaded);
   ASSERT(spte->kpage != NULL);
