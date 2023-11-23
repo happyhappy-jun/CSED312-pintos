@@ -4,15 +4,15 @@
 
 #include "spt.h"
 #include "filesys/file.h"
-#include "stdio.h"
 #include "string.h"
+#include "swap.h"
 #include "threads/malloc.h"
 #include "threads/thread.h"
 #include "userprog/pagedir.h"
 #include "vm/frame.h"
 
 static struct spt_entry *spt_add(struct spt *, struct spt_entry *);
-static void spt_remove_helper(struct hash_elem *, void * UNUSED);
+static void spt_remove_helper(struct hash_elem *, void *UNUSED);
 static struct hash_elem *spt_get_hash_elem(struct spt *, void *);
 static struct spt_entry *spt_make_clean_spt_entry(void *, bool, bool);
 static void spt_load_page_into_frame_from_file(struct spt_entry *);
@@ -100,7 +100,7 @@ static struct spt_entry *spt_make_clean_spt_entry(void *upage, bool writable, bo
 
 // Add file-backed spt_entry
 struct spt_entry *spt_add_file(struct spt *spt, void *upage, bool writable, struct file *file, off_t ofs, uint32_t read_bytes, uint32_t zero_bytes) {
-  struct spt_entry* spte = spt_make_clean_spt_entry(upage, writable, true);
+  struct spt_entry *spte = spt_make_clean_spt_entry(upage, writable, true);
   struct spt_entry_file_info *file_info = malloc(sizeof(struct spt_entry_file_info));
   file_info->file = file;
   file_info->ofs = ofs;
@@ -201,10 +201,10 @@ static void spt_load_page_into_frame_from_swap(struct spt_entry *spte) {
   spte->kpage = frame_alloc(spte->upage, PAL_USER);
 
   // Load this page.
-  // Todo: swap in from swap disk.
   spte->is_swapped = false;
-  // vm_swap_in(spte->swap_index, spte->kpage); // maybe?
-  spte->swap_index = -1;
+  swap_in(spte->swap_index, spte->kpage);
+
+  spte->is_loaded = true;
 }
 
 
