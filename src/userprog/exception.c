@@ -154,12 +154,16 @@ page_fault(struct intr_frame *f) {
       spt_load_page_into_frame(spte);
       install_page(spte->upage, spte->kpage, spte->writable);
       // Todo: Restart page-faulting instruction
+      // at this time, assume that "return" can handle this!
       return;
     }
   }
 
+  // Todo: fault under PHYS_BASE and not_present, check stack growth
+
   // fault under PHYS_BASE access by kernel
   // => fault while accessing user memory
+  // Todo: adjust this 'accessing user memory' part referring to the pintos docs 4.3.5.
   if (fault_addr < PHYS_BASE && !user) {
     f->eip = (void (*)(void))(f->eax);
     f->eax = 0xffffffff;
