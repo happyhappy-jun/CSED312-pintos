@@ -14,5 +14,6 @@ struct mmap_entry {
 };
 
 void syscall_init(void);
+bool sys_munmap(mmapid_t);
 
 #endif /* userprog/syscall.h */

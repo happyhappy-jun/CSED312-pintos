@@ -30,7 +30,6 @@ static void sys_close(int);
 
 #ifdef VM
 static mmapid_t sys_mmap(int, void *);
-static bool sys_munmap(mapid_t);
 static struct mmap_entry *get_mmap_entry_by_id(mmapid_t);
 #endif
 
@@ -396,6 +395,7 @@ bool sys_munmap(mmapid_t id) {
     spt_remove_by_entry(&curr->spt, spte);
   }
   list_remove(&mmap_entry->elem);
+  return true;
 }
 
 static struct mmap_entry *get_mmap_entry_by_id(mmapid_t id) {

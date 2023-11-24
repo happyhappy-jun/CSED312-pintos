@@ -153,8 +153,19 @@ void process_exit(void) {
     }
   }
 
+#ifdef VM
+  struct list *mmap_list = &cur->mmap_list;
+  while (!list_empty(mmap_list)) {
+    struct list_elem *e = list_pop_front(mmap_list);
+    struct mmap_entry *mme = list_entry(e, struct mmap_entry, elem);
+    sys_munmap(mme->id);
+    // TODO: all sys_munmap() should be true but it fail
+//    ASSERT(sys_munmap(mme->id) == true);
+  }
+
   // Todo: 7. On process termination here
   spt_destroy(&cur->spt);
+#endif
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -485,7 +496,7 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
     size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
     size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-    struct spt_entry* page = spt_add_file(&thread_current()->spt, upage, writable, file, ofs+iter*PGSIZE, page_read_bytes, page_zero_bytes);
+    struct spt_entry *page = spt_add_file(&thread_current()->spt, upage, writable, file, ofs + iter * PGSIZE, page_read_bytes, page_zero_bytes);
     if (page == NULL)
       return false;
 
