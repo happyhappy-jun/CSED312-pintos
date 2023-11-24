@@ -169,6 +169,7 @@ void spt_load_page_into_frame(struct spt_entry *spte) {
     spte->kpage = frame_alloc(spte->upage, PAL_USER | PAL_ZERO);
   }
   spte->is_loaded = true;
+  unpin_frame(spte->kpage);
 }
 
 // Load page from file

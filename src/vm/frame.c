@@ -74,3 +74,18 @@ struct frame *get_frame_to_evict(uint32_t *pagedir) {
 
   return NULL;
 }
+
+void set_frame_pinning(void *kpage, bool pinned) {
+  struct frame f_tmp;
+  f_tmp.kpage = kpage;
+  struct hash_elem *h = hash_find(&frame_table.table, &(f_tmp.elem));
+  struct frame *f = hash_entry(h, struct frame, elem);
+  f->pinned = pinned;
+}
+
+void unpin_frame(void *kpage) {
+  set_frame_pinning(kpage, false);
+}
+void pin_frame(void *kpage) {
+  set_frame_pinning(kpage, true)
+}

@@ -30,4 +30,8 @@ void frame_free(void *);
 
 struct frame *get_frame_to_evict(uint32_t *pagedir);
 
+void pin_frame(void *kpage);
+void unpin_frame(void *kpage);
+void set_frame_pinning(void *kpage, bool pinned);
+
 #endif//PINTOS_SRC_VM_FRAME_H_
