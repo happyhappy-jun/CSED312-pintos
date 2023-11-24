@@ -93,7 +93,6 @@ static struct spt_entry *spt_make_clean_spt_entry(void *upage, bool writable, bo
   spte->writable = writable;
   spte->is_file = is_file;
   spte->is_swapped = false;
-  // Todo: swap_index initial value (SWAP_ERROR?)
   spte->swap_index = -1;
   return spte;
 }
@@ -226,7 +225,7 @@ void spt_evict_page_from_frame(struct spt_entry *spte) {
 
   if (is_dirty || !spte->is_file) {
     spte->is_swapped = true;
-    spte->swap_index = swap_out(spte->kpage);// maybe?
+    spte->swap_index = swap_out(spte->kpage);
   }
 
   frame_free(spte->kpage);
