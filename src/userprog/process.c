@@ -478,6 +478,7 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
   ASSERT(ofs % PGSIZE == 0);
 
   file_seek(file, ofs);
+  int iter = 0;
   while (read_bytes > 0 || zero_bytes > 0) {
     /* Calculate how to fill this page.
        We will read PAGE_READ_BYTES bytes from FILE
@@ -503,15 +504,13 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
 //      return false;
 //    }
 
-    spt_add_file(&thread_current()->spt, upage, writable, file, ofs, page_read_bytes, page_zero_bytes);
-    printf("added to spt\n");
-    printf("added page: %p\n", upage);
-    printf("added to thread: %p\n", thread_current());
+    spt_add_file(&thread_current()->spt, upage, writable, file, ofs+iter*PGSIZE, page_read_bytes, page_zero_bytes);
 
     /* Advance. */
     read_bytes -= page_read_bytes;
     zero_bytes -= page_zero_bytes;
     upage += PGSIZE;
+    iter++;
   }
   return true;
 }
