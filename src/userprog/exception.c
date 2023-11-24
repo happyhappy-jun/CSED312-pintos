@@ -148,6 +148,8 @@ page_fault(struct intr_frame *f) {
   printf("not_present: %d\n", not_present);
   printf("user: %d\n", user);
   printf("write: %d\n", write);
+  printf("eip: %p\n", f->eip);
+  printf("esp: %p\n", f->esp);
 
   // fault under PHYS_BASE and not_present, check spt first
   if (fault_addr < PHYS_BASE && not_present) {
