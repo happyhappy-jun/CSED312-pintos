@@ -87,5 +87,5 @@ void unpin_frame(void *kpage) {
   set_frame_pinning(kpage, false);
 }
 void pin_frame(void *kpage) {
-  set_frame_pinning(kpage, true)
+  set_frame_pinning(kpage, true);
 }
