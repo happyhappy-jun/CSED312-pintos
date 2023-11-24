@@ -524,14 +524,19 @@ setup_stack(void **esp) {
   bool success = false;
 
   uint8_t *upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
-  kpage = frame_alloc(upage, PAL_USER | PAL_ZERO);
-  if (kpage != NULL) {
-    success = install_page(upage, kpage, true);
-    if (success)
-      *esp = PHYS_BASE;
-    else
-      frame_free(kpage);
-  }
+  struct spt_entry *stack_page = spt_add_anon(&thread_current()->spt, upage, true);
+  spt_load_page_into_frame(stack_page);
+  success = install_page(upage, stack_page->kpage, stack_page->writable);
+  *esp = PHYS_BASE;
+
+//  kpage = frame_alloc(upage, PAL_USER | PAL_ZERO);
+//  if (kpage != NULL) {
+//    success = install_page(upage, kpage, true);
+//    if (success)
+//      *esp = PHYS_BASE;
+//    else
+//      frame_free(kpage);
+//  }
   return success;
 }
 
