@@ -552,6 +552,8 @@ setup_stack(void **esp) {
 bool install_page(void *upage, void *kpage, bool writable) {
   struct thread *t = thread_current();
 
+  printf("install_page(%p, %p, %d)\n", upage, kpage, writable);
+  printf("t: %p\n", t);
   /* Verify that there's not already a page at that virtual
      address, then map our page there. */
   return (pagedir_get_page(t->pagedir, upage) == NULL
