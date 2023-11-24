@@ -336,6 +336,11 @@ mmapid_t sys_mmap(int fd, void *upage) {
   }
 
   size_t file_size = file_length(f);
+  if (file_size == 0) {
+    lock_release(&file_lock);
+    return MAP_FAILED;
+  }
+
   for (size_t offset = 0; offset < file_size; offset += PGSIZE) {
     struct spt_entry *spte = spt_get_entry(&curr->spt, upage + offset);
     if (spte != NULL) {
