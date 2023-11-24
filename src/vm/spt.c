@@ -138,7 +138,7 @@ static void spt_remove_helper(struct hash_elem *elem, void *aux UNUSED) {
 void spt_remove_by_upage(struct spt *spt, void *upage) {
   struct hash_elem *e = spt_get_hash_elem(spt, upage);
   if (e) {
-    spt_remove_by_entry(spt, hash_entry(e, struct spt_entry, elem);
+    spt_remove_by_entry(spt, hash_entry(e, struct spt_entry, elem));
   }
 }
 
