@@ -507,10 +507,14 @@ setup_stack(void **esp) {
   uint8_t *upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
 
   struct spt_entry *stack_page = spt_add_anon(&thread_current()->spt, upage, true);
+  if (stack_page == NULL)
+    return false;
   spt_load_page_into_frame(stack_page);
   success = install_page(upage, stack_page->kpage, stack_page->writable);
-
-  *esp = PHYS_BASE;
+  if (success)
+    *esp = PHYS_BASE;
+  else
+    spt_remove_by_upage(&thread_current()->spt, upage);
 
   return success;
 }
