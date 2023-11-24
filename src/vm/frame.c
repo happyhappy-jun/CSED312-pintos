@@ -26,11 +26,13 @@ bool frame_table_less(const struct hash_elem *a, const struct hash_elem *b, void
 void *frame_alloc(void *upage, enum palloc_flags flags) {
   void *kpage = palloc_get_page(flags);
   if (kpage == NULL) {
-    // Todo : Evict
-    // frame_evict() should implement the selecting algorithm.
-    // then evict the frame using the spt_evict_page_from_frame()
-    // spt_evict_page_from_frame() will handle whether to swap out or just free
-    PANIC("Evict");
+    struct frame *target = get_frame_to_evict(thread_current()->pagedir);
+    struct spt_entry *target_spte = spt_get_entry(&thread_current()->spt, target->upage);
+    spt_evict_page_from_frame(target_spte);
+    kpage = palloc_get_page(flags);
+    if (kpage == NULL) {
+      PANIC("frame_alloc: palloc_get_page failed");
+    }
   }
 
   struct frame *f = malloc(sizeof(struct frame));
@@ -53,35 +55,22 @@ void frame_free(void *kpage) {
   }
 }
 
-void frame_evict(void) {
-  struct frame *target = NULL;
-  struct hash_iterator i;
-  hash_first(&i, &frame_table);
-  while (hash_next(&i)) {
-    struct frame *f = hash_entry(hash_cur(&i), struct frame, elem);
-    if (target != NULL)
-      pagedir_set_accessed(target->thread->pagedir, target->upage, false);
-    if (!pagedir_is_accessed(f->thread->pagedir, f->upage)) {
-      target = f;
-    }
-    pagedir_set_accessed(f->thread->pagedir, target->upage, false);
-  }
-  if (target == NULL) {
-    hash_first(&i, &frame_table);
-    target = hash_entry(hash_cur(&i), struct frame, elem);
-  }
-
-  if (spt_has_entry(target->thread->spt, target->upage) {
-    struct spt_entry *spte = spt_get_entry(target->thread->spt, target->upage);
-    spte->is_loaded = false;
-    /* if dirty,
-         if file, write back to the file
-         if not file, swap out */
-  } else {
-    /* if dirty, swap out and add to spt */
-    /* else, just free */
+struct frame *get_frame_to_evict(uint32_t *pagedir) {
+  struct hash_iterator iter_hash;
+  int i;
+  for (i = 0; i < 2; i++) {
+    hash_first(&iter_hash, &frame_table.table);
+    do {
+      struct frame *f = hash_entry(hash_cur(&iter_hash), struct frame, elem);
+      if (f->pinned)
+        continue;
+      if (pagedir_is_accessed(pagedir, f->upage)) {
+        pagedir_set_accessed(pagedir, f->upage, false);
+        continue;
+      }
+      return f;
+    } while (hash_next(&iter_hash));
   }
 
-  pagedir_clear_page(target->thread->pagedir, target->upage);
-  frame_free(target->kpage);
+  return NULL;
 }
