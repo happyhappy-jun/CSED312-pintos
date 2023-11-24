@@ -4,22 +4,13 @@
 #include "filesys/filesys.h"
 #include "syscall.h"
 #include "threads/flags.h"
-#include "threads/init.h"
-#include "threads/interrupt.h"
-#include "threads/malloc.h"
 #include "threads/palloc.h"
-#include "threads/thread.h"
-#include "threads/vaddr.h"
 #include "userprog/gdt.h"
 #include "userprog/pagedir.h"
 #include "userprog/tss.h"
-#include "vm/frame.h"
-#include "vm/spt.h"
 #include <debug.h>
-#include <inttypes.h>
 #include <round.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 static thread_func start_process
@@ -54,8 +45,7 @@ tid_t process_execute(const char *file_name) {
   palloc_free_page(command);
   if (tid == TID_ERROR) {
     palloc_free_page(fn_copy);
-  }
-  else {
+  } else {
     // if the load() is not finished, wait for it
     // fn_copy will be freed in start_process()
     sema_down(&get_thread_by_tid(tid)->pcb->load_sema);
