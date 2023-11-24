@@ -484,23 +484,25 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
     size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
     size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-    /* Get a page of memory. */
-    uint8_t *kpage = frame_alloc(upage, PAL_USER);
-    if (kpage == NULL)
-      return false;
+//    /* Get a page of memory. */
+//    uint8_t *kpage = frame_alloc(upage, PAL_USER);
+//    if (kpage == NULL)
+//      return false;
+//
+//    /* Load this page. */
+//    if (file_read(file, kpage, page_read_bytes) != (int) page_read_bytes) {
+//      frame_free(kpage);
+//      return false;
+//    }
+//    memset(kpage + page_read_bytes, 0, page_zero_bytes);
+//
+//    /* Add the page to the process's address space. */
+//    if (!install_page(upage, kpage, writable)) {
+//      frame_free(kpage);
+//      return false;
+//    }
 
-    /* Load this page. */
-    if (file_read(file, kpage, page_read_bytes) != (int) page_read_bytes) {
-      frame_free(kpage);
-      return false;
-    }
-    memset(kpage + page_read_bytes, 0, page_zero_bytes);
-
-    /* Add the page to the process's address space. */
-    if (!install_page(upage, kpage, writable)) {
-      frame_free(kpage);
-      return false;
-    }
+    spt_add_file(&thread_current()->spt, upage, writable, file, ofs, page_read_bytes, page_zero_bytes);
 
     /* Advance. */
     read_bytes -= page_read_bytes;
