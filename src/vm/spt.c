@@ -32,7 +32,7 @@ void spt_destroy(struct spt *spt) {
 // hash function for spt
 unsigned spt_hash(const struct hash_elem *elem, void *aux UNUSED) {
   struct spt_entry *spte = hash_entry(elem, struct spt_entry, elem);
-  return hash_bytes(spte->upage, sizeof(spte->upage));
+  return hash_bytes(&spte->upage, sizeof(spte->upage));
 }
 
 // less function for spt
