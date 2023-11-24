@@ -29,7 +29,7 @@ void swap_init(void) {
 swap_index_t swap_out(void *page) {
   size_t index = bitmap_scan_and_flip(swap_table, 0, 1, true);
 
-  for (size_t i = 0; i < SECTORS_NUM; i++){
+  for (size_t i = 0; i < SECTORS_NUM; i++) {
     block_write(swap_block, index * SECTORS_NUM + i, page + i * BLOCK_SECTOR_SIZE);
   }
 
@@ -40,7 +40,7 @@ swap_index_t swap_out(void *page) {
 void swap_in(swap_index_t index, void *page) {
   bitmap_set(swap_table, index, false);
 
-  for (size_t i = 0; i < SECTORS_NUM; i++){
+  for (size_t i = 0; i < SECTORS_NUM; i++) {
     block_read(swap_block, index * SECTORS_NUM + i, page + i * BLOCK_SECTOR_SIZE);
   }
 }

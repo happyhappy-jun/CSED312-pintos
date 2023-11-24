@@ -65,7 +65,7 @@ static struct hash_elem *spt_get_hash_elem(struct spt *spt, void *upage) {
  *
  * If added successfully, return original spte which is added.
  * If spt_entry exists, return existing spt_entry. */
-static struct spt_entry *spt_add(struct spt* spt, struct spt_entry* spte) {
+static struct spt_entry *spt_add(struct spt *spt, struct spt_entry *spte) {
   struct hash_elem *e = hash_insert(&spt->spt, &spte->elem);
   if (e == NULL)
     return spte;
@@ -111,7 +111,7 @@ struct spt_entry *spt_add_file(struct spt *spt, void *upage, bool writable, stru
 }
 
 // Add non file-backed spt_entry
-struct spt_entry *spt_add_anon(struct spt* spt, void *upage, bool writable) {
+struct spt_entry *spt_add_anon(struct spt *spt, void *upage, bool writable) {
   struct spt_entry *spte = spt_make_clean_spt_entry(upage, writable, false);
   spte->file_info = NULL;
   return spt_add(spt, spte);
@@ -127,8 +127,8 @@ static void spt_remove_helper(struct hash_elem *elem, void *aux UNUSED) {
     pagedir_clear_page(thread_current()->pagedir, spte->upage);
   }
   if (spte->is_swapped)
-    // Todo: free corresponding swap table entry
-    // in swap free, we may need to check spt_entry and write back to the file
+    swap_free(spte->swap_index);
+  // in swap free, we may need to check spt_entry and write back to the file
   if (spte->file_info)
     free(spte->file_info);
 
@@ -207,7 +207,6 @@ static void spt_load_page_into_frame_from_swap(struct spt_entry *spte) {
   spte->is_loaded = true;
 }
 
-
 /* Evict spte corresponding frame
  *
  * Dirty File-backed Page and Anon Page will be swapped out
@@ -227,8 +226,7 @@ void spt_evict_page_from_frame(struct spt_entry *spte) {
 
   if (is_dirty || !spte->is_file) {
     spte->is_swapped = true;
-    // Todo: swap out into swap disk.
-    // spte->swap_index = vm_swap_out(spte->swap_index, spte->kpage); // maybe?
+    spte->swap_index = swap_out(spte->kpage);// maybe?
   }
 
   frame_free(spte->kpage);
