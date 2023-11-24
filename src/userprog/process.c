@@ -6,6 +6,7 @@
 #include "threads/flags.h"
 #include "threads/init.h"
 #include "threads/interrupt.h"
+#include "threads/malloc.h"
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
@@ -13,6 +14,7 @@
 #include "userprog/pagedir.h"
 #include "userprog/tss.h"
 #include "vm/frame.h"
+#include "vm/spt.h"
 #include <debug.h>
 #include <inttypes.h>
 #include <round.h>
@@ -68,6 +70,10 @@ start_process(void *file_name_) {
   char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
+
+  /* Initialize spt */
+  struct thread *t = thread_current();
+  spt_init(&t->spt);
 
   /* Initialize interrupt frame and load executable. */
   memset(&if_, 0, sizeof if_);
@@ -146,6 +152,9 @@ void process_exit(void) {
       free_fd(fd);
     }
   }
+
+  // Todo: 7. On process termination here
+  spt_destroy(&cur->spt);
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -400,7 +409,7 @@ done:
 
 /* load() helpers. */
 
-static bool install_page(void *upage, void *kpage, bool writable);
+bool install_page(void *upage, void *kpage, bool writable);
 
 /* Checks whether PHDR describes a valid, loadable segment in
    FILE and returns true if so, false otherwise. */
@@ -529,8 +538,7 @@ setup_stack(void **esp) {
    with palloc_get_page().
    Returns true on success, false if UPAGE is already mapped or
    if memory allocation fails. */
-static bool
-install_page(void *upage, void *kpage, bool writable) {
+bool install_page(void *upage, void *kpage, bool writable) {
   struct thread *t = thread_current();
 
   /* Verify that there's not already a page at that virtual

@@ -144,26 +144,34 @@ page_fault(struct intr_frame *f) {
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
+  // fault under PHYS_BASE and not_present, check spt first
+  if (fault_addr < PHYS_BASE && not_present) {
+    struct thread* cur = thread_current();
+    void *fault_page = pg_round_down(fault_addr);
+    struct spt_entry *spte = spt_get_entry(&cur->spt, fault_page);
+    if (spte != NULL) {
+      // in spt => load from file or swap
+      spt_load_page_into_frame(spte);
+      install_page(spte->upage, spte->kpage, spte->writable);
+      // Todo: Restart page-faulting instruction
+      // at this time, assume that "return" can handle this!
+      return;
+    }
+  }
+
+  // Todo: fault under PHYS_BASE and not_present, check stack growth
+
   // fault under PHYS_BASE access by kernel
   // => fault while accessing user memory
+  // Todo: adjust this 'accessing user memory' part referring to the pintos docs 4.3.5.
   if (fault_addr < PHYS_BASE && !user) {
     f->eip = (void (*)(void))(f->eax);
     f->eax = 0xffffffff;
     return;
   }
-  // other userspace page fault => exit(-1)
-  else if (user) {
-    thread_current()->pcb->exit_code = -1;
-    thread_exit();
-  }
 
-  /* To implement virtual memory, delete the rest of the function
-     body, and replace it with code that brings in the page to
-     which fault_addr refers. */
-  printf("Page fault at %p: %s error %s page in %s context.\n",
-         fault_addr,
-         not_present ? "not present" : "rights violation",
-         write ? "writing" : "reading",
-         user ? "user" : "kernel");
-  kill(f);
+
+  // page fault otherwise
+  thread_current()->pcb->exit_code = -1;
+  thread_exit();
 }

@@ -26,6 +26,9 @@ void *frame_alloc(void *upage, enum palloc_flags flags) {
   void *kpage = palloc_get_page(flags);
   if (kpage == NULL) {
     // Todo : Evict
+    // frame_evict() should implement the selecting algorithm.
+    // then evict the frame using the spt_evict_page_from_frame()
+    // spt_evict_page_from_frame() will handle whether to swap out or just free
     PANIC("Evict");
   }
 
