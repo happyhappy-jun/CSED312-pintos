@@ -3,12 +3,13 @@
 //
 
 #include "spt.h"
+#include "filesys/file.h"
+#include "stdio.h"
 #include "string.h"
 #include "threads/malloc.h"
 #include "threads/thread.h"
 #include "userprog/pagedir.h"
 #include "vm/frame.h"
-#include "filesys/file.h"
 
 static struct spt_entry *spt_add(struct spt *, struct spt_entry *);
 static void spt_remove_helper(struct hash_elem *, void * UNUSED);
@@ -121,8 +122,10 @@ struct spt_entry *spt_add_anon(struct spt* spt, void *upage, bool writable) {
  * Used as DESTRUCTOR for hash_destroy() */
 static void spt_remove_helper(struct hash_elem *elem, void *aux UNUSED) {
   struct spt_entry *spte = hash_entry(elem, struct spt_entry, elem);
-  if (spte->is_loaded)
+  if (spte->is_loaded) {
     spt_evict_page_from_frame(spte);
+    pagedir_clear_page(thread_current()->pagedir, spte->upage);
+  }
   if (spte->is_swapped)
     // Todo: free corresponding swap table entry
     // in swap free, we may need to check spt_entry and write back to the file
@@ -181,6 +184,7 @@ static void spt_load_page_into_frame_from_file(struct spt_entry *spte) {
     spte->kpage = frame_alloc(spte->upage, PAL_USER);
 
     // Load this page.
+    file_seek(spte->file_info->file, spte->file_info->ofs);
     if (file_read(spte->file_info->file, spte->kpage, spte->file_info->read_bytes) != (int) spte->file_info->read_bytes) {
       PANIC("file_read failed");
     }

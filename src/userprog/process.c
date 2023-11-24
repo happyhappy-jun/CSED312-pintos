@@ -477,6 +477,7 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
   ASSERT(ofs % PGSIZE == 0);
 
   file_seek(file, ofs);
+  int iter = 0;
   while (read_bytes > 0 || zero_bytes > 0) {
     /* Calculate how to fill this page.
        We will read PAGE_READ_BYTES bytes from FILE
@@ -484,28 +485,15 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
     size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
     size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-    /* Get a page of memory. */
-    uint8_t *kpage = frame_alloc(upage, PAL_USER);
-    if (kpage == NULL)
+    struct spt_entry* page = spt_add_file(&thread_current()->spt, upage, writable, file, ofs+iter*PGSIZE, page_read_bytes, page_zero_bytes);
+    if (page == NULL)
       return false;
-
-    /* Load this page. */
-    if (file_read(file, kpage, page_read_bytes) != (int) page_read_bytes) {
-      frame_free(kpage);
-      return false;
-    }
-    memset(kpage + page_read_bytes, 0, page_zero_bytes);
-
-    /* Add the page to the process's address space. */
-    if (!install_page(upage, kpage, writable)) {
-      frame_free(kpage);
-      return false;
-    }
 
     /* Advance. */
     read_bytes -= page_read_bytes;
     zero_bytes -= page_zero_bytes;
     upage += PGSIZE;
+    iter++;
   }
   return true;
 }
@@ -514,17 +502,18 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
    user virtual memory. */
 static bool
 setup_stack(void **esp) {
-  uint8_t *kpage;
   bool success = false;
 
   uint8_t *upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
-  kpage = frame_alloc(upage, PAL_USER | PAL_ZERO);
-  if (kpage != NULL) {
-    success = install_page(upage, kpage, true);
+
+  struct spt_entry *stack_page = spt_add_anon(&thread_current()->spt, upage, true);
+  if (stack_page != NULL) {
+    spt_load_page_into_frame(stack_page);
+    success = install_page(upage, stack_page->kpage, stack_page->writable);
     if (success)
       *esp = PHYS_BASE;
     else
-      frame_free(kpage);
+      spt_remove_by_upage(&thread_current()->spt, upage);
   }
   return success;
 }
