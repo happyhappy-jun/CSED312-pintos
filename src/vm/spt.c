@@ -3,12 +3,13 @@
 //
 
 #include "spt.h"
+#include "filesys/file.h"
+#include "stdio.h"
 #include "string.h"
 #include "threads/malloc.h"
 #include "threads/thread.h"
 #include "userprog/pagedir.h"
 #include "vm/frame.h"
-#include "filesys/file.h"
 
 static struct spt_entry *spt_add(struct spt *, struct spt_entry *);
 static void spt_remove_helper(struct hash_elem *, void * UNUSED);
@@ -183,6 +184,7 @@ static void spt_load_page_into_frame_from_file(struct spt_entry *spte) {
     spte->kpage = frame_alloc(spte->upage, PAL_USER);
 
     // Load this page.
+    file_seek(spte->file_info->file, spte->file_info->ofs);
     if (file_read(spte->file_info->file, spte->kpage, spte->file_info->read_bytes) != (int) spte->file_info->read_bytes) {
       PANIC("file_read failed");
     }
