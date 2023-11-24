@@ -190,5 +190,6 @@ page_fault(struct intr_frame *f) {
 
 static bool is_stack_growth(void *fault_addr) {
   struct thread *t = thread_current();
+  if (t->stack_pages >= STACK_MAX_PAGES) return false;
   return fault_addr >= t->stack_bottom - PGSIZE && fault_addr < t->stack_bottom;
 }
