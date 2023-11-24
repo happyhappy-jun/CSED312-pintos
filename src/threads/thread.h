@@ -114,6 +114,7 @@ struct thread {
 #endif
 #ifdef VM
   struct spt spt;
+  struct list mmap_list;
 #endif
 
   int original_priority;          /* Original priority of the thread */
