@@ -93,7 +93,7 @@ static struct spt_entry *spt_make_clean_spt_entry(void *upage, bool writable, bo
   spte->is_file = is_file;
   spte->is_swapped = false;
   // Todo: swap_index initial value (SWAP_ERROR?)
-  spte->swap_index = 0;
+  spte->swap_index = -1;
   return spte;
 }
 
@@ -200,7 +200,7 @@ static void spt_load_page_into_frame_from_swap(struct spt_entry *spte) {
   // Todo: swap in from swap disk.
   spte->is_swapped = false;
   // vm_swap_in(spte->swap_index, spte->kpage); // maybe?
-  // spte->swap_index = SWAP_ERROR;
+  spte->swap_index = -1;
 }
 
 
