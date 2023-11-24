@@ -121,8 +121,10 @@ struct spt_entry *spt_add_anon(struct spt* spt, void *upage, bool writable) {
  * Used as DESTRUCTOR for hash_destroy() */
 static void spt_remove_helper(struct hash_elem *elem, void *aux UNUSED) {
   struct spt_entry *spte = hash_entry(elem, struct spt_entry, elem);
-  if (spte->is_loaded)
+  if (spte->is_loaded) {
     spt_evict_page_from_frame(spte);
+    pagedir_clear_page(thread_current()->pagedir, spte->upage);
+  }
   if (spte->is_swapped)
     // Todo: free corresponding swap table entry
     // in swap free, we may need to check spt_entry and write back to the file
