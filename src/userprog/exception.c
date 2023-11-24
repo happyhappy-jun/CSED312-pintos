@@ -162,9 +162,12 @@ page_fault(struct intr_frame *f) {
 
   // Todo: fault under PHYS_BASE and not_present, check stack growth
   if (is_stack_growth(fault_addr) && not_present) {
-    struct spt_entry *new_stack = spt_add_anon(&cur->spt, pg_round_down(fault_addr), true);
+    void *new_stack_bottom = pg_round_down(fault_addr);
+    struct spt_entry *new_stack = spt_add_anon(&cur->spt, new_stack_bottom, true);
     spt_load_page_into_frame(new_stack);
     install_page(new_stack->upage, new_stack->kpage, new_stack->writable);
+    cur->stack_pages++;
+    cur->stack_bottom = new_stack_bottom;
     return;
   }
 
