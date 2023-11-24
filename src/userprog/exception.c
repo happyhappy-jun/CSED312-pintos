@@ -144,6 +144,11 @@ page_fault(struct intr_frame *f) {
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
+  printf("page fault addr: %p\n", fault_addr);
+  printf("not_present: %d\n", not_present);
+  printf("user: %d\n", user);
+  printf("write: %d\n", write);
+
   // fault under PHYS_BASE and not_present, check spt first
   if (fault_addr < PHYS_BASE && not_present) {
     struct thread* cur = thread_current();
@@ -153,6 +158,9 @@ page_fault(struct intr_frame *f) {
       // in spt => load from file or swap
       spt_load_page_into_frame(spte);
       install_page(spte->upage, spte->kpage, spte->writable);
+      printf("page fault handled\n");
+      printf("installed upage: %p, kpage: %p\n", spte->upage, spte->kpage);
+      printf("installed to the thread %p\n", cur);
       // Todo: Restart page-faulting instruction
       // at this time, assume that "return" can handle this!
       return;

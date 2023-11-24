@@ -404,6 +404,7 @@ bool load(const char *file_name, void (**eip)(void), void **esp) {
 
 done:
   /* We arrive here whether the load is successful or not. */
+  printf("load done\n");
   return success;
 }
 
@@ -503,6 +504,9 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
 //    }
 
     spt_add_file(&thread_current()->spt, upage, writable, file, ofs, page_read_bytes, page_zero_bytes);
+    printf("added to spt\n");
+    printf("added page: %p\n", upage);
+    printf("added to thread: %p\n", thread_current());
 
     /* Advance. */
     read_bytes -= page_read_bytes;
