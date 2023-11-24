@@ -12,6 +12,7 @@ static long long page_fault_cnt;
 
 static void kill(struct intr_frame *);
 static void page_fault(struct intr_frame *);
+static bool is_stack_growth(void *fault_addr);
 
 /* Registers handlers for interrupts that can be caused by user
    programs.
@@ -121,6 +122,7 @@ page_fault(struct intr_frame *f) {
   bool write;       /* True: access was write, false: access was read. */
   bool user;        /* True: access by user, false: access by kernel. */
   void *fault_addr; /* Fault address. */
+  struct thread* cur = thread_current();
 
   /* Obtain faulting address, the virtual address that was
      accessed to cause the fault.  It may point to code or to
@@ -146,7 +148,6 @@ page_fault(struct intr_frame *f) {
 
   // fault under PHYS_BASE and not_present, check spt first
   if (fault_addr < PHYS_BASE && not_present) {
-    struct thread* cur = thread_current();
     void *fault_page = pg_round_down(fault_addr);
     struct spt_entry *spte = spt_get_entry(&cur->spt, fault_page);
     if (spte != NULL) {
@@ -160,6 +161,13 @@ page_fault(struct intr_frame *f) {
   }
 
   // Todo: fault under PHYS_BASE and not_present, check stack growth
+  if (is_stack_growth(fault_addr) && not_present) {
+    struct spt_entry *new_stack = spt_add_anon(&cur->spt, pg_round_down(fault_addr), true);
+    spt_load_page_into_frame(new_stack);
+    install_page(new_stack->upage, new_stack->kpage, new_stack->writable);
+    return;
+  }
+
 
   // fault under PHYS_BASE access by kernel
   // => fault while accessing user memory
@@ -174,4 +182,10 @@ page_fault(struct intr_frame *f) {
   // page fault otherwise
   thread_current()->pcb->exit_code = -1;
   thread_exit();
+}
+
+
+static bool is_stack_growth(void *fault_addr) {
+  struct thread *t = thread_current();
+  return fault_addr >= t->stack_bottom - PGSIZE && fault_addr < t->stack_bottom;
 }
