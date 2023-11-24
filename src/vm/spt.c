@@ -4,15 +4,15 @@
 
 #include "spt.h"
 #include "filesys/file.h"
-#include "stdio.h"
 #include "string.h"
+#include "swap.h"
 #include "threads/malloc.h"
 #include "threads/thread.h"
 #include "userprog/pagedir.h"
 #include "vm/frame.h"
 
 static struct spt_entry *spt_add(struct spt *, struct spt_entry *);
-static void spt_remove_helper(struct hash_elem *, void * UNUSED);
+static void spt_remove_helper(struct hash_elem *, void *UNUSED);
 static struct hash_elem *spt_get_hash_elem(struct spt *, void *);
 static struct spt_entry *spt_make_clean_spt_entry(void *, bool, bool);
 static void spt_load_page_into_frame_from_file(struct spt_entry *);
@@ -65,7 +65,7 @@ static struct hash_elem *spt_get_hash_elem(struct spt *spt, void *upage) {
  *
  * If added successfully, return original spte which is added.
  * If spt_entry exists, return existing spt_entry. */
-static struct spt_entry *spt_add(struct spt* spt, struct spt_entry* spte) {
+static struct spt_entry *spt_add(struct spt *spt, struct spt_entry *spte) {
   struct hash_elem *e = hash_insert(&spt->spt, &spte->elem);
   if (e == NULL)
     return spte;
@@ -93,14 +93,13 @@ static struct spt_entry *spt_make_clean_spt_entry(void *upage, bool writable, bo
   spte->writable = writable;
   spte->is_file = is_file;
   spte->is_swapped = false;
-  // Todo: swap_index initial value (SWAP_ERROR?)
   spte->swap_index = -1;
   return spte;
 }
 
 // Add file-backed spt_entry
 struct spt_entry *spt_add_file(struct spt *spt, void *upage, bool writable, struct file *file, off_t ofs, uint32_t read_bytes, uint32_t zero_bytes) {
-  struct spt_entry* spte = spt_make_clean_spt_entry(upage, writable, true);
+  struct spt_entry *spte = spt_make_clean_spt_entry(upage, writable, true);
   struct spt_entry_file_info *file_info = malloc(sizeof(struct spt_entry_file_info));
   file_info->file = file;
   file_info->ofs = ofs;
@@ -111,7 +110,7 @@ struct spt_entry *spt_add_file(struct spt *spt, void *upage, bool writable, stru
 }
 
 // Add non file-backed spt_entry
-struct spt_entry *spt_add_anon(struct spt* spt, void *upage, bool writable) {
+struct spt_entry *spt_add_anon(struct spt *spt, void *upage, bool writable) {
   struct spt_entry *spte = spt_make_clean_spt_entry(upage, writable, false);
   spte->file_info = NULL;
   return spt_add(spt, spte);
@@ -127,8 +126,8 @@ static void spt_remove_helper(struct hash_elem *elem, void *aux UNUSED) {
     pagedir_clear_page(thread_current()->pagedir, spte->upage);
   }
   if (spte->is_swapped)
-    // Todo: free corresponding swap table entry
-    // in swap free, we may need to check spt_entry and write back to the file
+    swap_free(spte->swap_index);
+  // in swap free, we may need to check spt_entry and write back to the file
   if (spte->file_info)
     free(spte->file_info);
 
@@ -170,6 +169,7 @@ void spt_load_page_into_frame(struct spt_entry *spte) {
     spte->kpage = frame_alloc(spte->upage, PAL_USER | PAL_ZERO);
   }
   spte->is_loaded = true;
+  unpin_frame(spte->kpage);
 }
 
 // Load page from file
@@ -201,12 +201,11 @@ static void spt_load_page_into_frame_from_swap(struct spt_entry *spte) {
   spte->kpage = frame_alloc(spte->upage, PAL_USER);
 
   // Load this page.
-  // Todo: swap in from swap disk.
   spte->is_swapped = false;
-  // vm_swap_in(spte->swap_index, spte->kpage); // maybe?
-  spte->swap_index = -1;
-}
+  swap_in(spte->swap_index, spte->kpage);
 
+  spte->is_loaded = true;
+}
 
 /* Evict spte corresponding frame
  *
@@ -227,8 +226,7 @@ void spt_evict_page_from_frame(struct spt_entry *spte) {
 
   if (is_dirty || !spte->is_file) {
     spte->is_swapped = true;
-    // Todo: swap out into swap disk.
-    // spte->swap_index = vm_swap_out(spte->swap_index, spte->kpage); // maybe?
+    spte->swap_index = swap_out(spte->kpage);
   }
 
   frame_free(spte->kpage);
