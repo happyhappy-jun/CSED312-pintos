@@ -154,13 +154,10 @@ page_fault(struct intr_frame *f) {
       // in spt => load from file or swap
       spt_load_page_into_frame(spte);
       install_page(spte->upage, spte->kpage, spte->writable);
-      // Todo: Restart page-faulting instruction
-      // at this time, assume that "return" can handle this!
       return;
     }
   }
 
-  // Todo: fault under PHYS_BASE and not_present, check stack growth
   void *esp = user ? f->esp : cur->intr_esp;
   if (is_stack_growth(esp, fault_addr) && not_present) {
     void *new_stack_bottom = pg_round_down(fault_addr);
