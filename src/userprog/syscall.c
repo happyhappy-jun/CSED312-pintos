@@ -395,6 +395,7 @@ bool sys_munmap(mmapid_t id) {
     spt_remove_by_entry(&curr->spt, spte);
   }
   list_remove(&mmap_entry->elem);
+  free(mmap_entry);
   return true;
 }
 
