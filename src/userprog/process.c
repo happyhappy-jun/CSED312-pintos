@@ -149,8 +149,6 @@ void process_exit(void) {
     struct list_elem *e = list_front(mmap_list);
     struct mmap_entry *mme = list_entry(e, struct mmap_entry, elem);
     sys_munmap(mme->id);
-    // TODO: all sys_munmap() should be true but it fail
-//    ASSERT(sys_munmap(mme->id) == true);
   }
 
   // Todo: 7. On process termination here
