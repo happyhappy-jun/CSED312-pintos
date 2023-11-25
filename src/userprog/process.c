@@ -75,7 +75,7 @@ start_process(void *file_name_) {
   struct thread *t = thread_current();
   spt_init(&t->spt);
   t->stack_pages = 0;
-  t->stack_bottom = NULL;
+  t->intr_esp = NULL;
 
   /* Initialize interrupt frame and load executable. */
   memset(&if_, 0, sizeof if_);
@@ -515,7 +515,6 @@ setup_stack(void **esp) {
     success = install_page(upage, stack_page->kpage, stack_page->writable);
     if (success) {
       cur->stack_pages++;
-      cur->stack_bottom = upage;
       *esp = PHYS_BASE;
     } else
       spt_remove_by_upage(&cur->spt, upage);

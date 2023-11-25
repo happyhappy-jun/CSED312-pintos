@@ -115,7 +115,7 @@ struct thread {
 #ifdef VM
   struct spt spt;
   int stack_pages;
-  void *stack_bottom;
+  void *intr_esp;
 #endif
 
   int original_priority;          /* Original priority of the thread */

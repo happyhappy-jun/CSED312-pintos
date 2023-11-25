@@ -12,7 +12,7 @@ static long long page_fault_cnt;
 
 static void kill(struct intr_frame *);
 static void page_fault(struct intr_frame *);
-static bool is_stack_growth(void *fault_addr);
+static bool is_stack_growth(void* esp, void *fault_addr);
 
 /* Registers handlers for interrupts that can be caused by user
    programs.
@@ -161,13 +161,13 @@ page_fault(struct intr_frame *f) {
   }
 
   // Todo: fault under PHYS_BASE and not_present, check stack growth
-  if (is_stack_growth(fault_addr) && not_present) {
+  void *esp = user ? f->esp : cur->intr_esp;
+  if (is_stack_growth(esp, fault_addr) && not_present) {
     void *new_stack_bottom = pg_round_down(fault_addr);
     struct spt_entry *new_stack = spt_add_anon(&cur->spt, new_stack_bottom, true);
     spt_load_page_into_frame(new_stack);
     install_page(new_stack->upage, new_stack->kpage, new_stack->writable);
     cur->stack_pages++;
-    cur->stack_bottom = new_stack_bottom;
     return;
   }
 
@@ -188,9 +188,8 @@ page_fault(struct intr_frame *f) {
 }
 
 
-static bool is_stack_growth(void *fault_addr) {
+static bool is_stack_growth(void *esp, void *fault_addr) {
   struct thread *t = thread_current();
-  printf("fault_addr: %p, stack_bottom: %p, stack_pages: %d\n", fault_addr, t->stack_bottom, t->stack_pages);
   if (t->stack_pages >= STACK_MAX_PAGES) return false;
-  return fault_addr >= t->stack_bottom - PGSIZE && fault_addr < t->stack_bottom;
+  return esp - 32 <= fault_addr;
 }
