@@ -146,7 +146,7 @@ void process_exit(void) {
 #ifdef VM
   struct list *mmap_list = &cur->mmap_list;
   while (!list_empty(mmap_list)) {
-    struct list_elem *e = list_pop_front(mmap_list);
+    struct list_elem *e = list_front(mmap_list);
     struct mmap_entry *mme = list_entry(e, struct mmap_entry, elem);
     sys_munmap(mme->id);
     // TODO: all sys_munmap() should be true but it fail
