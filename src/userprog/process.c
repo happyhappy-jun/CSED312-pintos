@@ -497,13 +497,15 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
 static bool
 setup_stack(void **esp) {
   bool success = false;
+  struct thread *cur = thread_current();
 
   void *upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
-  spt_insert_stack(&thread_current()->spt, upage);
-  success = load_page(&thread_current()->spt, upage);
-  if (success)
+  spt_insert_stack(&cur->spt, upage);
+  success = load_page(&cur->spt, upage);
+  if (success) {
     *esp = PHYS_BASE;
-  else {
+    cur->stack_pages = 1;
+  } else {
     PANIC("Failed to setup stack");
   }
 

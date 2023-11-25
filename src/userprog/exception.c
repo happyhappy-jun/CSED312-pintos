@@ -13,6 +13,7 @@ static long long page_fault_cnt;
 
 static void kill(struct intr_frame *);
 static void page_fault(struct intr_frame *);
+static bool stack_growth(void *fault_addr, void *esp);
 
 /* Registers handlers for interrupts that can be caused by user
    programs.
@@ -144,21 +145,27 @@ page_fault(struct intr_frame *f) {
   not_present = (f->error_code & PF_P) == 0;
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
+
+  struct thread *cur = thread_current();
   void *fault_page = pg_round_down(fault_addr);
+  void *esp = user ? f->esp : cur->intr_esp;
+  struct spt *spt = &cur->spt;
 
-
-
-  struct spt *spt = &thread_current()->spt;
-  struct spt_entry *spte = spt_find(spt, fault_page);
-  if (spte != NULL) {
-    if (load_page(spt, fault_page))
-      return;
-    else {
-      thread_current()->pcb->exit_code = -1;
-      thread_exit();
+  if (fault_addr < PHYS_BASE && not_present) {
+    if (stack_growth(fault_page, esp)) {
+      spt_insert_stack(spt, fault_page);
+      cur->stack_pages++;
+    }
+    struct spt_entry *spte = spt_find(spt, fault_page);
+    if (spte != NULL) {
+      if (load_page(spt, fault_page))
+        return;
+      else {
+        thread_current()->pcb->exit_code = -1;
+        thread_exit();
+      }
     }
   }
-
 
   // fault under PHYS_BASE access by kernel
   // => fault while accessing user memory
@@ -182,4 +189,9 @@ page_fault(struct intr_frame *f) {
          write ? "writing" : "reading",
          user ? "user" : "kernel");
   kill(f);
+}
+
+static bool stack_growth(void *fault_addr, void *esp) {
+  if (thread_current()->stack_pages >= STACK_MAX_PAGES) return false;
+  return esp - 32 <= fault_addr && fault_addr >= PHYS_BASE - STACK_MAX_PAGES * PGSIZE && fault_addr <= PHYS_BASE;
 }

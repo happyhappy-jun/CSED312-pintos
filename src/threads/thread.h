@@ -111,10 +111,12 @@ struct thread {
   /* Owned by userprog/process.c. */
   uint32_t *pagedir; /* Page directory. */
   struct pcb *pcb;
+  void *intr_esp;
 #endif
 
 #ifdef VM
   struct spt spt;
+  int stack_pages;
 #endif
 
   int original_priority;          /* Original priority of the thread */
