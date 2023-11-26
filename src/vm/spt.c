@@ -17,6 +17,7 @@ static struct hash_elem *spt_get_hash_elem(struct spt *, void *);
 static struct spt_entry *spt_make_clean_spt_entry(void *, bool, bool);
 static void spt_load_page_into_frame_from_file(struct spt_entry *);
 static void spt_load_page_into_frame_from_swap(struct spt_entry *);
+extern struct lock file_lock;
 
 // Initialize spt
 void spt_init(struct spt *spt) {
@@ -183,12 +184,19 @@ static void spt_load_page_into_frame_from_file(struct spt_entry *spte) {
     // Get a frame from memory.
     spte->kpage = frame_alloc(spte->upage, PAL_USER);
 
+    bool holding_lock = lock_held_by_current_thread(&file_lock);
+    if (!holding_lock)
+      lock_acquire (&file_lock);
+
     // Load this page.
     file_seek(spte->file_info->file, spte->file_info->ofs);
     if (file_read(spte->file_info->file, spte->kpage, spte->file_info->read_bytes) != (int) spte->file_info->read_bytes) {
-      PANIC("file_read failed");
+      frame_free(spte->kpage);
+      lock_release (&file_lock);
     }
     memset(spte->kpage + spte->file_info->read_bytes, 0, spte->file_info->zero_bytes);
+    if (!holding_lock)
+      lock_release (&file_lock);
   }
 }
 
