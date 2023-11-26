@@ -335,8 +335,12 @@ mmapid_t sys_mmap(int fd, void *upage) {
   struct thread *curr = thread_current();
 
   struct file *_file = get_file_by_fd(fd);
-  struct file *f = file_reopen(_file);
+  if (_file == NULL) {
+    lock_release(&file_lock);
+    return MAP_FAILED;
+  }
 
+  struct file *f = file_reopen(_file);
   if (f == NULL) {
     lock_release(&file_lock);
     return MAP_FAILED;
