@@ -58,6 +58,8 @@ static void syscall_handler(struct intr_frame *f) {
   int syscall_n;
   int syscall_arg[3];
 
+  thread_current()->intr_esp = f->esp;
+
   syscall_n = get_syscall_n(f->esp);
   switch (syscall_n) {
   case SYS_HALT:

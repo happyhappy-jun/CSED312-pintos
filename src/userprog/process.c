@@ -64,6 +64,8 @@ start_process(void *file_name_) {
   /* Initialize spt */
   struct thread *t = thread_current();
   spt_init(&t->spt);
+  t->stack_pages = 0;
+  t->intr_esp = NULL;
 
   /* Initialize interrupt frame and load executable. */
   memset(&if_, 0, sizeof if_);
@@ -505,18 +507,20 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
    user virtual memory. */
 static bool
 setup_stack(void **esp) {
+  struct thread* cur = thread_current();
   bool success = false;
 
   uint8_t *upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
 
-  struct spt_entry *stack_page = spt_add_anon(&thread_current()->spt, upage, true);
+  struct spt_entry *stack_page = spt_add_anon(&cur->spt, upage, true);
   if (stack_page != NULL) {
     spt_load_page_into_frame(stack_page);
     success = install_page(upage, stack_page->kpage, stack_page->writable);
-    if (success)
+    if (success) {
+      cur->stack_pages++;
       *esp = PHYS_BASE;
-    else
-      spt_remove_by_upage(&thread_current()->spt, upage);
+    } else
+      spt_remove_by_upage(&cur->spt, upage);
   }
   return success;
 }

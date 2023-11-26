@@ -114,6 +114,8 @@ struct thread {
 #endif
 #ifdef VM
   struct spt spt;
+  int stack_pages;
+  void *intr_esp;
   struct list mmap_list;
 #endif
 
