@@ -207,7 +207,9 @@ static int sys_read(int fd, void *buffer, unsigned size) {
     }
     read_bytes = (int) size;
   } else {
+    lock_acquire(&file_lock);
     read_bytes = file_read(file, kbuffer, (off_t) size);
+    lock_release(&file_lock);
   }
 
   void *ptr = safe_memcpy_to_user(buffer, kbuffer, read_bytes);
@@ -238,10 +240,14 @@ static int sys_write(int fd, void *buffer, unsigned int size) {
   }
 
   if (fd == STDOUT_FILENO) {
+    lock_acquire(&file_lock);
     putbuf((const char *) kbuffer, size);
+    lock_release(&file_lock);
     write_bytes = (int) size;
   } else {
+    lock_acquire(&file_lock);
     write_bytes = file_write(file, kbuffer, (off_t) size);
+    lock_release(&file_lock);
   }
 
   palloc_free_multiple(kbuffer, page_cnt);

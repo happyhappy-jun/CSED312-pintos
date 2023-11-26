@@ -7,8 +7,10 @@
 #include "userprog/pagedir.h"
 
 struct frame_table frame_table;
+struct lock frame_table_lock;
 
 void frame_table_init(void) {
+    lock_init(&frame_table_lock);
   hash_init(&frame_table.table, frame_table_hash, frame_table_less, NULL);
 }
 
@@ -24,12 +26,13 @@ bool frame_table_less(const struct hash_elem *a, const struct hash_elem *b, void
 }
 
 void *frame_alloc(void *upage, enum palloc_flags flags) {
-  void *kpage = palloc_get_page(flags);
+  void *kpage = palloc_get_page(PAL_USER | flags);
+  lock_acquire(&frame_table_lock);
   if (kpage == NULL) {
     struct frame *target = get_frame_to_evict(thread_current()->pagedir);
     struct spt_entry *target_spte = spt_get_entry(&thread_current()->spt, target->upage);
     spt_evict_page_from_frame(target_spte);
-    kpage = palloc_get_page(flags);
+    kpage = palloc_get_page(PAL_USER | flags);
     if (kpage == NULL) {
       PANIC("frame_alloc: palloc_get_page failed");
     }
@@ -41,6 +44,7 @@ void *frame_alloc(void *upage, enum palloc_flags flags) {
   f->thread = thread_current();
 
   hash_insert(&frame_table.table, &f->elem);
+    lock_release(&frame_table_lock);
   return kpage;
 }
 
@@ -54,7 +58,6 @@ void frame_free(void *kpage) {
     free(hash_entry(e, struct frame, elem));
   }
 }
-
 
 struct frame *get_frame_to_evict(uint32_t *pagedir) {
   struct hash_iterator iter_hash;
