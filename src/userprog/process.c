@@ -4,22 +4,13 @@
 #include "filesys/filesys.h"
 #include "syscall.h"
 #include "threads/flags.h"
-#include "threads/init.h"
-#include "threads/interrupt.h"
-#include "threads/malloc.h"
 #include "threads/palloc.h"
-#include "threads/thread.h"
-#include "threads/vaddr.h"
 #include "userprog/gdt.h"
 #include "userprog/pagedir.h"
 #include "userprog/tss.h"
-#include "vm/frame.h"
-#include "vm/spt.h"
 #include <debug.h>
-#include <inttypes.h>
 #include <round.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 static thread_func start_process
@@ -54,8 +45,7 @@ tid_t process_execute(const char *file_name) {
   palloc_free_page(command);
   if (tid == TID_ERROR) {
     palloc_free_page(fn_copy);
-  }
-  else {
+  } else {
     // if the load() is not finished, wait for it
     // fn_copy will be freed in start_process()
     sema_down(&get_thread_by_tid(tid)->pcb->load_sema);
@@ -155,8 +145,19 @@ void process_exit(void) {
     }
   }
 
+#ifdef VM
+  struct list *mmap_list = &cur->mmap_list;
+  while (!list_empty(mmap_list)) {
+    struct list_elem *e = list_front(mmap_list);
+    struct mmap_entry *mme = list_entry(e, struct mmap_entry, elem);
+    sys_munmap(mme->id);
+  }
+
   // Todo: 7. On process termination here
+
+sema_up(&cur->pcb->wait_sema);// sema up wait_sema for waiting parent
   spt_destroy(&cur->spt);
+#endif
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -173,7 +174,9 @@ void process_exit(void) {
     pagedir_activate(NULL);
     pagedir_destroy(pd);
   }
-  sema_up(&cur->pcb->wait_sema);  // sema up wait_sema for waiting parent
+
+
+
   sig_children_parent_exit();     // sema up exit_sema for children to free their resources
   sema_down(&cur->pcb->exit_sema);// exit_sema up only when the parent exit
   free_pcb(cur->pcb);
@@ -487,7 +490,7 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
     size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
     size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-    struct spt_entry* page = spt_add_file(&thread_current()->spt, upage, writable, file, ofs+iter*PGSIZE, page_read_bytes, page_zero_bytes);
+    struct spt_entry *page = spt_add_file(&thread_current()->spt, upage, writable, file, ofs + iter * PGSIZE, page_read_bytes, page_zero_bytes);
     if (page == NULL)
       return false;
 
