@@ -4,6 +4,8 @@
 
 #include "swap.h"
 #include "devices/block.h"
+#include "frame.h"
+#include "stdio.h"
 #include "threads/vaddr.h"
 #include "vm/swap.h"
 #include <bitmap.h>
@@ -33,12 +35,12 @@ swap_index_t swap_out(void *page) {
     block_write(swap_block, index * SECTORS_NUM + i, page + i * BLOCK_SECTOR_SIZE);
   }
 
-  bitmap_set(swap_table, index, true);
+  bitmap_set(swap_table, index, false);
   return index;
 }
 
 void swap_in(swap_index_t index, void *page) {
-  bitmap_set(swap_table, index, false);
+  bitmap_set(swap_table, index, true);
 
   for (size_t i = 0; i < SECTORS_NUM; i++) {
     block_read(swap_block, index * SECTORS_NUM + i, page + i * BLOCK_SECTOR_SIZE);
@@ -46,5 +48,5 @@ void swap_in(swap_index_t index, void *page) {
 }
 
 void swap_free(swap_index_t index) {
-  bitmap_set(swap_table, index, false);
+  bitmap_set(swap_table, index, true);
 }
