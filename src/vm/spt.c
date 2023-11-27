@@ -220,6 +220,8 @@ static void spt_load_page_into_frame_from_swap(struct spt_entry *spte) {
  * Dirty File-backed Page and Anon Page will be swapped out
  * Otherwise, Page data in the frame will just be freed
  *
+ * Caller should clear the page table entry by pagedir_clear_page()
+ *
  * Set is_swapped, swap_index if swapped out
  * Clear is_loaded, kpage */
 void spt_evict_page_from_frame(struct spt_entry *spte) {
