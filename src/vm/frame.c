@@ -30,7 +30,8 @@ void *frame_alloc(void *upage, enum palloc_flags flags) {
   lock_acquire(&frame_table_lock);
   if (kpage == NULL) {
     struct frame *target = get_frame_to_evict(thread_current()->pagedir);
-    struct spt_entry *target_spte = spt_get_entry(&thread_current()->spt, target->upage);
+    struct thread *target_holder = target->thread;
+    struct spt_entry *target_spte = spt_get_entry(&target_holder->spt, target->upage);
     spt_evict_page_from_frame(target_spte);
     kpage = palloc_get_page(flags);
     if (kpage == NULL) {
