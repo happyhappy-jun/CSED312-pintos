@@ -225,9 +225,8 @@ static void spt_load_page_into_frame_from_swap(struct spt_entry *spte) {
 void spt_evict_page_from_frame(struct spt_entry *spte) {
   ASSERT(spte->is_loaded);
   ASSERT(spte->kpage != NULL);
-  struct thread *cur = thread_current();
 
-  bool is_dirty = pagedir_is_dirty(cur->pagedir, spte->upage);
+  bool is_dirty = pagedir_is_dirty(thread_current()->pagedir, spte->upage);
 
   // 1. dirty file
   // 2. anon page (whether dirty or not)
@@ -241,5 +240,4 @@ void spt_evict_page_from_frame(struct spt_entry *spte) {
   frame_free(spte->kpage);
   spte->is_loaded = false;
   spte->kpage = NULL;
-  pagedir_clear_page(cur->pagedir, spte->upage);
 }
