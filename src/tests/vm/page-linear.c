@@ -14,6 +14,7 @@ void test_main(void) {
   struct arc4 arc4;
   size_t i;
 
+
   /* Initialize to 0x5a. */
   msg("initialize");
   memset(buf, 0x5a, sizeof buf);
@@ -22,7 +23,7 @@ void test_main(void) {
   msg("read pass");
   for (i = 0; i < SIZE; i++)
     if (buf[i] != 0x5a)
-      fail("byte %zu != 0x5a", i);
+      fail("byte %zu(%p) != 0x5a", i, buf+i);
 
   /* Encrypt zeros. */
   msg("read/modify/write pass one");
@@ -38,5 +39,5 @@ void test_main(void) {
   msg("read pass");
   for (i = 0; i < SIZE; i++)
     if (buf[i] != 0x5a)
-      fail("byte %zu != 0x5a", i);
+      fail("byte %zu(%p) != 0x5a", i, buf+i);
 }
