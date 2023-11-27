@@ -26,6 +26,7 @@ struct spt_entry {
   bool is_loaded; // true if frame allocated, else false.
   bool writable; // true if page is writable, else false.
   bool is_file; // true if file-backed page(executable/memory map), else (stack, etc) false.
+  bool is_dirty; // true if file-backed page ever modified, else false.
   struct hash_elem elem; // hash element for spt.
 
   /* file info */
