@@ -33,7 +33,7 @@ void *frame_alloc(void *upage, enum palloc_flags flags) {
     struct thread *target_holder = target->thread;
     struct spt_entry *target_spte = spt_get_entry(&target_holder->spt, target->upage);
     spt_evict_page_from_frame(target_spte);
-    pagedir_clear_page(target_holder->pagedir, target->upage);
+    pagedir_clear_page(target_holder->pagedir, target_spte->upage);
     kpage = palloc_get_page(flags);
     if (kpage == NULL) {
       PANIC("frame_alloc: palloc_get_page failed");
