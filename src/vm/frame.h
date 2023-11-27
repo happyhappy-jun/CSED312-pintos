@@ -29,7 +29,7 @@ struct frame *get_frame(void *kpage);
 void *frame_alloc(void *, enum palloc_flags);
 void frame_free(void *);
 
-struct frame *get_frame_to_evict(uint32_t *pagedir);
+struct frame *get_frame_to_evict();
 
 void pin_frame(void *kpage);
 void unpin_frame(void *kpage);

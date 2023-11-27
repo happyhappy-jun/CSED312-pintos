@@ -38,7 +38,7 @@ void *frame_alloc(void *upage, enum palloc_flags flags) {
   void *kpage = palloc_get_page(flags);
   lock_acquire(&frame_table_lock);
   if (kpage == NULL) {
-    struct frame *target = get_frame_to_evict(thread_current()->pagedir);
+    struct frame *target = get_frame_to_evict();
     struct thread *target_holder = target->thread;
     struct spt_entry *target_spte = spt_get_entry(&target_holder->spt, target->upage);
     spt_evict_page_from_frame(target_spte);
@@ -70,7 +70,7 @@ void frame_free(void *kpage) {
   }
 }
 
-struct frame *get_frame_to_evict(uint32_t *pagedir) {
+struct frame *get_frame_to_evict() {
   struct hash_iterator iter_hash;
   int i;
   for (i = 0; i < 2; i++) {
@@ -79,8 +79,8 @@ struct frame *get_frame_to_evict(uint32_t *pagedir) {
       struct frame *f = hash_entry(hash_cur(&iter_hash), struct frame, elem);
       if (f->pinned)
         continue;
-      if (pagedir_is_accessed(pagedir, f->upage)) {
-        pagedir_set_accessed(pagedir, f->upage, false);
+      if (pagedir_is_accessed(f->thread->pagedir, f->upage)) {
+        pagedir_set_accessed(f->thread->pagedir, f->upage, false);
         continue;
       }
       return f;
