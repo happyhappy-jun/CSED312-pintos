@@ -154,8 +154,6 @@ void process_exit(void) {
   }
 
   // Todo: 7. On process termination here
-
-sema_up(&cur->pcb->wait_sema);// sema up wait_sema for waiting parent
   spt_destroy(&cur->spt);
 #endif
 
@@ -174,9 +172,7 @@ sema_up(&cur->pcb->wait_sema);// sema up wait_sema for waiting parent
     pagedir_activate(NULL);
     pagedir_destroy(pd);
   }
-
-
-
+  sema_up(&cur->pcb->wait_sema);  // sema up wait_sema for waiting parent
   sig_children_parent_exit();     // sema up exit_sema for children to free their resources
   sema_down(&cur->pcb->exit_sema);// exit_sema up only when the parent exit
   free_pcb(cur->pcb);
