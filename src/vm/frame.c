@@ -26,7 +26,12 @@ bool frame_table_less(const struct hash_elem *a, const struct hash_elem *b, void
 }
 
 struct frame *get_frame(void *kpage) {
-  return hash_entry(hash_find(&frame_table.table, kpage), struct frame, elem);
+  struct frame f;
+  f.kpage = kpage;
+  struct hash_elem *e = hash_find(&frame_table.table, &f.elem);
+  if (e == NULL)
+      return NULL;
+  return hash_entry(e, struct frame, elem);
 }
 
 void *frame_alloc(void *upage, enum palloc_flags flags) {
