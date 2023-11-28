@@ -68,6 +68,7 @@ userprog_SRC += userprog/user-memory-access.c # Accessing User Memory
 vm_SRC  = vm/frame.c			# Frame and Frame Table
 vm_SRC += vm/spt.c			    # Supplemental Page Table
 vm_SRC += vm/swap.c			# Swap Table
+vm_SRC += vm/mmap.c         # File Memory Mapping
 
 # Filesystem code.
 filesys_SRC  = filesys/filesys.c	# Filesystem core.
