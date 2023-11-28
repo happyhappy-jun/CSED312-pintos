@@ -166,8 +166,6 @@ void spt_load_page_into_frame(struct spt_entry *spte) {
   } else if (spte->is_swapped) {
     spt_load_page_into_frame_from_swap(spte);
   } else {
-    // Not in file and not in swap disk
-    // => load blank page
     spte->kpage = frame_alloc(spte->upage, PAL_USER | PAL_ZERO);
   }
   spte->is_loaded = true;
@@ -185,19 +183,18 @@ static void spt_load_page_into_frame_from_file(struct spt_entry *spte) {
     // Get a frame from memory.
     spte->kpage = frame_alloc(spte->upage, PAL_USER);
 
-    bool holding_lock = lock_held_by_current_thread(&file_lock);
-    if (!holding_lock)
-      lock_acquire (&file_lock);
 
     // Load this page.
+    lock_acquire (&file_lock);
     file_seek(spte->file_info->file, spte->file_info->ofs);
-    if (file_read(spte->file_info->file, spte->kpage, spte->file_info->read_bytes) != (int) spte->file_info->read_bytes) {
+    int read_bytes = file_read(spte->file_info->file, spte->kpage, spte->file_info->read_bytes);
+    lock_release(&file_lock);
+
+    if (read_bytes != (int) spte->file_info->read_bytes) {
       frame_free(spte->kpage);
       lock_release (&file_lock);
     }
     memset(spte->kpage + spte->file_info->read_bytes, 0, spte->file_info->zero_bytes);
-    if (!holding_lock)
-      lock_release (&file_lock);
   }
 }
 
@@ -265,15 +262,13 @@ void spt_evict_page_from_frame(struct spt_entry *spte) {
 
 static void spt_evict_page_from_frame_into_file(struct spt_entry *spte) {
   ASSERT(spte->is_file)
-  bool holding_lock = lock_held_by_current_thread(&file_lock);
-  if (!holding_lock)
-    lock_acquire(&file_lock);
 
   struct spt_entry_file_info* file_info = spte->file_info;
-  if (file_write_at(file_info->file, spte->kpage, file_info->read_bytes, file_info->ofs) != (int) file_info->read_bytes) {
+  lock_acquire(&file_lock);
+  int write_bytes = file_write_at(file_info->file, spte->kpage, file_info->read_bytes, file_info->ofs);
+  lock_release(&file_lock);
+
+  if (write_bytes != (int) file_info->read_bytes) {
     PANIC("Evict into file failed");
   }
-
-  if (!holding_lock)
-    lock_release(&file_lock);
 }
