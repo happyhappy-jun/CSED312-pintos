@@ -257,8 +257,8 @@ void clear_from_donations(struct lock *lock) {
   struct list_elem *e;
   struct thread *t;
 
-  e = list_begin(&thread_current()->donations);
-  for (e; e != list_end(&thread_current()->donations); e = list_next(e)) {
+  struct list *donations = &thread_current()->donations;
+  for (e = list_begin(donations); e != list_end(donations); e = list_next(e)) {
     t = list_entry(e,
                    struct thread, donation_elem);
     if (t->waiting_lock == lock) {
