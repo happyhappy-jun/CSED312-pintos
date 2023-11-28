@@ -17,6 +17,7 @@ static struct hash_elem *spt_get_hash_elem(struct spt *, void *);
 static struct spt_entry *spt_make_clean_spt_entry(void *, bool, bool);
 static void spt_load_page_into_frame_from_file(struct spt_entry *);
 static void spt_load_page_into_frame_from_swap(struct spt_entry *);
+static void spt_evict_page_from_frame_into_file(struct spt_entry *);
 extern struct lock file_lock;
 
 // Initialize spt
@@ -228,13 +229,17 @@ void spt_evict_page_from_frame(struct spt_entry *spte) {
   ASSERT(spte->is_loaded);
   ASSERT(spte->kpage != NULL);
 
-  bool is_dirty = pagedir_is_dirty(thread_current()->pagedir, spte->upage);
+  struct frame *target_frame = get_frame(spte->kpage);
+  struct thread *target_holder = target_frame->thread;
+  bool is_dirty = pagedir_is_dirty(target_holder->pagedir, spte->upage);
 
-  // 1. dirty file
-  // 2. anon page (whether dirty or not)
-  // will be swapped out when an eviction occurs.
+  // dirty page will be write-backed into corresponding file.
+  if (is_dirty && spte->is_file) {
+    spt_evict_page_from_frame_into_file(spte);
+  }
 
-  if (is_dirty || !spte->is_file) {
+  // anon page (whether dirty or not) will be swapped out when an eviction occurs.
+  if (!spte->is_file) {
     spte->is_swapped = true;
     spte->swap_index = swap_out(spte->kpage);
   }
@@ -242,4 +247,19 @@ void spt_evict_page_from_frame(struct spt_entry *spte) {
   frame_free(spte->kpage);
   spte->is_loaded = false;
   spte->kpage = NULL;
+}
+
+static void spt_evict_page_from_frame_into_file(struct spt_entry *spte) {
+  ASSERT(spte->is_file)
+  bool holding_lock = lock_held_by_current_thread(&file_lock);
+  if (!holding_lock)
+    lock_acquire(&file_lock);
+
+  struct spt_entry_file_info* file_info = spte->file_info;
+  if (file_write_at(file_info->file, spte->kpage, file_info->read_bytes, file_info->ofs) != (int) file_info->read_bytes) {
+    PANIC("Evict into file failed");
+  }
+
+  if (!holding_lock)
+    lock_release(&file_lock);
 }
