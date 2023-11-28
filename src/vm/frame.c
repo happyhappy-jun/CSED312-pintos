@@ -35,8 +35,8 @@ struct frame *get_frame(void *kpage) {
 }
 
 void *frame_alloc(void *upage, enum palloc_flags flags) {
-  void *kpage = palloc_get_page(flags);
   lock_acquire(&frame_table_lock);
+  void *kpage = palloc_get_page(flags);
   if (kpage == NULL) {
     struct frame *target = get_frame_to_evict();
     struct thread *target_holder = target->thread;
@@ -48,14 +48,13 @@ void *frame_alloc(void *upage, enum palloc_flags flags) {
       PANIC("frame_alloc: palloc_get_page failed");
     }
   }
-
   struct frame *f = malloc(sizeof(struct frame));
   f->kpage = kpage;
   f->upage = upage;
   f->thread = thread_current();
 
   hash_insert(&frame_table.table, &f->elem);
-    lock_release(&frame_table_lock);
+  lock_release(&frame_table_lock);
   return kpage;
 }
 
