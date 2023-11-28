@@ -333,27 +333,22 @@ mmapid_t sys_mmap(int fd, void *upage) {
   }
   struct thread *curr = thread_current();
 
-  lock_acquire(&file_lock);
-
   struct file *_file = get_file_by_fd(fd);
   if (_file == NULL) {
-    lock_release(&file_lock);
     return MAP_FAILED;
   }
 
+  lock_acquire(&file_lock);
   struct file *f = file_reopen(_file);
-  if (f == NULL) {
-    lock_release(&file_lock);
-    return MAP_FAILED;
-  }
-
-  size_t file_size = file_length(f);
-  if (file_size == 0) {
-    lock_release(&file_lock);
-    return MAP_FAILED;
-  }
-
   lock_release(&file_lock);
+  if (f == NULL)
+    return MAP_FAILED;
+
+  lock_acquire(&file_lock);
+  size_t file_size = file_length(f);
+  lock_release(&file_lock);
+  if (file_size == 0)
+    return MAP_FAILED;
 
   for (size_t offset = 0; offset < file_size; offset += PGSIZE) {
     struct spt_entry *spte = spt_get_entry(&curr->spt, upage + offset);
