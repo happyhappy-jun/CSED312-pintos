@@ -256,15 +256,21 @@ void thread_unblock(struct thread *t) {
 void clear_from_donations(struct lock *lock) {
   struct list_elem *e;
   struct thread *t;
-
+  bool found = false;
   struct list *donations = &thread_current()->donations;
-  for (e = list_begin(donations); e != list_end(donations); e = list_next(e)) {
-    t = list_entry(e,
-                   struct thread, donation_elem);
-    if (t->waiting_lock == lock) {
-      list_remove(e);
+  do {
+    if (list_empty(donations))
+      break;
+    found = false;
+    for (e = list_begin(donations); e != list_end(donations); e = list_next(e)) {
+      t = list_entry(e, struct thread, donation_elem);
+      if (t->waiting_lock == lock) {
+        found = true;
+        list_remove(e);
+        break;
+      }
     }
-  }
+  } while (found == true);
 }
 
 void update_donations(void) {
