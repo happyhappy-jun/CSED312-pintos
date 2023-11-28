@@ -93,7 +93,6 @@ static struct spt_entry *spt_make_clean_spt_entry(void *upage, bool writable, bo
   spte->is_loaded = false;
   spte->writable = writable;
   spte->is_file = is_file;
-  spte->is_dirty = false;
   spte->is_swapped = false;
   spte->swap_index = -1;
   return spte;
@@ -226,24 +225,15 @@ static void spt_load_page_into_frame_from_swap(struct spt_entry *spte) {
  * Set is_swapped, swap_index if swapped out
  * Clear is_loaded, kpage */
 void spt_evict_page_from_frame(struct spt_entry *spte) {
-  bool is_dirty;
-  ASSERT(spte->is_loaded)
-  ASSERT(spte->kpage != NULL)
-  struct frame *target_frame = get_frame(spte->kpage);
-  ASSERT(target_frame != NULL)
-  struct thread *target_holder = target_frame->thread;
-  ASSERT(target_holder != NULL)
+  ASSERT(spte->is_loaded);
+  ASSERT(spte->kpage != NULL);
 
-  if (spte->is_dirty) {
-    is_dirty = true;
-  } else {
-    is_dirty = pagedir_is_dirty(target_holder->pagedir, spte->upage);
-    spte->is_dirty = is_dirty;
-  }
+  bool is_dirty = pagedir_is_dirty(thread_current()->pagedir, spte->upage);
 
-  // 1. ever modified file
+  // 1. dirty file
   // 2. anon page (whether dirty or not)
   // will be swapped out when an eviction occurs.
+
   if (is_dirty || !spte->is_file) {
     spte->is_swapped = true;
     spte->swap_index = swap_out(spte->kpage);
