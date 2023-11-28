@@ -171,7 +171,9 @@ static int sys_open(const char *file_name) {
     palloc_free_page(kfile);
     sys_exit(-1);
   }
+  lock_acquire(&file_lock);
   file = filesys_open(kfile);
+  lock_release(&file_lock);
   palloc_free_page(kfile);
 
   if (file == NULL)
