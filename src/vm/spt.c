@@ -191,8 +191,7 @@ static void spt_load_page_into_frame_from_file(struct spt_entry *spte) {
     lock_release(&file_lock);
 
     if (read_bytes != (int) spte->file_info->read_bytes) {
-      frame_free(spte->kpage);
-      lock_release (&file_lock);
+      PANIC("Load from file failed");
     }
     memset(spte->kpage + spte->file_info->read_bytes, 0, spte->file_info->zero_bytes);
   }
