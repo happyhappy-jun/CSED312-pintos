@@ -13,6 +13,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifdef VM
+#include "vm/mmap.h"
+#endif
+
 static thread_func start_process
     NO_RETURN;
 static bool load(const char *cmdline, void (**eip)(void), void **esp);
@@ -150,7 +154,7 @@ void process_exit(void) {
   while (!list_empty(mmap_list)) {
     struct list_elem *e = list_front(mmap_list);
     struct mmap_entry *mme = list_entry(e, struct mmap_entry, elem);
-    sys_munmap(mme->id);
+    mmap_unmap_file(mme->id);
   }
 
   // Todo: 7. On process termination here

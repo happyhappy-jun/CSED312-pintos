@@ -9,6 +9,7 @@
 #include "user/syscall.h"
 #include "userprog/user-memory-access.h"
 #include "vm/frame.h"
+#include "vm/mmap.h"
 #include <stdio.h>
 #include <syscall-nr.h>
 
@@ -30,7 +31,7 @@ static void sys_close(int);
 
 #ifdef VM
 static mmapid_t sys_mmap(int, void *);
-static struct mmap_entry *get_mmap_entry_by_id(mmapid_t);
+static bool sys_munmap(mmapid_t);
 #endif
 
 void syscall_init(void) {
@@ -325,14 +326,12 @@ static bool sys_remove(const char *file) {
 
 #ifdef VM
 mmapid_t sys_mmap(int fd, void *upage) {
-  lock_acquire(&file_lock);
-
   if (pg_ofs(upage) != 0 || upage == NULL || fd == STDIN_FILENO || fd == STDOUT_FILENO) {
-    lock_release(&file_lock);
     return MAP_FAILED;
   }
-
   struct thread *curr = thread_current();
+
+  lock_acquire(&file_lock);
 
   struct file *_file = get_file_by_fd(fd);
   if (_file == NULL) {
@@ -352,74 +351,21 @@ mmapid_t sys_mmap(int fd, void *upage) {
     return MAP_FAILED;
   }
 
+  lock_release(&file_lock);
+
   for (size_t offset = 0; offset < file_size; offset += PGSIZE) {
     struct spt_entry *spte = spt_get_entry(&curr->spt, upage + offset);
     if (spte != NULL) {
-      lock_release(&file_lock);
       return MAP_FAILED;
     }
   }
 
-  for (size_t offset = 0; offset < file_size; offset += PGSIZE) {
-    size_t read_bytes = (offset + PGSIZE < file_size ? PGSIZE : file_size - offset);
-    size_t zero_bytes = PGSIZE - read_bytes;
-
-    struct spt_entry *spte = spt_add_file(&curr->spt, upage + offset, true, f, (off_t) offset, read_bytes, zero_bytes);
-    if (spte == NULL) {
-      lock_release(&file_lock);
-      return MAP_FAILED;
-    }
-  }
-
-  mmapid_t id;
-  if (!list_empty(&curr->mmap_list))
-    id = (mmapid_t) list_entry(list_back(&curr->mmap_list), struct mmap_entry, elem)->id + 1;
-  else
-    id = 0;
-
-  struct mmap_entry *mmap_entry = malloc(sizeof(struct mmap_entry));
-  mmap_entry->id = id;
-  mmap_entry->file = f;
-  mmap_entry->addr = upage;
-  mmap_entry->size = file_size;
-  list_push_back(&curr->mmap_list, &mmap_entry->elem);
-
-  lock_release(&file_lock);
+  mmapid_t id = mmap_map_file(f, upage, file_size);
   return id;
 }
 
-bool sys_munmap(mmapid_t id) {
-  struct thread *curr = thread_current();
-  struct mmap_entry *mmap_entry = get_mmap_entry_by_id(id);
-
-  if (mmap_entry == NULL)
-    return false;
-
-  size_t offset;
-  size_t file_size = mmap_entry->size;
-  for (offset = 0; offset < file_size; offset += PGSIZE) {
-    struct spt_entry *spte = spt_get_entry(&curr->spt, mmap_entry->addr + offset);
-    if (pagedir_is_dirty(curr->pagedir, spte->upage + offset)) {
-      lock_acquire(&file_lock);
-      file_write_at(spte->file_info->file, spte->upage, spte->file_info->read_bytes, spte->file_info->ofs);
-      lock_release(&file_lock);
-    }
-    spt_remove_by_entry(&curr->spt, spte);
-  }
-  list_remove(&mmap_entry->elem);
-  free(mmap_entry);
-  return true;
-}
-
-static struct mmap_entry *get_mmap_entry_by_id(mmapid_t id) {
-  struct thread *curr = thread_current();
-  struct list_elem *e;
-  for (e = list_begin(&curr->mmap_list); e != list_end(&curr->mmap_list); e = list_next(e)) {
-    struct mmap_entry *mmap_entry = list_entry(e, struct mmap_entry, elem);
-    if (mmap_entry->id == id)
-      return mmap_entry;
-  }
-  return NULL;
+static bool sys_munmap(mmapid_t id) {
+  return mmap_unmap_file(id);
 }
 
 #endif
