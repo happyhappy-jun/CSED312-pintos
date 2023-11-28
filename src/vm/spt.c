@@ -234,7 +234,7 @@ void spt_evict_page_from_frame(struct spt_entry *spte) {
   bool is_dirty = pagedir_is_dirty(target_holder->pagedir, spte->upage);
   bool can_write = false;
   if (spte->is_file)
-    can_write = spte->file_info->file == target_holder->pcb->file;
+    can_write = spte->file_info->file != target_holder->pcb->file;
 
   // dirty page will be write-backed into corresponding file. (unless it is executable)
   if (is_dirty && can_write) {
