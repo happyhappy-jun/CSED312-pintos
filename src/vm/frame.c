@@ -3,7 +3,6 @@
 //
 
 #include "vm/frame.h"
-#include "stdio.h"
 #include "threads/malloc.h"
 #include "userprog/pagedir.h"
 
@@ -11,7 +10,7 @@ struct frame_table frame_table;
 struct lock frame_table_lock;
 
 void frame_table_init(void) {
-  lock_init(&frame_table_lock);
+    lock_init(&frame_table_lock);
   hash_init(&frame_table.table, frame_table_hash, frame_table_less, NULL);
 }
 
@@ -37,19 +36,14 @@ struct frame *get_frame(void *kpage) {
 
 void *frame_alloc(void *upage, enum palloc_flags flags) {
   void *kpage = palloc_get_page(flags);
-
+  lock_acquire(&frame_table_lock);
   if (kpage == NULL) {
-
-    lock_acquire(&frame_table_lock);
-//    printf("[tid:%d] frame evict\n", thread_current()->tid);
     struct frame *target = get_frame_to_evict();
     struct thread *target_holder = target->thread;
     struct spt_entry *target_spte = spt_get_entry(&target_holder->spt, target->upage);
     spt_evict_page_from_frame(target_spte);
     pagedir_clear_page(target_holder->pagedir, target_spte->upage);
     kpage = palloc_get_page(flags);
-//    printf("[tid:%d] frame eviction handled\n", thread_current()->tid);
-    lock_release(&frame_table_lock);
     if (kpage == NULL) {
       PANIC("frame_alloc: palloc_get_page failed");
     }
@@ -61,7 +55,7 @@ void *frame_alloc(void *upage, enum palloc_flags flags) {
   f->thread = thread_current();
 
   hash_insert(&frame_table.table, &f->elem);
-
+    lock_release(&frame_table_lock);
   return kpage;
 }
 
