@@ -241,8 +241,10 @@ void spt_evict_page_from_frame(struct spt_entry *spte) {
     spt_evict_page_from_frame_into_file(spte);
   }
 
-  // anon page (whether dirty or not) will be swapped out when an eviction occurs.
-  if (!spte->is_file) {
+  // 1. dirty page in executable (like data region)
+  // 2. anon page (whether dirty or not)
+  // will be swapped out when an eviction occurs.
+  if ((is_dirty && !can_write) || !spte->is_file) {
     spte->is_swapped = true;
     spte->swap_index = swap_out(spte->kpage);
   }
