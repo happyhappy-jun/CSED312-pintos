@@ -4,6 +4,7 @@
 
 #include "spt.h"
 #include "filesys/file.h"
+#include "stdio.h"
 #include "string.h"
 #include "swap.h"
 #include "threads/malloc.h"
@@ -121,9 +122,10 @@ static void spt_remove_helper(struct hash_elem *elem, void *aux UNUSED) {
   struct spt_entry *spte = hash_entry(elem, struct spt_entry, elem);
   if (spte->is_loaded) {
     void *kpage = spte->kpage;
+    printf("[tid:%d] free page: %p:%p\n", thread_current()->tid, spte->upage, spte->kpage);
     evict_page_from_frame(spte);
-    frame_free(kpage);
     pagedir_clear_page(thread_current()->pagedir, spte->upage);
+    frame_free(kpage);
   }
   if (spte->is_swapped)
     swap_free(spte->swap_index);

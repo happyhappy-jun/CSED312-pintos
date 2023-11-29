@@ -114,9 +114,11 @@ void set_frame_pinning(void *kpage, bool pinned) {
 }
 
 void unpin_frame(void *kpage) {
+//  printf("[tid:%d] unpin page: %p\n", thread_current()->tid, kpage);
   set_frame_pinning(kpage, false);
 }
 void pin_frame(void *kpage) {
+//  printf("[tid:%d] pin page: %p\n", thread_current()->tid, kpage);
   set_frame_pinning(kpage, true);
 }
 
@@ -146,8 +148,6 @@ void load_page_into_frame(void *kpage, struct spt_entry *spte) {
 static void load_page_into_frame_from_file(struct spt_entry *spte) {
   ASSERT(spte->is_file);
   if (spte->is_swapped) {
-    // writable file page can be swapped out!
-    ASSERT(spte->writable)
     load_page_into_frame_from_swap(spte);
   } else {
     // Load this page.
@@ -170,6 +170,8 @@ static void load_page_into_frame_from_swap(struct spt_entry *spte) {
   // Load this page.
   spte->is_swapped = false;
   swap_in(spte->swap_index, spte->kpage);
+//  if (thread_current()->tid == 7)
+  printf("[tid:%d] swap in page: %p:%p <- %d (preview: %x)\n", thread_current()->tid, spte->upage, spte->kpage, spte->swap_index, *(unsigned *)spte->kpage);
 
   spte->swap_index = -1;
 }
@@ -216,6 +218,8 @@ void evict_page_from_frame(struct spt_entry *spte) {
   if ((is_dirty && !can_write) || !spte->is_file) {
     spte->is_swapped = true;
     spte->swap_index = swap_out(spte->kpage);
+//    if (target_holder->tid == 7)
+    printf("[tid:%d] swap out page of (%d): %p:%p -> %d (preview: %x)\n", thread_current()->tid, target_holder->tid, spte->upage, spte->kpage, spte->swap_index, *(unsigned *)spte->kpage);
   }
 
   spte->is_loaded = false;
