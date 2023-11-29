@@ -9,6 +9,7 @@
 #include "threads/malloc.h"
 #include "userprog/pagedir.h"
 
+static void frame_switch(struct frame *, void *);
 static void load_page_into_frame_from_file(struct spt_entry *);
 static void load_page_into_frame_from_swap(struct spt_entry *);
 static void evict_page_from_frame_into_file(struct spt_entry *);
@@ -41,19 +42,22 @@ struct frame *get_frame(void *kpage) {
   return hash_entry(e, struct frame, elem);
 }
 
+static void frame_switch(struct frame *target, void *upage) {
+  struct thread *target_holder = target->thread;
+  struct spt_entry *target_spte = spt_get_entry(&target_holder->spt, target->upage);
+  evict_page_from_frame(target_spte);
+  pagedir_clear_page(target_holder->pagedir, target_spte->upage);
+  target->upage = upage;
+  target->thread = thread_current();
+}
+
 void *frame_alloc(void *upage, enum palloc_flags flags) {
+  lock_acquire(&frame_table_lock);
   void *kpage = palloc_get_page(flags);
 
   if (kpage == NULL) {
-    lock_acquire(&frame_table_lock);
     struct frame *target = get_frame_to_evict();
-    struct thread *target_holder = target->thread;
-    struct spt_entry *target_spte = spt_get_entry(&target_holder->spt, target->upage);
-    evict_page_from_frame(target_spte);
-    pagedir_clear_page(target_holder->pagedir, target_spte->upage);
-    target->upage = upage;
-    target->thread = thread_current();
-    lock_release(&frame_table_lock);
+    frame_switch(target, upage);
     return target->kpage;
   }
 
@@ -62,6 +66,7 @@ void *frame_alloc(void *upage, enum palloc_flags flags) {
   f->upage = upage;
   f->thread = thread_current();
   hash_insert(&frame_table.table, &f->elem);
+  lock_release(&frame_table_lock);
   return kpage;
 }
 
