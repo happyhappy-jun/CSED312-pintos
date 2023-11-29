@@ -15,10 +15,6 @@ static struct spt_entry *spt_add(struct spt *, struct spt_entry *);
 static void spt_remove_helper(struct hash_elem *, void *UNUSED);
 static struct hash_elem *spt_get_hash_elem(struct spt *, void *);
 static struct spt_entry *spt_make_clean_spt_entry(void *, bool, bool);
-static void spt_load_page_into_frame_from_file(struct spt_entry *);
-static void spt_load_page_into_frame_from_swap(struct spt_entry *);
-static void spt_evict_page_from_frame_into_file(struct spt_entry *);
-extern struct lock file_lock;
 
 // Initialize spt
 void spt_init(struct spt *spt) {
@@ -124,7 +120,9 @@ struct spt_entry *spt_add_anon(struct spt *spt, void *upage, bool writable) {
 static void spt_remove_helper(struct hash_elem *elem, void *aux UNUSED) {
   struct spt_entry *spte = hash_entry(elem, struct spt_entry, elem);
   if (spte->is_loaded) {
-    spt_evict_page_from_frame(spte);
+    void *kpage = spte->kpage;
+    evict_page_from_frame(spte);
+    frame_free(kpage);
     pagedir_clear_page(thread_current()->pagedir, spte->upage);
   }
   if (spte->is_swapped)
@@ -150,124 +148,4 @@ void spt_remove_by_upage(struct spt *spt, void *upage) {
 void spt_remove_by_entry(struct spt *spt, struct spt_entry *spte) {
   hash_delete(&spt->spt, &spte->elem);
   spt_remove_helper(&spte->elem, NULL);
-}
-
-/* Load page into frame
- *
- * Caller should install the loaded page by install_page()
- *
- * Set kpage, is_loaded
- * Clear is_swapped, swap_index if swapped in */
-void spt_load_page_into_frame(struct spt_entry *spte) {
-  ASSERT(!spte->is_loaded);
-  ASSERT(spte->kpage == NULL);
-  if (spte->is_file) {
-    spt_load_page_into_frame_from_file(spte);
-  } else if (spte->is_swapped) {
-    spt_load_page_into_frame_from_swap(spte);
-  } else {
-    spte->kpage = frame_alloc(spte->upage, PAL_USER | PAL_ZERO);
-  }
-  spte->is_loaded = true;
-  unpin_frame(spte->kpage);
-}
-
-// Load page from file
-static void spt_load_page_into_frame_from_file(struct spt_entry *spte) {
-  ASSERT(spte->is_file);
-  if (spte->is_swapped) {
-    // writable file page can be swapped out!
-    ASSERT(spte->writable)
-    spt_load_page_into_frame_from_swap(spte);
-  } else {
-    // Get a frame from memory.
-    spte->kpage = frame_alloc(spte->upage, PAL_USER);
-
-
-    // Load this page.
-    lock_acquire (&file_lock);
-    file_seek(spte->file_info->file, spte->file_info->ofs);
-    int read_bytes = file_read(spte->file_info->file, spte->kpage, spte->file_info->read_bytes);
-    lock_release(&file_lock);
-
-    if (read_bytes != (int) spte->file_info->read_bytes) {
-      PANIC("Load from file failed");
-    }
-    memset(spte->kpage + spte->file_info->read_bytes, 0, spte->file_info->zero_bytes);
-  }
-}
-
-// Load page from swap disk
-static void spt_load_page_into_frame_from_swap(struct spt_entry *spte) {
-  ASSERT(spte->is_swapped);
-  // Todo: swap_index validation check
-
-  // Get a frame from memory.
-  spte->kpage = frame_alloc(spte->upage, PAL_USER);
-
-  // Load this page.
-  spte->is_swapped = false;
-  swap_in(spte->swap_index, spte->kpage);
-
-  spte->is_loaded = true;
-}
-
-/* Evict spte corresponding frame
- *
- * Dirty File-backed Page and Anon Page will be swapped out
- * Otherwise, Page data in the frame will just be freed
- *
- * Caller should clear the page table entry by pagedir_clear_page()
- *
- * Set is_swapped, swap_index if swapped out
- * Clear is_loaded, kpage */
-void spt_evict_page_from_frame(struct spt_entry *spte) {
-  bool is_dirty;
-  ASSERT(spte->is_loaded)
-  ASSERT(spte->kpage != NULL)
-  struct frame *target_frame = get_frame(spte->kpage);
-  ASSERT(target_frame != NULL)
-  struct thread *target_holder = target_frame->thread;
-  ASSERT(target_holder != NULL)
-
-  if (spte->is_dirty) {
-    is_dirty = true;
-  } else {
-    is_dirty = pagedir_is_dirty(target_holder->pagedir, spte->upage);
-    spte->is_dirty = is_dirty;
-  }
-
-  bool can_write = false;
-  if (spte->is_file)
-    can_write = spte->file_info->file != target_holder->pcb->file;
-
-  // dirty page will be write-backed into corresponding file. (unless it is executable)
-  if (is_dirty && can_write) {
-    spt_evict_page_from_frame_into_file(spte);
-  }
-
-  // 1. dirty page in executable (like data region)
-  // 2. anon page (whether dirty or not)
-  // will be swapped out when an eviction occurs.
-  if ((is_dirty && !can_write) || !spte->is_file) {
-    spte->is_swapped = true;
-    spte->swap_index = swap_out(spte->kpage);
-  }
-
-  frame_free(spte->kpage);
-  spte->is_loaded = false;
-  spte->kpage = NULL;
-}
-
-static void spt_evict_page_from_frame_into_file(struct spt_entry *spte) {
-  ASSERT(spte->is_file)
-
-  struct spt_entry_file_info* file_info = spte->file_info;
-  lock_acquire(&file_lock);
-  int write_bytes = file_write_at(file_info->file, spte->kpage, file_info->read_bytes, file_info->ofs);
-  lock_release(&file_lock);
-
-  if (write_bytes != (int) file_info->read_bytes) {
-    PANIC("Evict into file failed");
-  }
 }

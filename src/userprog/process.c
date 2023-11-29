@@ -14,6 +14,7 @@
 #include <string.h>
 
 #ifdef VM
+#include "vm/frame.h"
 #include "vm/mmap.h"
 #endif
 
@@ -514,7 +515,8 @@ setup_stack(void **esp) {
 
   struct spt_entry *stack_page = spt_add_anon(&cur->spt, upage, true);
   if (stack_page != NULL) {
-    spt_load_page_into_frame(stack_page);
+    void *kpage = frame_alloc(stack_page->upage, PAL_USER);
+    load_page_into_frame(kpage, stack_page);
     success = install_page(upage, stack_page->kpage, stack_page->writable);
     if (success) {
       cur->stack_pages++;

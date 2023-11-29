@@ -3,9 +3,16 @@
 //
 
 #include "vm/frame.h"
+#include "filesys/file.h"
+#include "string.h"
+#include "swap.h"
 #include "threads/malloc.h"
 #include "userprog/pagedir.h"
 
+static void load_page_into_frame_from_file(struct spt_entry *);
+static void load_page_into_frame_from_swap(struct spt_entry *);
+static void evict_page_from_frame_into_file(struct spt_entry *);
+extern struct lock file_lock;
 struct frame_table frame_table;
 struct lock frame_table_lock;
 
@@ -35,26 +42,26 @@ struct frame *get_frame(void *kpage) {
 }
 
 void *frame_alloc(void *upage, enum palloc_flags flags) {
-  lock_acquire(&frame_table_lock);
   void *kpage = palloc_get_page(flags);
+
   if (kpage == NULL) {
+    lock_acquire(&frame_table_lock);
     struct frame *target = get_frame_to_evict();
     struct thread *target_holder = target->thread;
     struct spt_entry *target_spte = spt_get_entry(&target_holder->spt, target->upage);
-    spt_evict_page_from_frame(target_spte);
+    evict_page_from_frame(target_spte);
     pagedir_clear_page(target_holder->pagedir, target_spte->upage);
-    kpage = palloc_get_page(flags);
-    if (kpage == NULL) {
-      PANIC("frame_alloc: palloc_get_page failed");
-    }
+    target->upage = upage;
+    target->thread = thread_current();
+    lock_release(&frame_table_lock);
+    return target->kpage;
   }
+
   struct frame *f = malloc(sizeof(struct frame));
   f->kpage = kpage;
   f->upage = upage;
   f->thread = thread_current();
-
   hash_insert(&frame_table.table, &f->elem);
-  lock_release(&frame_table_lock);
   return kpage;
 }
 
@@ -102,4 +109,117 @@ void unpin_frame(void *kpage) {
 }
 void pin_frame(void *kpage) {
   set_frame_pinning(kpage, true);
+}
+
+
+/* Load page into frame
+ *
+ * Caller should install the loaded page by install_page()
+ *
+ * Set kpage, is_loaded
+ * Clear is_swapped, swap_index if swapped in */
+void load_page_into_frame(void *kpage, struct spt_entry *spte) {
+  ASSERT(!spte->is_loaded);
+  ASSERT(spte->kpage == NULL);
+  spte->kpage = kpage;
+  if (spte->is_file) {
+    load_page_into_frame_from_file(spte);
+  } else if (spte->is_swapped) {
+    load_page_into_frame_from_swap(spte);
+  } else {
+    memset(spte->kpage, 0, PGSIZE);
+  }
+  spte->is_loaded = true;
+  unpin_frame(spte->kpage);
+}
+
+// Load page from file
+static void load_page_into_frame_from_file(struct spt_entry *spte) {
+  ASSERT(spte->is_file);
+  if (spte->is_swapped) {
+    // writable file page can be swapped out!
+    ASSERT(spte->writable)
+    load_page_into_frame_from_swap(spte);
+  } else {
+    // Load this page.
+    lock_acquire (&file_lock);
+    file_seek(spte->file_info->file, spte->file_info->ofs);
+    int read_bytes = file_read(spte->file_info->file, spte->kpage, spte->file_info->read_bytes);
+    lock_release(&file_lock);
+
+    if (read_bytes != (int) spte->file_info->read_bytes) {
+      PANIC("Load from file failed");
+    }
+    memset(spte->kpage + spte->file_info->read_bytes, 0, spte->file_info->zero_bytes);
+  }
+}
+
+// Load page from swap disk
+static void load_page_into_frame_from_swap(struct spt_entry *spte) {
+  ASSERT(spte->is_swapped);
+
+  // Load this page.
+  spte->is_swapped = false;
+  swap_in(spte->swap_index, spte->kpage);
+
+  spte->is_loaded = true;
+}
+
+/* Evict spte corresponding frame
+ *
+ * Dirty File-backed Page and Anon Page will be swapped out
+ * Otherwise, Page data in the frame will just be freed
+ *
+ * Caller should clear the page table entry by pagedir_clear_page()
+ *
+ * Set is_swapped, swap_index if swapped out
+ * Clear is_loaded, kpage */
+void evict_page_from_frame(struct spt_entry *spte) {
+  bool is_dirty;
+  ASSERT(spte->is_loaded)
+  ASSERT(spte->kpage != NULL)
+  struct frame *target_frame = get_frame(spte->kpage);
+  ASSERT(target_frame != NULL)
+  struct thread *target_holder = target_frame->thread;
+  ASSERT(target_holder != NULL)
+
+  if (spte->is_dirty) {
+    is_dirty = true;
+  } else {
+    is_dirty = pagedir_is_dirty(target_holder->pagedir, spte->upage);
+    spte->is_dirty = is_dirty;
+  }
+
+  bool can_write = false;
+  if (spte->is_file)
+    can_write = spte->file_info->file != target_holder->pcb->file;
+
+  // dirty page will be write-backed into corresponding file. (unless it is executable)
+  if (is_dirty && can_write) {
+    evict_page_from_frame_into_file(spte);
+  }
+
+  // 1. dirty page in executable (like data region)
+  // 2. anon page (whether dirty or not)
+  // will be swapped out when an eviction occurs.
+  if ((is_dirty && !can_write) || !spte->is_file) {
+    spte->is_swapped = true;
+    spte->swap_index = swap_out(spte->kpage);
+  }
+
+  spte->is_loaded = false;
+  spte->kpage = NULL;
+}
+
+static void evict_page_from_frame_into_file(struct spt_entry *spte) {
+  ASSERT(spte->is_file)
+
+  struct spt_entry_file_info* file_info = spte->file_info;
+  lock_acquire(&file_lock);
+  int write_bytes = file_write_at(file_info->file, spte->kpage, file_info->read_bytes, file_info->ofs);
+  lock_release(&file_lock);
+
+  if (write_bytes != (int) file_info->read_bytes) {
+    PANIC("Evict into file failed");
+  }
 }

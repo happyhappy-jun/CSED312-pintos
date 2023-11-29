@@ -4,6 +4,7 @@
 #include "threads/vaddr.h"
 #include "userprog/gdt.h"
 #include "userprog/syscall.h"
+#include "vm/frame.h"
 #include <inttypes.h>
 #include <stdio.h>
 
@@ -151,8 +152,8 @@ page_fault(struct intr_frame *f) {
     void *fault_page = pg_round_down(fault_addr);
     struct spt_entry *spte = spt_get_entry(&cur->spt, fault_page);
     if (spte != NULL) {
-      // in spt => load from file or swap
-      spt_load_page_into_frame(spte);
+      void* kpage = frame_alloc(spte->upage, PAL_USER);
+      load_page_into_frame(kpage, spte);
       install_page(spte->upage, spte->kpage, spte->writable);
       return;
     }
@@ -162,7 +163,8 @@ page_fault(struct intr_frame *f) {
   if (is_stack_growth(esp, fault_addr) && not_present) {
     void *new_stack_bottom = pg_round_down(fault_addr);
     struct spt_entry *new_stack = spt_add_anon(&cur->spt, new_stack_bottom, true);
-    spt_load_page_into_frame(new_stack);
+    void* kpage = frame_alloc(new_stack->upage, PAL_USER);
+    load_page_into_frame(kpage, new_stack);
     install_page(new_stack->upage, new_stack->kpage, new_stack->writable);
     cur->stack_pages++;
     return;
