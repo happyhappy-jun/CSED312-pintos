@@ -50,6 +50,7 @@ static void frame_switch(struct frame *target, void *upage) {
   pagedir_clear_page(target_holder->pagedir, target_spte->upage);
   target->upage = upage;
   target->thread = thread_current();
+  target->alloced_tick = timer_ticks();
 }
 
 void *frame_alloc(void *upage, enum palloc_flags flags) {
@@ -66,6 +67,7 @@ void *frame_alloc(void *upage, enum palloc_flags flags) {
   f->kpage = kpage;
   f->upage = upage;
   f->thread = thread_current();
+  f->alloced_tick = timer_ticks();
   hash_insert(&frame_table.table, &f->elem);
   pin_frame(kpage);
   lock_release(&frame_table_lock);
@@ -87,22 +89,20 @@ void frame_free(void *kpage) {
 
 struct frame *get_frame_to_evict() {
   struct hash_iterator iter_hash;
-  int i;
-  for (i = 0; i < 2; i++) {
-    hash_first(&iter_hash, &frame_table.table);
-    do {
-      struct frame *f = hash_entry(hash_cur(&iter_hash), struct frame, elem);
-      if (f->pinned)
-        continue;
-      if (pagedir_is_accessed(f->thread->pagedir, f->upage)) {
-        pagedir_set_accessed(f->thread->pagedir, f->upage, false);
-        continue;
-      }
-      return f;
-    } while (hash_next(&iter_hash));
+  struct frame *target = NULL;
+  int64_t min_tick = INT64_MAX;
+
+  hash_first(&iter_hash, &frame_table.table);
+  while (hash_next(&iter_hash)) {
+    struct frame *f = hash_entry(hash_cur(&iter_hash), struct frame, elem);
+    if (f->pinned) continue;
+    if (f->alloced_tick < min_tick) {
+      min_tick = f->alloced_tick;
+      target = f;
+    }
   }
 
-  return NULL;
+  return target;
 }
 
 void set_frame_pinning(void *kpage, bool pinned) {

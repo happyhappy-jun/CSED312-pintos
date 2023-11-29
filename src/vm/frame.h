@@ -7,6 +7,7 @@
 
 #include "threads/palloc.h"
 #include "threads/thread.h"
+#include "devices/timer.h"
 #include <hash.h>
 
 struct frame_table {
@@ -19,6 +20,7 @@ struct frame {
   struct thread *thread;
   struct hash_elem elem;
   bool pinned;
+  int64_t alloced_tick;
 };
 
 void frame_table_init(void);
