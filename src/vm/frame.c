@@ -171,7 +171,7 @@ static void load_page_into_frame_from_swap(struct spt_entry *spte) {
   spte->is_swapped = false;
   swap_in(spte->swap_index, spte->kpage);
 
-  spte->is_loaded = true;
+  spte->swap_index = -1;
 }
 
 /* Evict spte corresponding frame
