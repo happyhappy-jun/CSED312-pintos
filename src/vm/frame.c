@@ -67,6 +67,7 @@ void *frame_alloc(void *upage, enum palloc_flags flags) {
   f->upage = upage;
   f->thread = thread_current();
   hash_insert(&frame_table.table, &f->elem);
+  pin_frame(kpage);
   lock_release(&frame_table_lock);
   return kpage;
 }
