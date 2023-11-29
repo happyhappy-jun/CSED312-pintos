@@ -4,6 +4,7 @@
 
 #include "vm/frame.h"
 #include "filesys/file.h"
+#include "stdio.h"
 #include "string.h"
 #include "swap.h"
 #include "threads/malloc.h"
@@ -54,10 +55,10 @@ static void frame_switch(struct frame *target, void *upage) {
 void *frame_alloc(void *upage, enum palloc_flags flags) {
   lock_acquire(&frame_table_lock);
   void *kpage = palloc_get_page(flags);
-
   if (kpage == NULL) {
     struct frame *target = get_frame_to_evict();
     frame_switch(target, upage);
+    lock_release(&frame_table_lock);
     return target->kpage;
   }
 
