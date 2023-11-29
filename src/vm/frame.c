@@ -75,12 +75,14 @@ void *frame_alloc(void *upage, enum palloc_flags flags) {
 void frame_free(void *kpage) {
   struct frame f;
   f.kpage = kpage;
+  lock_acquire(&frame_table_lock);
   struct hash_elem *e = hash_find(&frame_table.table, &f.elem);
   if (e != NULL) {
     hash_delete(&frame_table.table, e);
     palloc_free_page(kpage);
     free(hash_entry(e, struct frame, elem));
   }
+  lock_release(&frame_table_lock);
 }
 
 struct frame *get_frame_to_evict() {
