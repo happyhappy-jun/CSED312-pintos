@@ -182,6 +182,8 @@ page_fault(struct intr_frame *f) {
 
 
   // page fault otherwise
+  intr_disable();
+  printf("[tid:%d] page fault\n", thread_current()->tid);
   PANIC("page fault");
   thread_current()->pcb->exit_code = -1;
   thread_exit();

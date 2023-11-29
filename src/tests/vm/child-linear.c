@@ -28,7 +28,7 @@ int main(int argc, char *argv[]) {
   /* Check that it's all zeros. */
   for (i = 0; i < SIZE; i++)
     if (buf[i] != '\0')
-      fail("byte %zu != 0", i);
+      fail("byte %p != 0", buf+i);
 
   return 0x42;
 }

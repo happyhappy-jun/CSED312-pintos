@@ -69,7 +69,7 @@ void *frame_alloc(void *upage, enum palloc_flags flags) {
   f->thread = thread_current();
   f->alloced_tick = timer_ticks();
   hash_insert(&frame_table.table, &f->elem);
-  pin_frame(kpage);
+//  pin_frame(kpage);
   lock_release(&frame_table_lock);
   return kpage;
 }
@@ -141,7 +141,7 @@ void load_page_into_frame(void *kpage, struct spt_entry *spte) {
     memset(spte->kpage, 0, PGSIZE);
   }
   spte->is_loaded = true;
-  unpin_frame(spte->kpage);
+//  unpin_frame(spte->kpage);
 }
 
 // Load page from file
@@ -155,7 +155,7 @@ static void load_page_into_frame_from_file(struct spt_entry *spte) {
     file_seek(spte->file_info->file, spte->file_info->ofs);
     int read_bytes = file_read(spte->file_info->file, spte->kpage, spte->file_info->read_bytes);
     lock_release(&file_lock);
-
+    printf("[tid:%d] read file page: %p:%p (preview: %x)\n", thread_current()->tid, spte->upage, spte->kpage, *(unsigned *)spte->kpage);
     if (read_bytes != (int) spte->file_info->read_bytes) {
       PANIC("Load from file failed");
     }
@@ -194,7 +194,7 @@ void evict_page_from_frame(struct spt_entry *spte) {
   struct thread *target_holder = target_frame->thread;
   ASSERT(target_holder != NULL)
 
-  pin_frame(spte->kpage);
+//  pin_frame(spte->kpage);
 
   if (spte->is_dirty) {
     is_dirty = true;
@@ -220,6 +220,8 @@ void evict_page_from_frame(struct spt_entry *spte) {
     spte->swap_index = swap_out(spte->kpage);
 //    if (target_holder->tid == 7)
     printf("[tid:%d] swap out page of (%d): %p:%p -> %d (preview: %x)\n", thread_current()->tid, target_holder->tid, spte->upage, spte->kpage, spte->swap_index, *(unsigned *)spte->kpage);
+  } else {
+    printf("[tid:%d] throw out page of (%d): %p:%p (preview: %x)\n", thread_current()->tid, target_holder->tid, spte->upage, spte->kpage, *(unsigned *)spte->kpage);
   }
 
   spte->is_loaded = false;
@@ -233,6 +235,8 @@ static void evict_page_from_frame_into_file(struct spt_entry *spte) {
   lock_acquire(&file_lock);
   int write_bytes = file_write_at(file_info->file, spte->kpage, file_info->read_bytes, file_info->ofs);
   lock_release(&file_lock);
+
+  printf("[tid:%d] write back page of (%d): %p:%p (preview: %x)\n", thread_current()->tid, get_frame(spte->kpage)->thread->tid, spte->upage, spte->kpage, *(unsigned *)spte->kpage);
 
   if (write_bytes != (int) file_info->read_bytes) {
     PANIC("Evict into file failed");
