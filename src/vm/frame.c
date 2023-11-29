@@ -127,7 +127,6 @@ void pin_frame(void *kpage) {
 void load_page_into_frame(void *kpage, struct spt_entry *spte) {
   ASSERT(!spte->is_loaded);
   ASSERT(spte->kpage == NULL);
-  pin_frame(kpage);
   spte->kpage = kpage;
   if (spte->is_file) {
     load_page_into_frame_from_file(spte);
@@ -215,8 +214,6 @@ void evict_page_from_frame(struct spt_entry *spte) {
     spte->is_swapped = true;
     spte->swap_index = swap_out(spte->kpage);
   }
-
-  unpin_frame(spte->kpage);
 
   spte->is_loaded = false;
   spte->kpage = NULL;
