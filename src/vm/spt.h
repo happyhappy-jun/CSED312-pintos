@@ -54,9 +54,9 @@ void spt_destroy(struct spt *spt);
 
 struct spt_entry *spt_find(struct spt *spt, void *upage);
 
-void spt_insert_mmap(struct spt *spt, void *upage, struct file *file, off_t offset, uint32_t read_bytes, uint32_t zero_bytes);
-void spt_insert_exec(struct spt *spt, void *upage, bool writable, struct file *file, off_t offset, uint32_t read_bytes, uint32_t zero_bytes);
-void spt_insert_stack(struct spt *spt, void *upage);
+struct spt_entry *spt_insert_mmap(struct spt *spt, void *upage, struct file *file, off_t offset, uint32_t read_bytes, uint32_t zero_bytes);
+struct spt_entry *spt_insert_exec(struct spt *spt, void *upage, bool writable, struct file *file, off_t offset, uint32_t read_bytes, uint32_t zero_bytes);
+struct spt_entry *spt_insert_stack(struct spt *spt, void *upage);
 
 void spt_remove(struct spt *spt, void *upage);
 

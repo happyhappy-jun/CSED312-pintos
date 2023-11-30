@@ -57,8 +57,11 @@ static struct file_info *file_info_generator(struct file *file, off_t offset, ui
 }
 
 
-void spt_insert_mmap(struct spt *spt, void *upage, struct file *file, off_t offset, uint32_t read_bytes, uint32_t zero_bytes) {
+struct spt_entry *spt_insert_mmap(struct spt *spt, void *upage, struct file *file, off_t offset, uint32_t read_bytes, uint32_t zero_bytes) {
   struct spt_entry *spte = malloc(sizeof(struct spt_entry));
+  if (spte == NULL) {
+    return NULL;
+  }
   spte->upage = upage;
   spte->kpage = NULL;
   spte->writable = true;
@@ -67,11 +70,20 @@ void spt_insert_mmap(struct spt *spt, void *upage, struct file *file, off_t offs
   spte->location = FILE;
   spte->file_info = file_info_generator(file, offset, read_bytes, zero_bytes);
   spte->swap_index = -1;
-  hash_insert(&spt->table, &spte->elem);
+  struct hash_elem *e = hash_insert(&spt->table, &spte->elem);
+  if (e == NULL) {
+    return spte;
+  } else {
+    free(spte);
+    return NULL;
+  }
 }
 
-void spt_insert_exec(struct spt *spt, void *upage, bool writable, struct file *file, off_t offset, uint32_t read_bytes, uint32_t zero_bytes) {
+struct spt_entry *spt_insert_exec(struct spt *spt, void *upage, bool writable, struct file *file, off_t offset, uint32_t read_bytes, uint32_t zero_bytes) {
   struct spt_entry *spte = malloc(sizeof(struct spt_entry));
+  if (spte == NULL) {
+    return NULL;
+  }
   spte->upage = upage;
   spte->kpage = NULL;
   spte->writable = writable;
@@ -80,11 +92,20 @@ void spt_insert_exec(struct spt *spt, void *upage, bool writable, struct file *f
   spte->location = FILE;
   spte->file_info = file_info_generator(file, offset, read_bytes, zero_bytes);
   spte->swap_index = -1;
-  hash_insert(&spt->table, &spte->elem);
+  struct hash_elem *e = hash_insert(&spt->table, &spte->elem);
+  if (e == NULL) {
+    return spte;
+  } else {
+    free(spte);
+    return NULL;
+  }
 }
 
-void spt_insert_stack(struct spt *spt, void *upage) {
+struct spt_entry *spt_insert_stack(struct spt *spt, void *upage) {
   struct spt_entry *spte = malloc(sizeof(struct spt_entry));
+  if (spte == NULL) {
+    return NULL;
+  }
   spte->upage = upage;
   spte->kpage = NULL;
   spte->writable = true;
@@ -93,7 +114,13 @@ void spt_insert_stack(struct spt *spt, void *upage) {
   spte->location = ZERO;
   spte->file_info = NULL;
   spte->swap_index = -1;
-  hash_insert(&spt->table, &spte->elem);
+  struct hash_elem *e = hash_insert(&spt->table, &spte->elem);
+  if (e == NULL) {
+      return spte;
+  } else {
+      free(spte);
+      return NULL;
+  }
 }
 
 void spt_remove(struct spt *spt, void *upage) {
