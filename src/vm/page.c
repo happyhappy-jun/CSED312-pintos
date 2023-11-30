@@ -115,6 +115,7 @@ static void load_file(void *kbuffer, struct spt_entry *spte) {
   file_seek(file_info->file, file_info->offset);
   int read_bytes = file_read(file_info->file, kbuffer, (int) file_info->read_bytes);
   lock_release(&file_lock);
+  memset(kbuffer + read_bytes, 0, (int) file_info->zero_bytes);
 
   if (read_bytes != (int) file_info->read_bytes) {
     PANIC("Failed to read file");
