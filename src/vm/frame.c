@@ -4,6 +4,7 @@
 
 #include "vm/frame.h"
 #include "devices/timer.h"
+#include "page.h"
 #include "string.h"
 #include "threads/malloc.h"
 #include "threads/thread.h"
@@ -47,6 +48,7 @@ void *frame_alloc(void *upage, enum palloc_flags flags) {
   
   if (kpage == NULL) {
     kpage = frame_switch(upage, flags);
+    return kpage;
   }
   
   struct frame *f = malloc(sizeof(struct frame));
@@ -65,9 +67,9 @@ void frame_free(void *kpage) {
   lock_acquire(&frame_table.frame_table_lock);
   struct frame *f = frame_find(kpage);
   hash_delete(&frame_table.frame_table, &f->elem);
+  lock_release(&frame_table.frame_table_lock);
   palloc_free_page(kpage);
   free(f);
-  lock_release(&frame_table.frame_table_lock);
 }
 
 void *frame_switch(void *upage, enum palloc_flags flags) {
@@ -79,11 +81,12 @@ void *frame_switch(void *upage, enum palloc_flags flags) {
     PANIC("Cannot find frame to evict");
   }
 
+  unload_page(&target->thread->spt, target->upage);
+
+  target->kpage = palloc_get_page(flags);
   target->upage = upage;
   target->thread = thread_current();
   target->timestamp = timer_ticks();
-
-  // Todo: unload(swap out or write back) the original frame content
 
   if (zero)
     memset(target->kpage, 0, PGSIZE);
@@ -92,19 +95,19 @@ void *frame_switch(void *upage, enum palloc_flags flags) {
 }
 
 static struct frame *frame_to_evict(void){
-    struct frame *target = NULL;
-    struct hash_iterator i;
-    int64_t min = INT64_MAX;
+  struct frame *target = NULL;
+  struct hash_iterator i;
+  int64_t min = INT64_MAX;
 
-    lock_acquire(&frame_table.frame_table_lock);
-    hash_first(&i, &frame_table.frame_table);
-    while (hash_next(&i)) {
-        struct frame *f = hash_entry(hash_cur(&i), struct frame, elem);
-        if (f->timestamp < min) {
-            min = f->timestamp;
-            target = f;
-        }
-    }
-    lock_release(&frame_table.frame_table_lock);
-    return target;
+  lock_acquire(&frame_table.frame_table_lock);
+  hash_first(&i, &frame_table.frame_table);
+  while (hash_next(&i)) {
+      struct frame *f = hash_entry(hash_cur(&i), struct frame, elem);
+      if (f->timestamp < min) {
+          min = f->timestamp;
+          target = f;
+      }
+  }
+  lock_release(&frame_table.frame_table_lock);
+  return target;
 }
