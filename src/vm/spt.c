@@ -161,12 +161,14 @@ void spt_remove_by_entry(struct spt *spt, struct spt_entry *spte) {
 void spt_load_page_into_frame(struct spt_entry *spte) {
   ASSERT(!spte->is_loaded);
   ASSERT(spte->kpage == NULL);
-  if (spte->is_file) {
-    spt_load_page_into_frame_from_file(spte);
-  } else if (spte->is_swapped) {
+  spte->kpage = frame_alloc(spte->upage, PAL_USER);
+  pin_frame(spte->kpage);
+  if (spte->is_swapped) {
     spt_load_page_into_frame_from_swap(spte);
+  } else if (spte->is_file) {
+    spt_load_page_into_frame_from_file(spte);
   } else {
-    spte->kpage = frame_alloc(spte->upage, PAL_USER | PAL_ZERO);
+    memset(spte->kpage, 0, PGSIZE);
   }
   spte->is_loaded = true;
   unpin_frame(spte->kpage);
@@ -175,40 +177,25 @@ void spt_load_page_into_frame(struct spt_entry *spte) {
 // Load page from file
 static void spt_load_page_into_frame_from_file(struct spt_entry *spte) {
   ASSERT(spte->is_file);
-  if (spte->is_swapped) {
-    // writable file page can be swapped out!
-    ASSERT(spte->writable)
-    spt_load_page_into_frame_from_swap(spte);
-  } else {
-    // Get a frame from memory.
-    spte->kpage = frame_alloc(spte->upage, PAL_USER);
 
+  lock_acquire (&file_lock);
+  file_seek(spte->file_info->file, spte->file_info->ofs);
+  int read_bytes = file_read(spte->file_info->file, spte->kpage, spte->file_info->read_bytes);
+  lock_release(&file_lock);
 
-    // Load this page.
-    lock_acquire (&file_lock);
-    file_seek(spte->file_info->file, spte->file_info->ofs);
-    int read_bytes = file_read(spte->file_info->file, spte->kpage, spte->file_info->read_bytes);
-    lock_release(&file_lock);
-
-    if (read_bytes != (int) spte->file_info->read_bytes) {
-      PANIC("Load from file failed");
-    }
-    memset(spte->kpage + spte->file_info->read_bytes, 0, spte->file_info->zero_bytes);
+  if (read_bytes != (int) spte->file_info->read_bytes) {
+    PANIC("Load from file failed");
   }
+
+  memset(spte->kpage + spte->file_info->read_bytes, 0, spte->file_info->zero_bytes);
 }
 
 // Load page from swap disk
 static void spt_load_page_into_frame_from_swap(struct spt_entry *spte) {
   ASSERT(spte->is_swapped);
-  // Todo: swap_index validation check
 
-  // Get a frame from memory.
-  spte->kpage = frame_alloc(spte->upage, PAL_USER);
-
-  // Load this page.
   spte->is_swapped = false;
   swap_in(spte->swap_index, spte->kpage);
-
   spte->is_loaded = true;
 }
 
@@ -225,6 +212,7 @@ void spt_evict_page_from_frame(struct spt_entry *spte) {
   bool is_dirty;
   ASSERT(spte->is_loaded)
   ASSERT(spte->kpage != NULL)
+  pin_frame(spte->kpage);
   struct frame *target_frame = get_frame(spte->kpage);
   ASSERT(target_frame != NULL)
   struct thread *target_holder = target_frame->thread;
@@ -253,7 +241,7 @@ void spt_evict_page_from_frame(struct spt_entry *spte) {
     spte->is_swapped = true;
     spte->swap_index = swap_out(spte->kpage);
   }
-
+  unpin_frame(spte->kpage);
   frame_free(spte->kpage);
   spte->is_loaded = false;
   spte->kpage = NULL;
