@@ -24,6 +24,7 @@ enum page_location {
 
 struct spt {
   struct hash table;
+  void *pagedir;
 };
 
 struct file_info {
@@ -37,12 +38,13 @@ struct spt_entry {
   void *upage;
   void *kpage;
   bool writable;
+  bool dirty;
 
   enum spte_type type;
   enum page_location location;
 
   struct file_info *file_info;
-  unsigned swap_index;
+  int swap_index;
 
   struct hash_elem elem;
 };

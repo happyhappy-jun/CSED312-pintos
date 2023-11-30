@@ -4,6 +4,7 @@
 
 #include "vm/spt.h"
 #include "threads/malloc.h"
+#include "userprog/process.h"
 
 static unsigned spt_hash(const struct hash_elem *elem, void *aux);
 static bool spt_less(const struct hash_elem *a, const struct hash_elem *b, void *aux);
@@ -11,6 +12,7 @@ static void spte_destroy(struct hash_elem *elem, void *aux);
 static struct file_info *file_info_generator(struct file *file, off_t offset, uint32_t read_bytes, uint32_t zero_bytes);
 
 void spt_init(struct spt *spt) {
+  spt->pagedir = thread_current()->pagedir;
   hash_init(&spt->table, spt_hash, spt_less, NULL);
 }
 
@@ -60,6 +62,7 @@ void spt_insert_mmap(struct spt *spt, void *upage, struct file *file, off_t offs
   spte->upage = upage;
   spte->kpage = NULL;
   spte->writable = true;
+  spte->dirty = false;
   spte->type = MMAP;
   spte->location = FILE;
   spte->file_info = file_info_generator(file, offset, read_bytes, zero_bytes);
@@ -72,6 +75,7 @@ void spt_insert_exec(struct spt *spt, void *upage, bool writable, struct file *f
   spte->upage = upage;
   spte->kpage = NULL;
   spte->writable = writable;
+  spte->dirty = false;
   spte->type = EXEC;
   spte->location = FILE;
   spte->file_info = file_info_generator(file, offset, read_bytes, zero_bytes);
@@ -84,6 +88,7 @@ void spt_insert_stack(struct spt *spt, void *upage) {
   spte->upage = upage;
   spte->kpage = NULL;
   spte->writable = true;
+  spte->dirty = false;
   spte->type = STACK;
   spte->location = ZERO;
   spte->file_info = NULL;
