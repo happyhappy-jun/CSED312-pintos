@@ -59,6 +59,7 @@ void *frame_alloc(void *upage, enum palloc_flags flags) {
 
   lock_acquire(&frame_table.frame_table_lock);
   hash_insert(&frame_table.frame_table, &f->elem);
+  frame_pin(f->kpage);
   lock_release(&frame_table.frame_table_lock);
   return kpage;
 }
@@ -102,11 +103,24 @@ static struct frame *frame_to_evict(void){
   hash_first(&i, &frame_table.frame_table);
   while (hash_next(&i)) {
       struct frame *f = hash_entry(hash_cur(&i), struct frame, elem);
+      if (f->pinned)
+          continue;
       if (f->timestamp < min) {
           min = f->timestamp;
           target = f;
       }
   }
+  frame_pin(target->kpage);
   lock_release(&frame_table.frame_table_lock);
   return target;
+}
+
+void frame_pin(void *kpage) {
+  struct frame *f = frame_find(kpage);
+  f->pinned = true;
+}
+
+void frame_unpin(void *kpage) {
+  struct frame *f = frame_find(kpage);
+  f->pinned = false;
 }

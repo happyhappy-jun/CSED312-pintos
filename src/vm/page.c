@@ -27,6 +27,7 @@ bool load_page(struct spt *spt, void *upage) {
     frame_free(kpage);
     return false;
   }
+  frame_unpin(kpage);
   return true;
 }
 

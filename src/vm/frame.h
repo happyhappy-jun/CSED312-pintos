@@ -17,9 +17,10 @@ struct frame_table {
 struct frame {
   void *kpage;
   void *upage;
+  int64_t timestamp;
+  bool pinned;
   struct thread *thread;
   struct hash_elem elem;
-  int64_t timestamp;
 };
 
 void frame_table_init(void);
@@ -27,5 +28,8 @@ void frame_table_init(void);
 void *frame_alloc(void *upage, enum palloc_flags flags);
 void frame_free(void *kpage);
 void *frame_switch(void *upage, enum palloc_flags flags);
+
+void frame_pin(void *kpage);
+void frame_unpin(void *kpage);
 
 #endif//PINTOS_SRC_VM_FRAME_H_
