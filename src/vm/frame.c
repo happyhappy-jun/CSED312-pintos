@@ -81,9 +81,8 @@ void *frame_switch(void *upage, enum palloc_flags flags) {
     PANIC("Cannot find frame to evict");
   }
 
-  unload_page(&target->thread->spt, target->upage);
+  unload_page_data(&target->thread->spt, target->upage);
 
-  target->kpage = palloc_get_page(flags);
   target->upage = upage;
   target->thread = thread_current();
   target->timestamp = timer_ticks();
