@@ -34,7 +34,6 @@ struct spt_entry {
 
   /* anon info */
   bool is_swapped; // true if swapped, else false.
-  // Todo: change to swap_index_t, after implementing swap table.
   unsigned swap_index; // swap index; 0 if not in swap, else swap->index.
 };
 
@@ -48,7 +47,7 @@ struct spt_entry *spt_add_file(struct spt *, void *, bool, struct file *, off_t,
 struct spt_entry *spt_add_anon(struct spt *, void *, bool);
 void spt_remove_by_upage(struct spt *, void *);
 void spt_remove_by_entry(struct spt *, struct spt_entry *);
-void spt_load_page_into_frame(struct spt_entry *);
+bool spt_load_page_into_frame(struct spt_entry *);
 void spt_evict_page_from_frame(struct spt_entry *);
 
 #endif//PINTOS_SRC_VM_SPT_H_

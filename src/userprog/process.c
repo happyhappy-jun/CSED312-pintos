@@ -514,8 +514,9 @@ setup_stack(void **esp) {
 
   struct spt_entry *stack_page = spt_add_anon(&cur->spt, upage, true);
   if (stack_page != NULL) {
-    spt_load_page_into_frame(stack_page);
-    success = install_page(upage, stack_page->kpage, stack_page->writable);
+    success = spt_load_page_into_frame(stack_page);
+//    success = install_page(upage, stack_page->kpage, stack_page->writable);
+
     if (success) {
       cur->stack_pages++;
       *esp = PHYS_BASE;

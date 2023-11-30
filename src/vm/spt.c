@@ -9,6 +9,7 @@
 #include "threads/malloc.h"
 #include "threads/thread.h"
 #include "userprog/pagedir.h"
+#include "userprog/process.h"
 #include "vm/frame.h"
 
 static struct spt_entry *spt_add(struct spt *, struct spt_entry *);
@@ -123,7 +124,7 @@ static void spt_remove_helper(struct hash_elem *elem, void *aux UNUSED) {
   struct spt_entry *spte = hash_entry(elem, struct spt_entry, elem);
   if (spte->is_loaded) {
     spt_evict_page_from_frame(spte);
-    pagedir_clear_page(thread_current()->pagedir, spte->upage);
+//    pagedir_clear_page(thread_current()->pagedir, spte->upage);
   }
   if (spte->is_swapped)
     swap_free(spte->swap_index);
@@ -156,11 +157,10 @@ void spt_remove_by_entry(struct spt *spt, struct spt_entry *spte) {
  *
  * Set kpage, is_loaded
  * Clear is_swapped, swap_index if swapped in */
-void spt_load_page_into_frame(struct spt_entry *spte) {
+bool spt_load_page_into_frame(struct spt_entry *spte) {
   ASSERT(!spte->is_loaded);
   ASSERT(spte->kpage == NULL);
   spte->kpage = frame_alloc(spte->upage, PAL_USER);
-  pin_frame(spte->kpage);
   if (spte->is_swapped) {
     spt_load_page_into_frame_from_swap(spte);
   } else if (spte->is_file) {
@@ -169,7 +169,9 @@ void spt_load_page_into_frame(struct spt_entry *spte) {
     memset(spte->kpage, 0, PGSIZE);
   }
   spte->is_loaded = true;
+  bool result = install_page(spte->upage, spte->kpage, spte->writable);
   unpin_frame(spte->kpage);
+  return result;
 }
 
 // Load page from file
@@ -244,6 +246,7 @@ void spt_evict_page_from_frame(struct spt_entry *spte) {
   frame_free(spte->kpage);
   spte->is_loaded = false;
   spte->kpage = NULL;
+  pagedir_clear_page(target_holder->pagedir, spte->upage);
 }
 
 static void spt_evict_page_from_frame_into_file(struct spt_entry *spte) {

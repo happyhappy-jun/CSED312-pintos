@@ -153,7 +153,7 @@ page_fault(struct intr_frame *f) {
     if (spte != NULL) {
       // in spt => load from file or swap
       spt_load_page_into_frame(spte);
-      install_page(spte->upage, spte->kpage, spte->writable);
+//      install_page(spte->upage, spte->kpage, spte->writable);
       return;
     }
   }
@@ -163,7 +163,7 @@ page_fault(struct intr_frame *f) {
     void *new_stack_bottom = pg_round_down(fault_addr);
     struct spt_entry *new_stack = spt_add_anon(&cur->spt, new_stack_bottom, true);
     spt_load_page_into_frame(new_stack);
-    install_page(new_stack->upage, new_stack->kpage, new_stack->writable);
+//    install_page(new_stack->upage, new_stack->kpage, new_stack->writable);
     cur->stack_pages++;
     return;
   }
