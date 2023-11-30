@@ -58,6 +58,7 @@ void *frame_alloc(void *upage, enum palloc_flags flags) {
   lock_acquire(&frame_table.frame_table_lock);
   hash_insert(&frame_table.frame_table, &f->elem);
   lock_release(&frame_table.frame_table_lock);
+  return kpage;
 }
 
 void frame_free(void *kpage) {
