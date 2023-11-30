@@ -26,5 +26,6 @@ void frame_table_init(void);
 
 void *frame_alloc(void *upage, enum palloc_flags flags);
 void frame_free(void *kpage);
+void *frame_switch(void *upage, enum palloc_flags flags);
 
 #endif//PINTOS_SRC_VM_FRAME_H_

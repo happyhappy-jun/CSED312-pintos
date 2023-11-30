@@ -14,7 +14,6 @@ static struct frame_table frame_table;
 static struct frame *frame_find(void *kpage);
 static unsigned frame_table_hash(const struct hash_elem *elem, void *aux);
 static bool frame_table_less(const struct hash_elem *a, const struct hash_elem *b, void *aux);
-static void frame_evict(void);
 static struct frame *frame_to_evict(void);
 
 
@@ -46,9 +45,10 @@ static struct frame *frame_find(void *kpage) {
 
 void *frame_alloc(void *upage, enum palloc_flags flags) {
   void *kpage = palloc_get_page(flags);
+  
   if (kpage == NULL) {
-    frame_evict();
-    kpage = palloc_get_page(flags);
+    kpage = frame_switch(upage, flags);
+    return kpage;
   }
   
   struct frame *f = malloc(sizeof(struct frame));
@@ -72,12 +72,26 @@ void frame_free(void *kpage) {
   free(f);
 }
 
-static void frame_evict(void) {
+void *frame_switch(void *upage, enum palloc_flags flags) {
+  ASSERT(!lock_held_by_current_thread(&frame_table.frame_table_lock));
   struct frame *target = frame_to_evict();
+  bool zero = flags & PAL_ZERO;
+
   if (target == NULL) {
     PANIC("Cannot find frame to evict");
   }
+
   unload_page(&target->thread->spt, target->upage);
+
+  target->kpage = palloc_get_page(flags);
+  target->upage = upage;
+  target->thread = thread_current();
+  target->timestamp = timer_ticks();
+
+  if (zero)
+    memset(target->kpage, 0, PGSIZE);
+
+  return target->kpage;
 }
 
 static struct frame *frame_to_evict(void){
