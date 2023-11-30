@@ -34,9 +34,10 @@ void spt_destroy(struct spt *spt) {
 
 static void spte_destroy(struct hash_elem *elem, void *aux) {
   struct spt_entry *spte = hash_entry(elem, struct spt_entry, elem);
-  if (spte->type == SWAP) {
+  if (spte->location == SWAP) {
     swap_free(spte->swap_index);
-  } else if (spte->type == EXEC || spte->type == MMAP) {
+  }
+  if (spte->type == EXEC || spte->type == MMAP) {
     free(spte->file_info);
   }
   free(spte);
