@@ -7,6 +7,7 @@
 #include "filesys/file.h"
 #include "stdio.h"
 #include "string.h"
+#include "swap.h"
 #include "threads/palloc.h"
 #include "threads/vaddr.h"
 #include "userprog/pagedir.h"
@@ -127,8 +128,7 @@ static void load_swap(void *kbuffer, struct spt_entry *spte) {
   ASSERT(spte->location == SWAP)
   ASSERT(spte->swap_index != -1)
 
-  // Todo: swap in into kbuffer
-
+  swap_in(spte->swap_index, kbuffer);
   spte->swap_index = -1;
 }
 
@@ -145,5 +145,7 @@ static void unload_file(void *kbuffer, struct spt_entry *spte) {
 
 static void unload_swap(void *kbuffer, struct spt_entry *spte) {
   ASSERT(kbuffer != NULL)
-  // Todo: swap out into swap disk from kbuffer
+  ASSERT(spte->swap_index == -1)
+
+  spte->swap_index = (int) swap_out(kbuffer);
 }
