@@ -4,6 +4,7 @@
 #include "threads/vaddr.h"
 #include "userprog/gdt.h"
 #include "userprog/syscall.h"
+#include "vm/page.h"
 #include <inttypes.h>
 #include <stdio.h>
 
@@ -143,6 +144,21 @@ page_fault(struct intr_frame *f) {
   not_present = (f->error_code & PF_P) == 0;
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
+  void *fault_page = pg_round_down(fault_addr);
+
+
+
+  struct spt *spt = &thread_current()->spt;
+  struct spt_entry *spte = spt_find(spt, fault_page);
+  if (spte != NULL) {
+    if (load_page(spt, fault_page))
+      return;
+    else {
+      thread_current()->pcb->exit_code = -1;
+      thread_exit();
+    }
+  }
+
 
   // fault under PHYS_BASE access by kernel
   // => fault while accessing user memory

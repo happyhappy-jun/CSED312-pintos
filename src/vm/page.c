@@ -5,6 +5,7 @@
 #include "vm/page.h"
 #include "debug.h"
 #include "filesys/file.h"
+#include "stdio.h"
 #include "string.h"
 #include "threads/palloc.h"
 #include "threads/vaddr.h"

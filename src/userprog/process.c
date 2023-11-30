@@ -12,6 +12,7 @@
 #include "userprog/gdt.h"
 #include "userprog/pagedir.h"
 #include "userprog/tss.h"
+#include "vm/page.h"
 #include <debug.h>
 #include <inttypes.h>
 #include <round.h>
@@ -471,6 +472,8 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
   ASSERT(ofs % PGSIZE == 0);
 
   file_seek(file, ofs);
+  int offset = 0;
+  struct thread *cur = thread_current();
   while (read_bytes > 0 || zero_bytes > 0) {
     /* Calculate how to fill this page.
        We will read PAGE_READ_BYTES bytes from FILE
@@ -478,28 +481,13 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
     size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
     size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-    /* Get a page of memory. */
-    uint8_t *kpage = palloc_get_page(PAL_USER);
-    if (kpage == NULL)
-      return false;
-
-    /* Load this page. */
-    if (file_read(file, kpage, page_read_bytes) != (int) page_read_bytes) {
-      palloc_free_page(kpage);
-      return false;
-    }
-    memset(kpage + page_read_bytes, 0, page_zero_bytes);
-
-    /* Add the page to the process's address space. */
-    if (!install_page(upage, kpage, writable)) {
-      palloc_free_page(kpage);
-      return false;
-    }
+    spt_insert_exec(&cur->spt, upage, writable, file, ofs + offset, page_read_bytes, page_zero_bytes);
 
     /* Advance. */
     read_bytes -= page_read_bytes;
     zero_bytes -= page_zero_bytes;
     upage += PGSIZE;
+    offset += PGSIZE;
   }
   return true;
 }
@@ -508,17 +496,17 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
    user virtual memory. */
 static bool
 setup_stack(void **esp) {
-  uint8_t *kpage;
   bool success = false;
 
-  kpage = palloc_get_page(PAL_USER | PAL_ZERO);
-  if (kpage != NULL) {
-    success = install_page(((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
-    if (success)
-      *esp = PHYS_BASE;
-    else
-      palloc_free_page(kpage);
+  void *upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
+  spt_insert_stack(&thread_current()->spt, upage);
+  success = load_page(&thread_current()->spt, upage);
+  if (success)
+    *esp = PHYS_BASE;
+  else {
+    PANIC("Failed to setup stack");
   }
+
   return success;
 }
 
