@@ -50,7 +50,9 @@ bool load_page_data(void *kpage, struct spt *spt, void *upage) {
   void *kbuffer = palloc_get_page(PAL_ZERO);
   switch (spte->location) {
   case LOADED:
-    PANIC("Page already loaded");
+    palloc_free_page(kbuffer);
+    while(spte->location == LOADED);
+    return load_page_data(kpage, spt, upage);
   case FILE:
     load_file(kbuffer, spte);
     break;
