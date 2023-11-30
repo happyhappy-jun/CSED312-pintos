@@ -4,6 +4,7 @@
 #include "threads/fixed-point.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "vm/mmap.h"
 #include "vm/spt.h"
 #include <debug.h>
 #include <list.h>
@@ -116,6 +117,7 @@ struct thread {
 
 #ifdef VM
   struct spt spt;
+  struct mmap_list mmap_list;
   int stack_pages;
 #endif
 

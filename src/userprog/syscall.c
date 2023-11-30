@@ -24,6 +24,8 @@ static int sys_write(int, void *, unsigned);
 static void sys_seek(int, unsigned);
 static unsigned sys_tell(int);
 static void sys_close(int);
+static int sys_mmap(int, void *);
+static bool sys_munmap(int);
 
 void syscall_init(void) {
   lock_init(&file_lock);
@@ -103,6 +105,15 @@ static void syscall_handler(struct intr_frame *f) {
   case SYS_CLOSE:
     get_syscall_args(f->esp, 1, syscall_arg);
     sys_close(syscall_arg[0]);
+    break;
+  case SYS_MMAP:
+    get_syscall_args(f->esp, 2, syscall_arg);
+    f->eax = sys_mmap(syscall_arg[0], (void *) syscall_arg[1]);
+    break;
+  case SYS_MUNMAP:
+    get_syscall_args(f->esp, 1, syscall_arg);
+    f->eax = sys_munmap(syscall_arg[0]);
+    break;
   default: break;
   }
 }
@@ -299,4 +310,21 @@ static bool sys_remove(const char *file) {
 
   palloc_free_page(kfile);
   return success;
+}
+
+static int sys_mmap(int fd, void *upage) {
+  if (pg_ofs(upage) != 0 || upage == NULL || fd == STDIN_FILENO || fd == STDOUT_FILENO) {
+    return MMAP_FAILED;
+  }
+
+  struct file *file = get_file_by_fd(fd);
+  if (file == NULL) {
+      return MMAP_FAILED;
+  }
+
+  return mmap_map_file(&thread_current()->mmap_list, file, upage);
+}
+
+static bool sys_munmap(int id) {
+  return mmap_unmap_file(&thread_current()->mmap_list, id);
 }

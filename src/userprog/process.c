@@ -68,9 +68,11 @@ start_process(void *file_name_) {
   char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
+  struct thread *cur = thread_current();
 
 #ifdef VM
-  spt_init(&thread_current()->spt);
+  spt_init(&cur->spt);
+  mmap_init(&cur->mmap_list);
 #endif
 
   /* Initialize interrupt frame and load executable. */
@@ -83,13 +85,13 @@ start_process(void *file_name_) {
 
   /* allocate pid when the load() succeed */
   if (success)
-    thread_current()->pcb->pid = allocate_pid();
+    cur->pcb->pid = allocate_pid();
   /* Let the parent thread/process know the load() is finished */
-  sema_up(&thread_current()->pcb->load_sema);
+  sema_up(&cur->pcb->load_sema);
 
   /* If load failed, quit. */
   if (!success) {
-    thread_current()->pcb->exit_code = -1;
+    cur->pcb->exit_code = -1;
     thread_exit();
   }
 
@@ -138,6 +140,11 @@ void process_exit(void) {
   uint32_t *pd;
 
   printf("%s: exit(%d)\n", cur->name, cur->pcb->exit_code);
+
+#ifdef VM
+  mmap_destroy(&cur->mmap_list);
+  spt_destroy(&cur->spt);
+#endif
 
   /* allow write and close the executable file */
   file_close(cur->pcb->file);
