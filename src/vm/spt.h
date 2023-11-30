@@ -5,4 +5,57 @@
 #ifndef PINTOS_SRC_VM_SPT_H_
 #define PINTOS_SRC_VM_SPT_H_
 
+#include "filesys/off_t.h"
+#include "hash.h"
+#include "stdbool.h"
+
+enum spte_type {
+  MMAP,
+  EXEC,
+  STACK
+};
+
+enum page_location {
+  LOADED,
+  FILE,
+  SWAP,
+  ZERO
+};
+
+struct spt {
+  struct hash table;
+};
+
+struct file_info {
+  struct file *file;
+  off_t offset;
+  uint32_t read_bytes;
+  uint32_t zero_bytes;
+};
+
+struct spt_entry {
+  void *upage;
+  void *kpage;
+  bool writable;
+
+  enum spte_type type;
+  enum page_location location;
+
+  struct file_info *file_info;
+  unsigned swap_index;
+
+  struct hash_elem elem;
+};
+
+void spt_init(struct spt *spt);
+void spt_destroy(struct spt *spt);
+
+struct spt_entry *spt_find(struct spt *spt, void *upage);
+
+void spt_insert_mmap(struct spt *spt, void *upage, struct file *file, off_t offset, uint32_t read_bytes, uint32_t zero_bytes);
+void spt_insert_exec(struct spt *spt, void *upage, bool writable, struct file *file, off_t offset, uint32_t read_bytes, uint32_t zero_bytes);
+void spt_insert_stack(struct spt *spt, void *upage);
+
+void spt_remove(struct spt *spt, void *upage);
+
 #endif//PINTOS_SRC_VM_SPT_H_
