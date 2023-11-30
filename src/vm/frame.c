@@ -88,7 +88,7 @@ void *frame_switch(void *upage, enum palloc_flags flags) {
   if (zero)
     memset(target->kpage, 0, PGSIZE);
 
-  return target;
+  return target->kpage;
 }
 
 static struct frame *frame_to_evict(void){
