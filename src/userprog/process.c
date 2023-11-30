@@ -322,6 +322,8 @@ bool load(const char *file_name, void (**eip)(void), void **esp) {
     goto done;
   process_activate();
 
+  t->spt.pagedir = t->pagedir;
+
   /* Open executable file. */
   file = filesys_open(argv[0]);
   if (file == NULL) {
