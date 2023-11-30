@@ -204,18 +204,16 @@ void lock_acquire(struct lock *lock) {
     lock->holder = thread_current();
   } else {
     /* Modify here for priority donation */
-//    if (lock->holder != NULL) {
-//      current_thread->waiting_lock = lock;
-//      list_insert_ordered(&lock->holder->donations,
-//                          &current_thread->donation_elem,
-//                          compare_thread_priority, NULL);
-//      donate_priority();
-//    }
-//    sema_down(&lock->semaphore);
-//    current_thread->waiting_lock = NULL;
-//    lock->holder = current_thread;
+    if (lock->holder != NULL) {
+      current_thread->waiting_lock = lock;
+      list_insert_ordered(&lock->holder->donations,
+                          &current_thread->donation_elem,
+                          compare_thread_priority, NULL);
+      donate_priority();
+    }
     sema_down(&lock->semaphore);
-    lock->holder = thread_current();
+    current_thread->waiting_lock = NULL;
+    lock->holder = current_thread;
   }
 }
 
@@ -252,13 +250,11 @@ void lock_release(struct lock *lock) {
     sema_up(&lock->semaphore);
   } else {
     /* Modify here for priority donation */
-//    lock->holder = NULL;
-//
-//    clear_from_donations(lock);
-//    update_donations();
-//
-//    sema_up(&lock->semaphore);
     lock->holder = NULL;
+
+    clear_from_donations(lock);
+    update_donations();
+
     sema_up(&lock->semaphore);
   }
 }
