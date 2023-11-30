@@ -33,7 +33,6 @@ void spt_destroy(struct spt *spt) {
 
 static void spte_destroy(struct hash_elem *elem, void *aux) {
   struct spt_entry *spte = hash_entry(elem, struct spt_entry, elem);
-  // Todo: free spte
   free(spte);
 }
 

@@ -19,7 +19,7 @@ void mmap_init(struct mmap_list *mmap_list) {
 void mmap_destroy(struct mmap_list *mmap_list) {
     struct list_elem *e;
     while (!list_empty(&mmap_list->list)) {
-        e = list_pop_front(&mmap_list->list);
+        e = list_front(&mmap_list->list);
         struct mmap_entry *mmap_entry = list_entry(e, struct mmap_entry, elem);
         mmap_unmap_file(mmap_list, mmap_entry->id);
         free(mmap_entry);
@@ -98,6 +98,7 @@ bool mmap_unmap_file(struct mmap_list *mmap_list, mmapid_t id) {
     lock_release(&file_lock);
     mmap_entry->file = NULL;
   }
+  list_remove(&mmap_entry->elem);
   return true;
 }
 
