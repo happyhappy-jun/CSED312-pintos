@@ -48,7 +48,7 @@ void swap_in(swap_index_t index, void *page) {
   for (size_t i = 0; i < SECTORS_NUM; i++) {
     block_read(swap_block, index * SECTORS_NUM + i, page + i * BLOCK_SECTOR_SIZE);
   }
-  lock_acquire(&swap_lock);
+  lock_release(&swap_lock);
 }
 
 void swap_free(swap_index_t index) {
