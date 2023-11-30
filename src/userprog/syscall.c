@@ -166,7 +166,9 @@ static int sys_open(const char *file_name) {
     palloc_free_page(kfile);
     sys_exit(-1);
   }
+  lock_acquire(&file_lock);
   file = filesys_open(kfile);
+  lock_release(&file_lock);
   palloc_free_page(kfile);
 
   if (file == NULL)
@@ -182,7 +184,10 @@ static int sys_filesize(int fd) {
   if (file == NULL)
     return 0;
 
-  return file_length(file);
+  lock_acquire(&file_lock);
+  off_t size = file_length(file);
+  lock_release(&file_lock);
+  return size;
 }
 
 static int sys_read(int fd, void *buffer, unsigned size) {
@@ -204,7 +209,9 @@ static int sys_read(int fd, void *buffer, unsigned size) {
     }
     read_bytes = (int) size;
   } else {
+    lock_acquire(&file_lock);
     read_bytes = file_read(file, kbuffer, (off_t) size);
+    lock_release(&file_lock);
   }
 
   void *ptr = safe_memcpy_to_user(buffer, kbuffer, read_bytes);
@@ -238,7 +245,9 @@ static int sys_write(int fd, void *buffer, unsigned int size) {
     putbuf((const char *) kbuffer, size);
     write_bytes = (int) size;
   } else {
+    lock_acquire(&file_lock);
     write_bytes = file_write(file, kbuffer, (off_t) size);
+    lock_release(&file_lock);
   }
 
   palloc_free_multiple(kbuffer, page_cnt);
@@ -272,7 +281,9 @@ static void sys_close(int fd) {
   if (file == NULL)
     return;
 
+  lock_acquire(&file_lock);
   file_close(file);
+  lock_release(&file_lock);
   free_fd(fd);
 }
 
