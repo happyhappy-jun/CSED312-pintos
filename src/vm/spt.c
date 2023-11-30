@@ -125,7 +125,6 @@ struct spt_entry *spt_insert_stack(struct spt *spt, void *upage) {
 
 void spt_remove(struct spt *spt, void *upage) {
   struct spt_entry *spte = spt_find(spt, upage);
-  spte_destroy(&spte->elem, NULL);
   hash_delete(&spt->table, &spte->elem);
-  free(spte);
+  spte_destroy(&spte->elem, NULL);
 }
