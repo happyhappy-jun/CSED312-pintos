@@ -3,6 +3,7 @@
 //
 
 #include "vm/spt.h"
+#include "page.h"
 #include "swap.h"
 #include "threads/malloc.h"
 #include "userprog/process.h"
@@ -34,6 +35,9 @@ void spt_destroy(struct spt *spt) {
 
 static void spte_destroy(struct hash_elem *elem, void *aux) {
   struct spt_entry *spte = hash_entry(elem, struct spt_entry, elem);
+  if (spte->location == LOADED) {
+    unload_page(&thread_current()->spt, spte->upage);
+  }
   if (spte->location == SWAP) {
     swap_free(spte->swap_index);
   }
