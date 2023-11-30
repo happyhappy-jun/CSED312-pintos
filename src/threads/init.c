@@ -36,6 +36,7 @@
 #include "devices/ide.h"
 #include "filesys/filesys.h"
 #include "filesys/fsutil.h"
+#include "vm/frame.h"
 #endif
 
 /* Page directory with kernel mappings only. */
@@ -112,6 +113,10 @@ int main(void) {
 #ifdef USERPROG
   exception_init();
   syscall_init();
+#endif
+
+#ifdef VM
+  frame_table_init();
 #endif
 
   /* Start thread scheduler and enable interrupts. */
