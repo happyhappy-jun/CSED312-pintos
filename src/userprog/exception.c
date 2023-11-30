@@ -152,7 +152,7 @@ page_fault(struct intr_frame *f) {
   struct spt *spt = &cur->spt;
 
   if (fault_addr < PHYS_BASE && not_present) {
-    if (stack_growth(fault_page, esp)) {
+    if (stack_growth(fault_addr, esp)) {
       spt_insert_stack(spt, fault_page);
       cur->stack_pages++;
     }
