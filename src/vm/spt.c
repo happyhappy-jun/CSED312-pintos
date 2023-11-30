@@ -27,8 +27,6 @@ void spt_init(struct spt *spt) {
 
 // Destroy spt
 void spt_destroy(struct spt *spt) {
-  // Todo: 7. On process termination
-  // spt_remove_helper() will free each spt_entry in spt.
   hash_destroy(&spt->spt, spt_remove_helper);
 }
 
@@ -212,11 +210,12 @@ void spt_evict_page_from_frame(struct spt_entry *spte) {
   bool is_dirty;
   ASSERT(spte->is_loaded)
   ASSERT(spte->kpage != NULL)
-  pin_frame(spte->kpage);
   struct frame *target_frame = get_frame(spte->kpage);
   ASSERT(target_frame != NULL)
   struct thread *target_holder = target_frame->thread;
   ASSERT(target_holder != NULL)
+
+  pin_frame(spte->kpage);
 
   if (spte->is_dirty) {
     is_dirty = true;
