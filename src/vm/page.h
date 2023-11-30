@@ -10,5 +10,8 @@
 
 bool load_page(struct spt *spt, void *upage);
 bool unload_page(struct spt *spt, void *upage);
+bool load_page_data(void *kpage, struct spt *spt, void *upage);
+bool unload_page_data(struct spt *spt, void *upage);
+
 
 #endif//PINTOS_SRC_VM_PAGE_H_

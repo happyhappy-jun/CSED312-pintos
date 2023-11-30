@@ -20,8 +20,27 @@ static void load_swap(void *kbuffer, struct spt_entry *spte);
 static void unload_file(void *kbuffer, struct spt_entry *spte);
 static void unload_swap(void *kbuffer, struct spt_entry *spte);
 
-
 bool load_page(struct spt *spt, void *upage) {
+  void *kpage = frame_alloc(upage, PAL_USER);
+  bool success = load_page_data(kpage, spt, upage);
+  if (!success) {
+    frame_free(kpage);
+    return false;
+  }
+  return true;
+}
+
+bool unload_page(struct spt *spt, void *upage) {
+  bool success = unload_page_data(spt, upage);
+  if (!success) {
+    return false;
+  }
+  frame_free(spt_find(spt, upage)->kpage);
+  return true;
+}
+
+
+bool load_page_data(void *kpage, struct spt *spt, void *upage) {
   struct spt_entry *spte = spt_find(spt, upage);
   if (spte == NULL) {
     return false;
@@ -43,7 +62,6 @@ bool load_page(struct spt *spt, void *upage) {
   default:
     return false;
   }
-  void *kpage = frame_alloc(upage, PAL_USER);
   memcpy(kpage, kbuffer, PGSIZE);
   palloc_free_page(kbuffer);
   spte->location = LOADED;
@@ -52,7 +70,7 @@ bool load_page(struct spt *spt, void *upage) {
 }
 
 
-bool unload_page(struct spt *spt, void *upage) {
+bool unload_page_data(struct spt *spt, void *upage) {
   struct spt_entry *spte = spt_find(spt, upage);
   if (spte == NULL) {
     return false;
@@ -72,7 +90,6 @@ bool unload_page(struct spt *spt, void *upage) {
     kbuffer = palloc_get_page(PAL_ZERO);
     memcpy(kbuffer, spte->kpage, PGSIZE);
   }
-  frame_free(spte->kpage);
 
   switch (spte->type) {
   case MMAP:
