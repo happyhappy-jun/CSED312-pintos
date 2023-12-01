@@ -35,14 +35,13 @@ void spt_destroy(struct spt *spt) {
   lock_acquire(&spt->spt_lock);
   hash_destroy(&spt->table, spte_destroy);
   lock_release(&spt->spt_lock);
-  printf("[tid:%d] spt_destroy\n", thread_current()->tid);
 }
 
 static void spte_destroy(struct hash_elem *elem, void *aux) {
   ASSERT(lock_held_by_current_thread((const struct lock *)aux))
   struct spt_entry *spte = hash_entry(elem, struct spt_entry, elem);
   if (spte->location == LOADED) {
-    unload_page(&thread_current()->spt, spte->upage);
+    unload_page(&thread_current()->spt, spte);
   }
   if (spte->location == SWAP) {
     swap_free(spte->swap_index);

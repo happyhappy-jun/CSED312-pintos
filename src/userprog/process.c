@@ -73,7 +73,6 @@ start_process(void *file_name_) {
 #ifdef VM
   spt_init(&cur->spt);
   mmap_init(&cur->mmap_list);
-  printf("[tid:%d] %p\n", cur->tid, cur);
 #endif
 
   /* Initialize interrupt frame and load executable. */

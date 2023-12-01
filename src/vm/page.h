@@ -9,9 +9,9 @@
 #include "stdbool.h"
 
 bool load_page(struct spt *spt, void *upage);
-bool unload_page(struct spt *spt, void *upage);
+bool unload_page(struct spt *spt, struct spt_entry *spte);
 bool load_page_data(void *kpage, struct spt *spt, void *upage);
-bool unload_page_data(struct spt *spt, void *upage);
+bool unload_page_data(struct spt *spt, struct spt_entry *spte);
 
 
 #endif//PINTOS_SRC_VM_PAGE_H_

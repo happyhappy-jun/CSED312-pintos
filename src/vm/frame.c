@@ -83,9 +83,8 @@ void *frame_switch(void *upage, enum palloc_flags flags) {
     PANIC("Cannot find frame to evict");
   }
 
-  printf("[tid:%d] target holder: %p(%d)\n", thread_current()->tid, target->thread, target->thread->tid);
-
-  unload_page_data(&target->thread->spt, target->upage);
+  struct spt_entry *spte = spt_find(&target->thread->spt, target->upage);
+  unload_page_data(&target->thread->spt, spte);
 
   target->upage = upage;
   target->thread = thread_current();

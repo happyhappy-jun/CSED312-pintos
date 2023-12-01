@@ -31,12 +31,12 @@ bool load_page(struct spt *spt, void *upage) {
   return true;
 }
 
-bool unload_page(struct spt *spt, void *upage) {
-  bool success = unload_page_data(spt, upage);
+bool unload_page(struct spt *spt, struct spt_entry *spte) {
+  bool success = unload_page_data(spt, spte);
   if (!success) {
     return false;
   }
-  frame_free(spt_find(spt, upage)->kpage);
+  frame_free(spte->kpage);
   return true;
 }
 
@@ -73,14 +73,8 @@ bool load_page_data(void *kpage, struct spt *spt, void *upage) {
 }
 
 
-bool unload_page_data(struct spt *spt, void *upage) {
-  struct spt_entry *spte = spt_find(spt, upage);
-  if (spte == NULL) {
-    return false;
-  }
-
+bool unload_page_data(struct spt *spt, struct spt_entry *spte) {
   ASSERT(spte->location == LOADED)
-
   bool dirty = spte->dirty;
   if (!dirty) {
     dirty = pagedir_is_dirty(spt->pagedir, spte->upage);

@@ -89,8 +89,8 @@ bool mmap_unmap_file(struct mmap_list *mmap_list, mmapid_t id) {
       struct spt_entry *spte = spt_find(spt, addr + offset);
       ASSERT(spte != NULL)
       ASSERT(spte->type == MMAP)
-      if (spte->location == LOADED)
-        unload_page(spt, addr + offset);
+//      if (spte->location == LOADED)
+//        unload_page(spt, addr + offset);
       spt_remove(spt, addr + offset);
     }
     lock_acquire(&file_lock);
