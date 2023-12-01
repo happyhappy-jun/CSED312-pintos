@@ -68,9 +68,9 @@ void frame_free(void *kpage) {
   lock_acquire(&frame_table.frame_table_lock);
   struct frame *f = frame_find(kpage);
   hash_delete(&frame_table.frame_table, &f->elem);
-  lock_release(&frame_table.frame_table_lock);
   palloc_free_page(kpage);
   free(f);
+  lock_release(&frame_table.frame_table_lock);
 }
 
 void *frame_switch(void *upage, enum palloc_flags flags) {

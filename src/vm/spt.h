@@ -8,6 +8,7 @@
 #include "filesys/off_t.h"
 #include "hash.h"
 #include "stdbool.h"
+#include "threads/synch.h"
 
 enum spte_type {
   MMAP,
@@ -25,6 +26,7 @@ enum page_location {
 struct spt {
   struct hash table;
   void *pagedir;
+  struct lock spt_lock;
 };
 
 struct file_info {

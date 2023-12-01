@@ -15,7 +15,8 @@ static struct file_info *file_info_generator(struct file *file, off_t offset, ui
 
 void spt_init(struct spt *spt) {
   spt->pagedir = thread_current()->pagedir;
-  hash_init(&spt->table, spt_hash, spt_less, NULL);
+  lock_init(&spt->spt_lock);
+  hash_init(&spt->table, spt_hash, spt_less, &spt->spt_lock);
 }
 
 static unsigned spt_hash(const struct hash_elem *elem, void *aux) {
@@ -30,10 +31,13 @@ static bool spt_less(const struct hash_elem *a, const struct hash_elem *b, void 
 }
 
 void spt_destroy(struct spt *spt) {
+  lock_acquire(&spt->spt_lock);
   hash_destroy(&spt->table, spte_destroy);
+  lock_release(&spt->spt_lock);
 }
 
 static void spte_destroy(struct hash_elem *elem, void *aux) {
+  ASSERT(lock_held_by_current_thread((const struct lock *)aux))
   struct spt_entry *spte = hash_entry(elem, struct spt_entry, elem);
   if (spte->location == LOADED) {
     unload_page(&thread_current()->spt, spte->upage);
@@ -50,7 +54,12 @@ static void spte_destroy(struct hash_elem *elem, void *aux) {
 struct spt_entry *spt_find(struct spt *spt, void *upage) {
   struct spt_entry finder;
   finder.upage = upage;
+  bool hold = lock_held_by_current_thread(&spt->spt_lock);
+  if (!hold)
+    lock_acquire(&spt->spt_lock);
   struct hash_elem *e = hash_find(&spt->table, &finder.elem);
+  if (!hold)
+    lock_release(&spt->spt_lock);
   if (e == NULL) {
       return NULL;
   }
@@ -80,7 +89,9 @@ struct spt_entry *spt_insert_mmap(struct spt *spt, void *upage, struct file *fil
   spte->location = FILE;
   spte->file_info = file_info_generator(file, offset, read_bytes, zero_bytes);
   spte->swap_index = -1;
+  lock_acquire(&spt->spt_lock);
   struct hash_elem *e = hash_insert(&spt->table, &spte->elem);
+  lock_release(&spt->spt_lock);
   if (e == NULL) {
     return spte;
   } else {
@@ -102,7 +113,9 @@ struct spt_entry *spt_insert_exec(struct spt *spt, void *upage, bool writable, s
   spte->location = FILE;
   spte->file_info = file_info_generator(file, offset, read_bytes, zero_bytes);
   spte->swap_index = -1;
+  lock_acquire(&spt->spt_lock);
   struct hash_elem *e = hash_insert(&spt->table, &spte->elem);
+  lock_release(&spt->spt_lock);
   if (e == NULL) {
     return spte;
   } else {
@@ -124,7 +137,9 @@ struct spt_entry *spt_insert_stack(struct spt *spt, void *upage) {
   spte->location = ZERO;
   spte->file_info = NULL;
   spte->swap_index = -1;
+  lock_acquire(&spt->spt_lock);
   struct hash_elem *e = hash_insert(&spt->table, &spte->elem);
+  lock_release(&spt->spt_lock);
   if (e == NULL) {
       return spte;
   } else {
@@ -135,6 +150,8 @@ struct spt_entry *spt_insert_stack(struct spt *spt, void *upage) {
 
 void spt_remove(struct spt *spt, void *upage) {
   struct spt_entry *spte = spt_find(spt, upage);
+  lock_acquire(&spt->spt_lock);
   hash_delete(&spt->table, &spte->elem);
-  spte_destroy(&spte->elem, NULL);
+  spte_destroy(&spte->elem, &spt->spt_lock);
+  lock_release(&spt->spt_lock);
 }
