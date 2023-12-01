@@ -11,7 +11,7 @@
 
 static char buf[BUF_SIZE];
 
-#define CHILD_CNT 3
+#define CHILD_CNT 10
 
 void test_main(void) {
   pid_t children[CHILD_CNT];

@@ -1,9 +1,7 @@
 #include "filesys/inode.h"
 #include "filesys/filesys.h"
 #include "filesys/free-map.h"
-#include "stdio.h"
 #include "threads/malloc.h"
-#include "threads/thread.h"
 #include <debug.h>
 #include <list.h>
 #include <round.h>
@@ -183,8 +181,6 @@ off_t inode_read_at(struct inode *inode, void *buffer_, off_t size, off_t offset
   uint8_t *buffer = buffer_;
   off_t bytes_read = 0;
   uint8_t *bounce = NULL;
-
-  printf("[tid:%d] inode_read_at(%p, %p, %d, %d)\n", thread_current()->tid, inode, buffer, size, offset);
 
   while (size > 0) {
     /* Disk sector to read, starting byte offset within sector. */

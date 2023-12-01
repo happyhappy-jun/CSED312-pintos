@@ -19,7 +19,7 @@ int main(int argc, const char *argv[]) {
   size_t i;
 
   test_name = "child-syn-read";
-  quiet = false;
+  quiet = true;
 
   CHECK(argc == 2, "argc must be 2, actually %d", argc);
   child_idx = atoi(argv[1]);

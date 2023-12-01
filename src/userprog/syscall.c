@@ -166,8 +166,6 @@ static int sys_open(const char *file_name) {
     palloc_free_page(kfile);
     sys_exit(-1);
   }
-
-  printf("[tid:%d] sys_open(%s)\n", thread_current()->tid, kfile);
   lock_acquire(&file_lock);
   file = filesys_open(kfile);
   lock_release(&file_lock);

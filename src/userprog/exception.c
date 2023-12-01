@@ -158,7 +158,6 @@ page_fault(struct intr_frame *f) {
     }
     struct spt_entry *spte = spt_find(spt, fault_page);
     if (spte != NULL) {
-      printf("[tid:%d] page fault handling: %p\n", cur->tid, fault_addr);
       if (load_page(spt, fault_page))
         return;
       else {

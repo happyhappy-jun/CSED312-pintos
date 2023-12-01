@@ -2,7 +2,6 @@
 #include "filesys/filesys.h"
 #include "filesys/inode.h"
 #include "threads/malloc.h"
-#include "threads/thread.h"
 #include <list.h>
 #include <stdio.h>
 #include <string.h>
@@ -84,10 +83,8 @@ lookup(const struct dir *dir, const char *name,
   ASSERT(dir != NULL);
   ASSERT(name != NULL);
 
-  printf("[tid:%d] lookup(%p, %s, %p, %p)\n", thread_current()->tid, dir, name, ep, ofsp);
   for (ofs = 0; inode_read_at(dir->inode, &e, sizeof e, ofs) == sizeof e;
-       ofs += sizeof e) {
-    printf("[tid:%d] ofs = %d, e.in_use = %d, e.name = %s\n", thread_current()->tid, ofs, e.in_use, e.name);
+       ofs += sizeof e)
     if (e.in_use && !strcmp(name, e.name)) {
       if (ep != NULL)
         *ep = e;
@@ -95,7 +92,6 @@ lookup(const struct dir *dir, const char *name,
         *ofsp = ofs;
       return true;
     }
-  }
   return false;
 }
 
@@ -109,7 +105,7 @@ bool dir_lookup(const struct dir *dir, const char *name,
 
   ASSERT(dir != NULL);
   ASSERT(name != NULL);
-  printf("[tid:%d] dir_lookup(%p, %s, %p)\n", thread_current()->tid, dir, name, inode);
+
   if (lookup(dir, name, &e, NULL))
     *inode = inode_open(e.inode_sector);
   else
