@@ -8,9 +8,9 @@
 #include "vm/spt.h"
 #include "stdbool.h"
 
-bool load_page(struct spt *spt, void *upage);
+bool load_page(struct spt *spt, struct spt_entry *spte);
 bool unload_page(struct spt *spt, struct spt_entry *spte);
-bool load_page_data(void *kpage, struct spt *spt, void *upage);
+bool load_page_data(void *kpage, struct spt *spt, struct spt_entry *spte);
 bool unload_page_data(struct spt *spt, struct spt_entry *spte);
 
 

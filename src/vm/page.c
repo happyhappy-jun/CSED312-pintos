@@ -20,9 +20,9 @@ static void load_swap(void *kbuffer, struct spt_entry *spte);
 static void unload_file(void *kbuffer, struct spt_entry *spte);
 static void unload_swap(void *kbuffer, struct spt_entry *spte);
 
-bool load_page(struct spt *spt, void *upage) {
-  void *kpage = frame_alloc(upage, PAL_USER);
-  bool success = load_page_data(kpage, spt, upage);
+bool load_page(struct spt *spt, struct spt_entry *spte) {
+  void *kpage = frame_alloc(spte->upage, PAL_USER);
+  bool success = load_page_data(kpage, spt, spte);
   if (!success) {
     frame_free(kpage);
     return false;
@@ -41,18 +41,13 @@ bool unload_page(struct spt *spt, struct spt_entry *spte) {
 }
 
 
-bool load_page_data(void *kpage, struct spt *spt, void *upage) {
-  struct spt_entry *spte = spt_find(spt, upage);
-  if (spte == NULL) {
-    return false;
-  }
-
+bool load_page_data(void *kpage, struct spt *spt, struct spt_entry *spte) {
   void *kbuffer = palloc_get_page(PAL_ZERO);
   switch (spte->location) {
   case LOADED:
     palloc_free_page(kbuffer);
     while(spte->location == LOADED);
-    return load_page_data(kpage, spt, upage);
+    return load_page_data(kpage, spt, spte);
   case FILE:
     load_file(kbuffer, spte);
     break;
