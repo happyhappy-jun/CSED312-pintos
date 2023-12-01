@@ -3,6 +3,7 @@
 #include "filesys/file.h"
 #include "filesys/free-map.h"
 #include "filesys/inode.h"
+#include "threads/thread.h"
 #include <debug.h>
 #include <stdio.h>
 #include <string.h>
@@ -40,6 +41,7 @@ void filesys_done(void) {
    or if internal memory allocation fails. */
 bool filesys_create(const char *name, off_t initial_size) {
   block_sector_t inode_sector = 0;
+  printf("[tid:%d] filesys_create(%s, %d)\n", thread_current()->tid, name, initial_size);
   struct dir *dir = dir_open_root();
   bool success = (dir != NULL
                   && free_map_allocate(1, &inode_sector)
@@ -62,9 +64,11 @@ filesys_open(const char *name) {
   struct dir *dir = dir_open_root();
   struct inode *inode = NULL;
 
+  printf("[tid:%d] filesys_open(%s)\n", thread_current()->tid, name);
   if (dir != NULL)
     dir_lookup(dir, name, &inode);
   dir_close(dir);
+  printf("[tid:%d] inode = %p\n", thread_current()->tid, inode);
 
   return file_open(inode);
 }

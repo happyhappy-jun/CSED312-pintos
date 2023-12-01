@@ -1,6 +1,8 @@
 #include "filesys/file.h"
 #include "filesys/inode.h"
+#include "stdio.h"
 #include "threads/malloc.h"
+#include "threads/thread.h"
 #include <debug.h>
 
 /* An open file. */
@@ -37,6 +39,7 @@ file_reopen(struct file *file) {
 
 /* Closes FILE. */
 void file_close(struct file *file) {
+  printf("[tid:%d] file_close(%p)\n", thread_current()->tid, file);
   if (file != NULL) {
     file_allow_write(file);
     inode_close(file->inode);
