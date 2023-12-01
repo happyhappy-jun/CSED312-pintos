@@ -37,7 +37,12 @@ static bool frame_table_less(const struct hash_elem *a, const struct hash_elem *
 static struct frame *frame_find(void *kpage) {
   struct frame finder;
   finder.kpage = kpage;
+  bool hold = lock_held_by_current_thread(&frame_table.frame_table_lock);
+  if (!hold)
+    lock_acquire(&frame_table.frame_table_lock);
   struct hash_elem *e = hash_find(&frame_table.frame_table, &finder.elem);
+  if (!hold)
+    lock_release(&frame_table.frame_table_lock);
   if (e == NULL) {
     return NULL;
   }
