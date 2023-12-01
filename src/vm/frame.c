@@ -5,6 +5,7 @@
 #include "vm/frame.h"
 #include "devices/timer.h"
 #include "page.h"
+#include "stdio.h"
 #include "string.h"
 #include "threads/malloc.h"
 #include "threads/thread.h"
@@ -81,6 +82,8 @@ void *frame_switch(void *upage, enum palloc_flags flags) {
   if (target == NULL) {
     PANIC("Cannot find frame to evict");
   }
+
+  printf("[tid:%d] target holder: %p(%d)\n", thread_current()->tid, target->thread, target->thread->tid);
 
   unload_page_data(&target->thread->spt, target->upage);
 

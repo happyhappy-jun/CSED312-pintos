@@ -4,6 +4,7 @@
 
 #include "vm/spt.h"
 #include "page.h"
+#include "stdio.h"
 #include "swap.h"
 #include "threads/malloc.h"
 #include "userprog/process.h"
@@ -34,6 +35,7 @@ void spt_destroy(struct spt *spt) {
   lock_acquire(&spt->spt_lock);
   hash_destroy(&spt->table, spte_destroy);
   lock_release(&spt->spt_lock);
+  printf("[tid:%d] spt_destroy\n", thread_current()->tid);
 }
 
 static void spte_destroy(struct hash_elem *elem, void *aux) {
