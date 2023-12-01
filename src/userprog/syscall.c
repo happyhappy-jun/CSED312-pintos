@@ -242,7 +242,9 @@ static int sys_write(int fd, void *buffer, unsigned int size) {
   }
 
   if (fd == STDOUT_FILENO) {
+    lock_acquire(&file_lock);
     putbuf((const char *) kbuffer, size);
+    lock_release(&file_lock);
     write_bytes = (int) size;
   } else {
     lock_acquire(&file_lock);
@@ -330,7 +332,7 @@ static int sys_mmap(int fd, void *upage) {
 
   struct file *file = get_file_by_fd(fd);
   if (file == NULL) {
-      return MMAP_FAILED;
+    return MMAP_FAILED;
   }
 
   return mmap_map_file(&thread_current()->mmap_list, file, upage);
