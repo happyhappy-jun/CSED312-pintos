@@ -3,6 +3,7 @@
 //
 
 #include "vm/spt.h"
+#include "frame.h"
 #include "page.h"
 #include "stdio.h"
 #include "swap.h"
@@ -41,7 +42,13 @@ static void spte_destroy(struct hash_elem *elem, void *aux) {
   ASSERT(lock_held_by_current_thread((const struct lock *)aux))
   struct spt_entry *spte = hash_entry(elem, struct spt_entry, elem);
   if (spte->location == LOADED) {
-    unload_page(&thread_current()->spt, spte);
+    if (frame_pinned(spte->kpage)) {
+      // this means that the frame is being switched.
+      while (frame_pinned(spte->kpage));
+    } else {
+      frame_pin(spte->kpage);
+      unload_page(&thread_current()->spt, spte);
+    }
   }
   if (spte->location == SWAP) {
     swap_free(spte->swap_index);

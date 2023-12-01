@@ -32,6 +32,7 @@ void *frame_switch(void *upage, enum palloc_flags flags);
 
 void frame_pin(void *kpage);
 void frame_unpin(void *kpage);
+bool frame_pinned(void *kpage);
 
 void frame_set_spte(void *kpage, struct spt_entry *spte);
 #endif//PINTOS_SRC_VM_FRAME_H_
