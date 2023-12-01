@@ -85,6 +85,7 @@ void *frame_switch(void *upage, enum palloc_flags flags) {
 
   struct spt_entry *spte = spt_find(&target->thread->spt, target->upage);
   unload_page_data(&target->thread->spt, spte);
+  unload_page_data(&target->thread->spt, target->spte);
 
   target->upage = upage;
   target->thread = thread_current();
@@ -125,4 +126,8 @@ void frame_pin(void *kpage) {
 void frame_unpin(void *kpage) {
   struct frame *f = frame_find(kpage);
   f->pinned = false;
+}
+void frame_set_spte(void *kpage, struct spt_entry *spte) {
+  struct frame *f = frame_find(kpage);
+  f->spte = spte;
 }
