@@ -48,6 +48,7 @@ bool load_page_data(void *kpage, struct spt *spt, struct spt_entry *spte) {
   switch (spte->location) {
   case LOADED:
     palloc_free_page(kbuffer);
+    printf("[tid:%d] waiting 1\n", thread_current()->tid);
     while(spte->location == LOADED) {
       thread_yield();
     }

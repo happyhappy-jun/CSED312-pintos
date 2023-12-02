@@ -39,6 +39,7 @@ static void spte_destroy(struct hash_elem *elem, void *aux) {
   struct spt_entry *spte = hash_entry(elem, struct spt_entry, elem);
   if (spte->location == LOADED) {
     if (!frame_test_and_pin(spte->kpage)) {
+      printf("[tid:%d] waiting 2\n", thread_current()->tid);
       while (frame_pinned(spte->kpage)) {
         thread_yield();
       }
