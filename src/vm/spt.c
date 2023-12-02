@@ -43,7 +43,7 @@ static void spte_destroy(struct hash_elem *elem, void *aux) {
       unload_page(&thread_current()->spt, spte);
     else {
       lock_release(&spte->lock);
-      while (spte->location != LOADED) {
+      while (spte->location == LOADED) {
         thread_yield();
       }
       lock_acquire(&spte->lock);
