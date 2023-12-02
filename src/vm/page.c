@@ -55,9 +55,9 @@ bool unload_page(struct spt *spt, struct spt_entry *spte) {
 
 bool load_page_data(void *kpage, struct spt_entry *spte) {
   bool hold = lock_held_by_current_thread(&spte->lock);
-  ASSERT(spte->location != LOADED)
   if (!hold)
-      lock_acquire(&spte->lock);
+    lock_acquire(&spte->lock);
+  ASSERT(spte->location != LOADED)
   void *kbuffer = palloc_get_page(PAL_ZERO);
   switch (spte->location) {
   case LOADED:
