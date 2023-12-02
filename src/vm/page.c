@@ -45,9 +45,9 @@ bool unload_page(struct spt *spt, struct spt_entry *spte) {
 bool load_page_data(void *kpage, struct spt *spt, struct spt_entry *spte) {
   switch (spte->location) {
   case LOADED:
-    printf("[tid:%d] waiting 1\n", thread_current()->tid);
+    printf("[tid:%d] waiting %p\n", thread_current()->tid, spte->upage);
     while(spte->location == LOADED);
-    printf("[tid:%d] waiting 1 done\n", thread_current()->tid);
+    printf("[tid:%d] waiting done\n", thread_current()->tid);
     return load_page_data(kpage, spt, spte);
   case FILE:
     load_file(kpage, spte);
