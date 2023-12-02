@@ -490,7 +490,9 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
     size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
     size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-    spt_insert_exec(&cur->spt, upage, writable, file, ofs + offset, page_read_bytes, page_zero_bytes);
+    struct spt_entry *spte = spt_insert_exec(&cur->spt, upage, writable, file, ofs + offset, page_read_bytes, page_zero_bytes);
+    if (spte == NULL)
+      return false;
 
     /* Advance. */
     read_bytes -= page_read_bytes;
@@ -515,7 +517,7 @@ setup_stack(void **esp) {
     *esp = PHYS_BASE;
     cur->stack_pages = 1;
   } else {
-    PANIC("Failed to setup stack");
+    spt_remove(&cur->spt, initial_stack);
   }
 
   return success;
