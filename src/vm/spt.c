@@ -46,7 +46,6 @@ static void spte_destroy(struct hash_elem *elem, void *aux) {
       }
       printf("[tid:%d] waiting 2 end\n", thread_current()->tid);
     } else {
-      printf("[tid:%d] unload LOADED spte: %p:%p\n", thread_current()->tid, spte->upage, spte->kpage);
       unload_page(&thread_current()->spt, spte);
     }
   }
