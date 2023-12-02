@@ -81,17 +81,17 @@ void frame_free(void *kpage) {
 void *frame_switch(void *upage, enum palloc_flags flags) {
   ASSERT(!lock_held_by_current_thread(&frame_table.frame_table_lock));
   struct frame *target = frame_to_evict();
+  struct thread *target_thread = target->thread;
   bool zero = flags & PAL_ZERO;
 
   if (target == NULL) {
     PANIC("Cannot find frame to evict");
   }
 
-  unload_page_data(&target->thread->spt, target->spte);
-
   target->upage = upage;
   target->thread = thread_current();
   target->timestamp = timer_ticks();
+  unload_page_data(&target_thread->spt, target->spte);
 
   if (zero)
     memset(target->kpage, 0, PGSIZE);
