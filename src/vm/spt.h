@@ -26,7 +26,6 @@ enum page_location {
 struct spt {
   struct hash table;
   void *pagedir;
-  struct lock spt_lock;
 };
 
 struct file_info {
