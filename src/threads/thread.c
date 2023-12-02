@@ -72,11 +72,11 @@ static void idle(void *aux UNUSED);
 static struct thread *running_thread(void);
 static struct thread *next_thread_to_run(void);
 static void init_thread(struct thread *, const char *name, int priority);
-static bool is_thread(struct thread *)UNUSED;
-                                      static void *alloc_frame(struct thread *, size_t size);
-                                      static void schedule(void);
-                                      void thread_schedule_tail(struct thread *prev);
-                                      static tid_t allocate_tid(void);
+static bool is_thread(struct thread *) UNUSED;
+static void *alloc_frame(struct thread *, size_t size);
+static void schedule(void);
+void thread_schedule_tail(struct thread *prev);
+static tid_t allocate_tid(void);
 
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
@@ -91,7 +91,7 @@ static bool is_thread(struct thread *)UNUSED;
 
    It is not safe to call thread_current() until this function
    finishes. */
-    void thread_init(void) {
+void thread_init(void) {
   ASSERT(intr_get_level() == INTR_OFF);
 
   lock_init(&tid_lock);
@@ -133,8 +133,8 @@ void thread_tick(void) {
   if (t == idle_thread)
     idle_ticks++;
 #ifdef USERPROG
-    else if (t->pagedir != NULL)
-      user_ticks++;
+  else if (t->pagedir != NULL)
+    user_ticks++;
 #endif
   else
     kernel_ticks++;
@@ -260,7 +260,7 @@ void clear_from_donations(struct lock *lock) {
   e = list_begin(&thread_current()->donations);
   for (e; e != list_end(&thread_current()->donations); e = list_next(e)) {
     t = list_entry(e,
-    struct thread, donation_elem);
+                   struct thread, donation_elem);
     if (t->waiting_lock == lock) {
       list_remove(e);
     }
@@ -281,8 +281,8 @@ void update_donations(void) {
 
   struct thread *max = list_entry(
       list_max(&current_thread->donations, compare_thread_priority, NULL),
-  struct thread,
-  donation_elem);
+      struct thread,
+      donation_elem);
 
   if (max->priority > current_thread->original_priority) {
     current_thread->priority = max->priority;
@@ -379,7 +379,7 @@ void thread_foreach(thread_action_func *func, void *aux) {
   for (e = list_begin(&all_list); e != list_end(&all_list);
        e = list_next(e)) {
     struct thread *t = list_entry(e,
-    struct thread, allelem);
+                                  struct thread, allelem);
     func(t, aux);
   }
 }
@@ -400,7 +400,7 @@ void thread_set_priority(int new_priority) {
   }
 
   struct thread *t = list_entry(list_front(&ready_list),
-  struct thread, elem);
+                                struct thread, elem);
   if (new_priority < t->priority)
     if (!intr_context())
       thread_yield();
@@ -476,9 +476,9 @@ static void idle(void *idle_started_ UNUSED) {
        See [IA32-v2a] "HLT", [IA32-v2b] "STI", and [IA32-v3a]
        7.11.1 "HLT Instruction". */
     asm volatile("sti; hlt"
-        :
-        :
-        : "memory");
+                 :
+                 :
+                 : "memory");
   }
 }
 
@@ -537,6 +537,10 @@ init_thread(struct thread *t, const char *name, int priority) {
     t->recent_cpu = RECENT_CPU_INITIAL;
   }
 
+#ifdef VM
+  list_init(&t->mmap_list);
+#endif
+
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable();
@@ -567,7 +571,7 @@ next_thread_to_run(void) {
     return idle_thread;
   else
     return list_entry(list_pop_front(&ready_list),
-  struct thread, elem);
+                      struct thread, elem);
 }
 
 /* Completes a thread switch by activating the new thread's page
@@ -671,7 +675,7 @@ void thread_wakeup(int64_t current_tick) {
   while (!list_empty(&sleep_list)) {
     /* Get the front element */
     elem = list_entry(list_front(&sleep_list),
-    struct sleep_list_elem, elem);
+                      struct sleep_list_elem, elem);
     /* Break the while loop if the element's `end_tick` is greater than
      * `current_tick` */
     if (elem->end_tick > current_tick) {
@@ -730,7 +734,7 @@ void sort_ready_list() {
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof(
-struct thread, stack);
+    struct thread, stack);
 
 pid_t allocate_pid(void) {
   static pid_t next_pid = 1;
