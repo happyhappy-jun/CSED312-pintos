@@ -12,7 +12,6 @@
 
 static struct frame_table frame_table;
 
-static struct frame *frame_find(void *kpage);
 static unsigned frame_table_hash(const struct hash_elem *elem, void *aux);
 static bool frame_table_less(const struct hash_elem *a, const struct hash_elem *b, void *aux);
 static struct frame *frame_to_evict(void);
@@ -34,7 +33,7 @@ static bool frame_table_less(const struct hash_elem *a, const struct hash_elem *
   return fte_a->kpage < fte_b->kpage;
 }
 
-static struct frame *frame_find(void *kpage) {
+struct frame *frame_find(void *kpage) {
   struct frame finder;
   finder.kpage = kpage;
   bool hold = lock_held_by_current_thread(&frame_table.frame_table_lock);

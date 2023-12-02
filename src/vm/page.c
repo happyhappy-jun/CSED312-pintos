@@ -45,7 +45,7 @@ bool unload_page(struct spt *spt, struct spt_entry *spte) {
 bool load_page_data(void *kpage, struct spt *spt, struct spt_entry *spte) {
   switch (spte->location) {
   case LOADED:
-    printf("[tid:%d] waiting %p\n", thread_current()->tid, spte->upage);
+    printf("[tid:%d] waiting %p:%p (%d, %p)\n", thread_current()->tid, spte->upage, spte->kpage, frame_find(spte->kpage)->thread->tid, frame_find(spte->kpage)->upage);
     while(spte->location == LOADED);
     printf("[tid:%d] waiting done\n", thread_current()->tid);
     return load_page_data(kpage, spt, spte);
@@ -74,8 +74,6 @@ bool unload_page_data(struct spt *spt, struct spt_entry *spte) {
     dirty = pagedir_is_dirty(spt->pagedir, spte->upage);
     spte->dirty = dirty;
   }
-  if (spt == &thread_current()->spt)
-    thread_current()->unloading_addr = spte->upage;
   pagedir_clear_page(spt->pagedir, spte->upage);
 
   switch (spte->type) {
@@ -106,7 +104,6 @@ bool unload_page_data(struct spt *spt, struct spt_entry *spte) {
     return false;
   }
   ASSERT(spte->location != LOADED)
-  thread_current()->unloading_addr = NULL;
   return true;
 }
 

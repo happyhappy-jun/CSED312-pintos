@@ -26,6 +26,7 @@ struct frame {
 
 void frame_table_init(void);
 
+struct frame *frame_find(void *kpage);
 void *frame_alloc(void *upage, enum palloc_flags flags);
 void frame_free(void *kpage);
 void *frame_switch(void *upage, enum palloc_flags flags);
