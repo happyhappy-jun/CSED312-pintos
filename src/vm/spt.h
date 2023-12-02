@@ -47,6 +47,7 @@ struct spt_entry {
   struct file_info *file_info;
   int swap_index;
 
+  struct lock lock;
   struct hash_elem elem;
 };
 

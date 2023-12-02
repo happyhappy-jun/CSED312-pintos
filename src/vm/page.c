@@ -21,8 +21,13 @@ static void unload_file(void *kbuffer, struct spt_entry *spte);
 static void unload_swap(void *kbuffer, struct spt_entry *spte);
 
 bool load_page(struct spt_entry *spte) {
+  bool hold = lock_held_by_current_thread(&spte->lock);
+  if (!hold)
+    lock_acquire(&spte->lock);
   void *kpage = frame_alloc(spte->upage, PAL_USER);
   bool success = load_page_data(kpage, spte);
+  if (!hold)
+      lock_release(&spte->lock);
   if (!success) {
     frame_free(kpage);
     return false;
@@ -33,8 +38,13 @@ bool load_page(struct spt_entry *spte) {
 }
 
 bool unload_page(struct spt *spt, struct spt_entry *spte) {
+  bool hold = lock_held_by_current_thread(&spte->lock);
+  if (!hold)
+    lock_acquire(&spte->lock);
   void *kpage = spte->kpage;
   bool success = unload_page_data(spt, spte);
+  if (!hold)
+      lock_release(&spte->lock);
   if (!success) {
     return false;
   }
@@ -44,16 +54,14 @@ bool unload_page(struct spt *spt, struct spt_entry *spte) {
 
 
 bool load_page_data(void *kpage, struct spt_entry *spte) {
+  bool hold = lock_held_by_current_thread(&spte->lock);
+  ASSERT(spte->location != LOADED)
+  if (!hold)
+      lock_acquire(&spte->lock);
   void *kbuffer = palloc_get_page(PAL_ZERO);
   switch (spte->location) {
   case LOADED:
-    palloc_free_page(kbuffer);
-    printf("[tid:%d] waiting 1\n", thread_current()->tid);
-    while(spte->location == LOADED) {
-      thread_yield();
-    }
-    printf("[tid:%d] waiting 1 end\n", thread_current()->tid);
-    return load_page_data(kpage, spte);
+    PANIC("Page already loaded");
   case FILE:
     load_file(kbuffer, spte);
     break;
@@ -70,11 +78,17 @@ bool load_page_data(void *kpage, struct spt_entry *spte) {
   palloc_free_page(kbuffer);
   spte->location = LOADED;
   spte->kpage = kpage;
-  return install_page(spte->upage, spte->kpage, spte->writable);
+  bool result = install_page(spte->upage, spte->kpage, spte->writable);
+  if (!hold)
+      lock_release(&spte->lock);
+  return result;
 }
 
 
 bool unload_page_data(struct spt *spt, struct spt_entry *spte) {
+  bool hold = lock_held_by_current_thread(&spte->lock);
+  if (!hold)
+      lock_acquire(&spte->lock);
   ASSERT(spte->location == LOADED)
   void *kpage = spte->kpage;
   bool dirty = spte->dirty;
@@ -121,6 +135,8 @@ bool unload_page_data(struct spt *spt, struct spt_entry *spte) {
   if (dirty)
     palloc_free_page(kbuffer);
   ASSERT(spte->location != LOADED)
+  if (!hold)
+      lock_release(&spte->lock);
   return true;
 }
 

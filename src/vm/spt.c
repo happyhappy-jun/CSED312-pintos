@@ -39,16 +39,9 @@ void spt_destroy(struct spt *spt) {
 
 static void spte_destroy(struct hash_elem *elem, void *aux) {
   struct spt_entry *spte = hash_entry(elem, struct spt_entry, elem);
+  lock_acquire(&spte->lock);
   if (spte->location == LOADED) {
-    if (!frame_test_and_pin(spte->kpage)) {
-      printf("[tid:%d] waiting 2\n", thread_current()->tid);
-      while (spte->location == LOADED) {
-        thread_yield();
-      }
-      printf("[tid:%d] waiting 2 end\n", thread_current()->tid);
-    } else {
-      unload_page(&thread_current()->spt, spte);
-    }
+    unload_page(&thread_current()->spt, spte);
   }
   if (spte->location == SWAP) {
     swap_free(spte->swap_index);
@@ -56,6 +49,7 @@ static void spte_destroy(struct hash_elem *elem, void *aux) {
   if (spte->type == EXEC || spte->type == MMAP) {
     free(spte->file_info);
   }
+  lock_release(&spte->lock);
   free(spte);
 }
 
@@ -92,6 +86,7 @@ struct spt_entry *spt_insert_mmap(struct spt *spt, void *upage, struct file *fil
   spte->location = FILE;
   spte->file_info = file_info_generator(file, offset, read_bytes, zero_bytes);
   spte->swap_index = -1;
+  lock_init(&spte->lock);
   struct hash_elem *e = hash_insert(&spt->table, &spte->elem);
   if (e == NULL) {
     return spte;
@@ -114,6 +109,7 @@ struct spt_entry *spt_insert_exec(struct spt *spt, void *upage, bool writable, s
   spte->location = FILE;
   spte->file_info = file_info_generator(file, offset, read_bytes, zero_bytes);
   spte->swap_index = -1;
+  lock_init(&spte->lock);
   struct hash_elem *e = hash_insert(&spt->table, &spte->elem);
   if (e == NULL) {
     return spte;
@@ -136,6 +132,7 @@ struct spt_entry *spt_insert_stack(struct spt *spt, void *upage) {
   spte->location = ZERO;
   spte->file_info = NULL;
   spte->swap_index = -1;
+  lock_init(&spte->lock);
   struct hash_elem *e = hash_insert(&spt->table, &spte->elem);
   if (e == NULL) {
       return spte;
