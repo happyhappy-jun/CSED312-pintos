@@ -171,7 +171,7 @@ void process_exit(void) {
     pagedir_activate(NULL);
     pagedir_destroy(pd);
   }
-  printf("%s: exit(%d)\n", cur->name, cur->pcb->exit_code);
+  printf("%s(%d): exit(%d)\n", cur->name, cur->tid, cur->pcb->exit_code);
   sema_up(&cur->pcb->wait_sema);  // sema up wait_sema for waiting parent
   sig_children_parent_exit();     // sema up exit_sema for children to free their resources
   sema_down(&cur->pcb->exit_sema);// exit_sema up only when the parent exit
