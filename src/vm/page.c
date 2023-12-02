@@ -72,6 +72,8 @@ bool unload_page_data(struct spt *spt, struct spt_entry *spte) {
     dirty = pagedir_is_dirty(spt->pagedir, spte->upage);
     spte->dirty = dirty;
   }
+  if (spt == &thread_current()->spt)
+    thread_current()->unloading_addr = spte->upage;
   pagedir_clear_page(spt->pagedir, spte->upage);
 
   switch (spte->type) {

@@ -12,7 +12,6 @@
 #include "userprog/gdt.h"
 #include "userprog/pagedir.h"
 #include "userprog/tss.h"
-#include "vm/frame.h"
 #include "vm/page.h"
 #include <debug.h>
 #include <inttypes.h>
@@ -143,8 +142,6 @@ void process_exit(void) {
   printf("%s: exit(%d)\n", cur->name, cur->pcb->exit_code);
 
 #ifdef VM
-  struct spt_entry *initial_stack = spt_find(&cur->spt, ((uint8_t *) PHYS_BASE) - PGSIZE);
-  frame_unpin(initial_stack->kpage);
   mmap_destroy(&cur->mmap_list);
   spt_destroy(&cur->spt);
 #endif
@@ -516,7 +513,6 @@ setup_stack(void **esp) {
   void *upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
   struct spt_entry *initial_stack = spt_insert_stack(&cur->spt, upage);
   success = load_page(&cur->spt, initial_stack);
-  frame_pin(initial_stack->kpage);
   if (success) {
     *esp = PHYS_BASE;
     cur->stack_pages = 1;

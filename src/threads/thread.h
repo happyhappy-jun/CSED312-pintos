@@ -113,6 +113,7 @@ struct thread {
   uint32_t *pagedir; /* Page directory. */
   struct pcb *pcb;
   void *intr_esp;
+  void *unloading_addr;
 #endif
 
 #ifdef VM
