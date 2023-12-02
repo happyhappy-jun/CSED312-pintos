@@ -61,6 +61,7 @@ void *frame_alloc(void *upage, enum palloc_flags flags) {
   f->upage = upage;
   f->thread = thread_current();
   f->timestamp = timer_ticks();
+  f->spte = NULL;
 
   bool hold = lock_held_by_current_thread(&frame_table.frame_table_lock);
   if (!hold)
@@ -87,6 +88,7 @@ void frame_free(void *kpage) {
 void *frame_switch(void *upage, enum palloc_flags flags) {
   struct frame *target = frame_to_evict();
   struct thread *target_thread = target->thread;
+  struct spt_entry *target_spte = target->spte;
   bool zero = flags & PAL_ZERO;
 
   if (target == NULL) {
@@ -96,7 +98,8 @@ void *frame_switch(void *upage, enum palloc_flags flags) {
   target->upage = upage;
   target->thread = thread_current();
   target->timestamp = timer_ticks();
-  unload_page_data(&target_thread->spt, target->spte);
+  target->spte = NULL;
+  unload_page_data(&target_thread->spt, target_spte);
 
   if (zero)
     memset(target->kpage, 0, PGSIZE);
