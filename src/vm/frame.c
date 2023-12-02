@@ -152,6 +152,8 @@ void frame_unpin(void *kpage) {
 
 bool frame_pinned(void *kpage) {
   struct frame *f = frame_find(kpage);
+  if (f == NULL)
+      return false;
   return f->pinned;
 }
 
