@@ -50,7 +50,9 @@ bool load_page_data(void *kpage, struct spt *spt, struct spt_entry *spte) {
     printf("[tid:%d] waiting %p:%p\n", thread_current()->tid, spte->upage, spte->kpage);
     printf("evicted by %d:%p\n", spte->tid_evicted_by, spte->addr_evicted_by);
     palloc_free_page(kbuffer);
-    while(spte->location == LOADED) {printf(".");}
+    while(spte->location == LOADED) {
+      thread_yield();
+    }
     printf("[tid:%d] waiting done\n", thread_current()->tid);
     return load_page_data(kpage, spt, spte);
   case FILE:
