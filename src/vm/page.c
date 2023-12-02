@@ -103,7 +103,7 @@ bool unload_page_data(struct spt *spt, struct spt_entry *spte) {
   default:
     return false;
   }
-
+  thread_current()->unloading_addr = NULL;
   return true;
 }
 
