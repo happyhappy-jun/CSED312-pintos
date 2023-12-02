@@ -45,6 +45,7 @@ bool unload_page(struct spt *spt, struct spt_entry *spte) {
 bool load_page_data(void *kpage, struct spt *spt, struct spt_entry *spte) {
   switch (spte->location) {
   case LOADED:
+    printf("[tid:%d] waiting 1\n", thread_current()->tid);
     while(spte->location == LOADED);
     return load_page_data(kpage, spt, spte);
   case FILE:
@@ -103,6 +104,7 @@ bool unload_page_data(struct spt *spt, struct spt_entry *spte) {
   default:
     return false;
   }
+  ASSERT(spte->location != LOADED)
   thread_current()->unloading_addr = NULL;
   return true;
 }

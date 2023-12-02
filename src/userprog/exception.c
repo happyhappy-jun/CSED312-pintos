@@ -159,8 +159,7 @@ page_fault(struct intr_frame *f) {
     struct spt_entry *spte = spt_find(spt, fault_page);
     if (spte != NULL) {
       if (cur->unloading_addr == fault_page) {
-        printf("faulting %p\n", fault_page);
-        PANIC("i can't resolve this");
+        printf("[tid:%d] redundant faulting %p\n", cur->tid, fault_page);
       }
       if (load_page(spt, spte))
         return;
