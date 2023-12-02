@@ -89,15 +89,7 @@ bool unload_page_data(struct spt *spt, struct spt_entry *spte) {
   bool hold = lock_held_by_current_thread(&spte->lock);
   if (!hold)
       lock_acquire(&spte->lock);
-  if (spte->location != LOADED) {
-    printf("[tid:%d] unload UNLOADED data\n", thread_current()->tid);
-    printf("spte: %p\n", spte);
-    printf("spte->upage: %p\n", spte->upage);
-    printf("spte->kpage: %p\n", spte->kpage);
-    printf("spte->location: %d\n", spte->location);
-    printf("called by: %d(1:me, 0:other)\n", thread_current()->pagedir == spt->pagedir);
-    PANIC("Page not loaded");
-  }
+  ASSERT(spte->location == LOADED)
   void *kpage = spte->kpage;
   bool dirty = spte->dirty;
   if (!dirty) {
