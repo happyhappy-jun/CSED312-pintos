@@ -50,6 +50,7 @@ static void spte_destroy(struct hash_elem *elem, void *aux) {
     free(spte->file_info);
   }
   lock_release(&spte->lock);
+  printf("[tid:%d] free spte: %p\n", thread_current()->tid, spte);
   free(spte);
 }
 
