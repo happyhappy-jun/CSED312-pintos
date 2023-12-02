@@ -47,12 +47,10 @@ bool load_page_data(void *kpage, struct spt *spt, struct spt_entry *spte) {
   void *kbuffer = palloc_get_page(PAL_ZERO);
   switch (spte->location) {
   case LOADED:
-    printf("[tid:%d] waiting %p:%p (%d, %p)\n", thread_current()->tid, spte->upage, spte->kpage, frame_find(spte->kpage)->thread->tid, frame_find(spte->kpage)->upage);
     palloc_free_page(kbuffer);
     while(spte->location == LOADED) {
       thread_yield();
     }
-    printf("[tid:%d] waiting done\n", thread_current()->tid);
     return load_page_data(kpage, spt, spte);
   case FILE:
     load_file(kbuffer, spte);
