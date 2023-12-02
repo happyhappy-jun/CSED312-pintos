@@ -52,6 +52,7 @@ bool load_page_data(void *kpage, struct spt *spt, struct spt_entry *spte) {
     while(spte->location == LOADED) {
       thread_yield();
     }
+    printf("[tid:%d] waiting 1 end\n", thread_current()->tid);
     return load_page_data(kpage, spt, spte);
   case FILE:
     load_file(kbuffer, spte);

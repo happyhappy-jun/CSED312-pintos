@@ -43,6 +43,7 @@ static void spte_destroy(struct hash_elem *elem, void *aux) {
       while (frame_pinned(spte->kpage)) {
         thread_yield();
       }
+      printf("[tid:%d] waiting 2 end\n", thread_current()->tid);
     } else {
       unload_page(&thread_current()->spt, spte);
     }
