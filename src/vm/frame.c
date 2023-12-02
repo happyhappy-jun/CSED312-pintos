@@ -122,19 +122,49 @@ static struct frame *frame_to_evict(void){
 }
 
 void frame_pin(void *kpage) {
+  bool hold = lock_held_by_current_thread(&frame_table.frame_table_lock);
+  if (!hold)
+    lock_acquire(&frame_table.frame_table_lock);
   struct frame *f = frame_find(kpage);
-  f->pinned = true;
+  if (f!=NULL)
+    f->pinned = true;
+  if (!hold)
+    lock_release(&frame_table.frame_table_lock);
 }
 
 void frame_unpin(void *kpage) {
+  bool hold = lock_held_by_current_thread(&frame_table.frame_table_lock);
+  if (!hold)
+    lock_acquire(&frame_table.frame_table_lock);
   struct frame *f = frame_find(kpage);
-  f->pinned = false;
+  if (f!=NULL)
+    f->pinned = false;
+  if (!hold)
+    lock_release(&frame_table.frame_table_lock);
 }
 
 bool frame_pinned(void *kpage) {
   struct frame *f = frame_find(kpage);
   return f->pinned;
 }
+
+bool frame_test_and_pin(void *kpage) {
+  bool result = true;
+  bool hold = lock_held_by_current_thread(&frame_table.frame_table_lock);
+  if (!hold)
+      lock_acquire(&frame_table.frame_table_lock);
+
+  if (frame_pinned(kpage))
+      result = false;
+  else
+      frame_pin(kpage);
+
+  if (!hold)
+      lock_release(&frame_table.frame_table_lock);
+
+  return result;
+}
+
 
 void frame_set_spte(void *kpage, struct spt_entry *spte) {
   struct frame *f = frame_find(kpage);
