@@ -95,6 +95,7 @@ bool unload_page_data(struct spt *spt, struct spt_entry *spte) {
     printf("spte->upage: %p\n", spte->upage);
     printf("spte->kpage: %p\n", spte->kpage);
     printf("spte->location: %d\n", spte->location);
+    printf("called by: %d(1:me, 0:other)\n", thread_current()->pagedir == spt->pagedir);
     PANIC("Page not loaded");
   }
   void *kpage = spte->kpage;
