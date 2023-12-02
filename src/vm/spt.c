@@ -41,8 +41,13 @@ static void spte_destroy(struct hash_elem *elem, void *aux) {
   struct spt_entry *spte = hash_entry(elem, struct spt_entry, elem);
   lock_acquire(&spte->lock);
   if (spte->location == LOADED) {
-    frame_pin(spte->kpage);
-    unload_page(&thread_current()->spt, spte);
+    if (frame_test_and_pin(spte->kpage))
+      unload_page(&thread_current()->spt, spte);
+    else {
+      lock_release(&spte->lock);
+      while (spte->location != LOADED);
+      lock_acquire(&spte->lock);
+    }
   }
   if (spte->location == SWAP) {
     swap_free(spte->swap_index);
