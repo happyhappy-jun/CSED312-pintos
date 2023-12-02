@@ -47,8 +47,7 @@ bool load_page_data(void *kpage, struct spt *spt, struct spt_entry *spte) {
   void *kbuffer = palloc_get_page(PAL_ZERO);
   switch (spte->location) {
   case LOADED:
-    printf("[tid:%d] waiting %p:%p\n", thread_current()->tid, spte->upage, spte->kpage);
-    printf("evicted by %d:%p\n", spte->tid_evicted_by, spte->addr_evicted_by);
+    printf("[tid:%d] waiting %p:%p (%d, %p)\n", thread_current()->tid, spte->upage, spte->kpage, frame_find(spte->kpage)->thread->tid, frame_find(spte->kpage)->upage);
     palloc_free_page(kbuffer);
     while(spte->location == LOADED) {
       thread_yield();
@@ -84,8 +83,6 @@ bool unload_page_data(struct spt *spt, struct spt_entry *spte) {
     spte->dirty = dirty;
   }
   spte->kpage = NULL;
-  spte->tid_evicted_by = frame_find(kpage)->thread->tid;
-  spte->addr_evicted_by = frame_find(kpage)->upage;
   pagedir_clear_page(spt->pagedir, spte->upage);
 
   void *kbuffer = NULL;
