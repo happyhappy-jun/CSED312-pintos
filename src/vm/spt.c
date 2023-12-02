@@ -32,6 +32,7 @@ static bool spt_less(const struct hash_elem *a, const struct hash_elem *b, void 
 }
 
 void spt_destroy(struct spt *spt) {
+  printf("[tid:%d] spt_destroy\n", thread_current()->tid);
   hash_destroy(&spt->table, spte_destroy);
 }
 
