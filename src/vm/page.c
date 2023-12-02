@@ -20,9 +20,9 @@ static void load_swap(void *kbuffer, struct spt_entry *spte);
 static void unload_file(void *kbuffer, struct spt_entry *spte);
 static void unload_swap(void *kbuffer, struct spt_entry *spte);
 
-bool load_page(struct spt *spt, struct spt_entry *spte) {
+bool load_page(struct spt_entry *spte) {
   void *kpage = frame_alloc(spte->upage, PAL_USER);
-  bool success = load_page_data(kpage, spt, spte);
+  bool success = load_page_data(kpage, spte);
   if (!success) {
     frame_free(kpage);
     return false;
@@ -43,7 +43,7 @@ bool unload_page(struct spt *spt, struct spt_entry *spte) {
 }
 
 
-bool load_page_data(void *kpage, struct spt *spt, struct spt_entry *spte) {
+bool load_page_data(void *kpage, struct spt_entry *spte) {
   void *kbuffer = palloc_get_page(PAL_ZERO);
   switch (spte->location) {
   case LOADED:
@@ -53,7 +53,7 @@ bool load_page_data(void *kpage, struct spt *spt, struct spt_entry *spte) {
       thread_yield();
     }
     printf("[tid:%d] waiting 1 end\n", thread_current()->tid);
-    return load_page_data(kpage, spt, spte);
+    return load_page_data(kpage, spte);
   case FILE:
     load_file(kbuffer, spte);
     break;

@@ -158,7 +158,7 @@ page_fault(struct intr_frame *f) {
     }
     struct spt_entry *spte = spt_find(spt, fault_page);
     if (spte != NULL) {
-      if (load_page(spt, spte))
+      if (load_page(spte))
         return;
       else {
         thread_current()->pcb->exit_code = -1;

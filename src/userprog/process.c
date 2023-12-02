@@ -511,7 +511,7 @@ setup_stack(void **esp) {
 
   void *upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
   struct spt_entry *initial_stack = spt_insert_stack(&cur->spt, upage);
-  success = load_page(&cur->spt, initial_stack);
+  success = load_page(initial_stack);
   if (success) {
     *esp = PHYS_BASE;
     cur->stack_pages = 1;
