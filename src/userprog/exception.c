@@ -175,7 +175,7 @@ page_fault(struct intr_frame *f) {
     return;
   }
 
-
+  printf("[tid:%d] page fault: %p\n", thread_current()->tid, fault_addr);
   thread_current()->pcb->exit_code = -1;
   thread_exit();
 }
