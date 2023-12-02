@@ -45,7 +45,6 @@ static void spte_destroy(struct hash_elem *elem, void *aux) {
     if (!frame_test_and_pin(spte->kpage)) {
       while (frame_pinned(spte->kpage));
     } else {
-      frame_pin(spte->kpage);
       unload_page(&thread_current()->spt, spte);
     }
   }
