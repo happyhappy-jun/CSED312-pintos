@@ -123,8 +123,7 @@ static void load_file(void *kbuffer, struct spt_entry *spte) {
   struct file_info *file_info = spte->file_info;
 
   lock_acquire(&file_lock);
-  file_seek(file_info->file, file_info->offset);
-  int read_bytes = file_read(file_info->file, kbuffer, (int) file_info->read_bytes);
+  int read_bytes = file_read_at(file_info->file, kbuffer, (int) file_info->read_bytes, file_info->offset);
   lock_release(&file_lock);
   memset(kbuffer + read_bytes, 0, (int) file_info->zero_bytes);
 
