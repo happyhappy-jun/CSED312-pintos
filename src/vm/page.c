@@ -148,8 +148,11 @@ static void unload_file(void *kbuffer, struct spt_entry *spte) {
   struct file_info *file_info = spte->file_info;
 
   lock_acquire(&file_lock);
-  file_write_at(file_info->file, kbuffer, file_info->read_bytes, spte->file_info->offset);
+  int write_bytes = file_write_at(file_info->file, kbuffer, (int) file_info->read_bytes, file_info->offset);
   lock_release(&file_lock);
+  if (write_bytes != (int) file_info->read_bytes) {
+    PANIC("Failed to write file");
+  }
 }
 
 static void unload_swap(void *kbuffer, struct spt_entry *spte) {
