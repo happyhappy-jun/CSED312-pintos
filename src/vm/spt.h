@@ -48,6 +48,8 @@ struct spt_entry {
   struct file_info *file_info;
   int swap_index;
 
+  int tid_evicted_by;
+  void *addr_evicted_by;
   struct hash_elem elem;
 };
 

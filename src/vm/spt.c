@@ -119,6 +119,8 @@ struct spt_entry *spt_insert_exec(struct spt *spt, void *upage, bool writable, s
   spte->location = FILE;
   spte->file_info = file_info_generator(file, offset, read_bytes, zero_bytes);
   spte->swap_index = -1;
+  spte->tid_evicted_by = -1;
+  spte->addr_evicted_by = (void *) 0xffffffff;
   lock_acquire(&spt->spt_lock);
   struct hash_elem *e = hash_insert(&spt->table, &spte->elem);
   lock_release(&spt->spt_lock);
@@ -143,6 +145,8 @@ struct spt_entry *spt_insert_stack(struct spt *spt, void *upage) {
   spte->location = ZERO;
   spte->file_info = NULL;
   spte->swap_index = -1;
+  spte->tid_evicted_by = -1;
+  spte->addr_evicted_by = (void *) 0xffffffff;
   lock_acquire(&spt->spt_lock);
   struct hash_elem *e = hash_insert(&spt->table, &spte->elem);
   lock_release(&spt->spt_lock);
