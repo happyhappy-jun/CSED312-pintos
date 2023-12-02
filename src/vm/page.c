@@ -90,6 +90,8 @@ bool unload_page_data(struct spt *spt, struct spt_entry *spte) {
   if (!hold)
       lock_acquire(&spte->lock);
   if (spte->location != LOADED) {
+    printf("[tid:%d] unload UNLOADED data\n", thread_current()->tid);
+    printf("spte: %p\n", spte);
     printf("spte->upage: %p\n", spte->upage);
     printf("spte->kpage: %p\n", spte->kpage);
     printf("spte->location: %d\n", spte->location);
