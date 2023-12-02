@@ -62,24 +62,29 @@ void *frame_alloc(void *upage, enum palloc_flags flags) {
   f->thread = thread_current();
   f->timestamp = timer_ticks();
 
-  lock_acquire(&frame_table.frame_table_lock);
+  bool hold = lock_held_by_current_thread(&frame_table.frame_table_lock);
+  if (!hold)
+    lock_acquire(&frame_table.frame_table_lock);
   hash_insert(&frame_table.frame_table, &f->elem);
   frame_pin(f->kpage);
-  lock_release(&frame_table.frame_table_lock);
+  if (!hold)
+    lock_release(&frame_table.frame_table_lock);
   return kpage;
 }
 
 void frame_free(void *kpage) {
-  lock_acquire(&frame_table.frame_table_lock);
+  bool hold = lock_held_by_current_thread(&frame_table.frame_table_lock);
+  if (!hold)
+    lock_acquire(&frame_table.frame_table_lock);
   struct frame *f = frame_find(kpage);
   hash_delete(&frame_table.frame_table, &f->elem);
   palloc_free_page(kpage);
   free(f);
-  lock_release(&frame_table.frame_table_lock);
+  if (!hold)
+    lock_release(&frame_table.frame_table_lock);
 }
 
 void *frame_switch(void *upage, enum palloc_flags flags) {
-  ASSERT(!lock_held_by_current_thread(&frame_table.frame_table_lock));
   struct frame *target = frame_to_evict();
   struct thread *target_thread = target->thread;
   bool zero = flags & PAL_ZERO;
@@ -104,7 +109,9 @@ static struct frame *frame_to_evict(void){
   struct hash_iterator i;
   int64_t min = INT64_MAX;
 
-  lock_acquire(&frame_table.frame_table_lock);
+  bool hold = lock_held_by_current_thread(&frame_table.frame_table_lock);
+  if (!hold)
+    lock_acquire(&frame_table.frame_table_lock);
   hash_first(&i, &frame_table.frame_table);
   while (hash_next(&i)) {
       struct frame *f = hash_entry(hash_cur(&i), struct frame, elem);
@@ -116,7 +123,8 @@ static struct frame *frame_to_evict(void){
       }
   }
   frame_pin(target->kpage);
-  lock_release(&frame_table.frame_table_lock);
+  if (!hold)
+    lock_release(&frame_table.frame_table_lock);
   return target;
 }
 
