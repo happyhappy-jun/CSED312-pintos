@@ -138,7 +138,7 @@ int process_wait(tid_t child_tid) {
 void process_exit(void) {
   struct thread *cur = thread_current();
   uint32_t *pd;
-  printf("[tid:%d] process_exit()\n", cur->tid);
+  printf("[tid:%d] process_exit(%d)\n", cur->tid, cur->pcb->exit_code);
 #ifdef VM
   mmap_destroy(&cur->mmap_list);
   spt_destroy(&cur->spt);
