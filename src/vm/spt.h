@@ -1,53 +1,65 @@
 //
-// Created by 김치헌 on 2023/11/23.
+// Created by 김치헌 on 2023/11/30.
 //
 
 #ifndef PINTOS_SRC_VM_SPT_H_
 #define PINTOS_SRC_VM_SPT_H_
 
 #include "filesys/off_t.h"
-#include <hash.h>
+#include "hash.h"
+#include "stdbool.h"
+#include "threads/synch.h"
 
-struct spt {
-  struct hash spt;
+enum spte_type {
+  MMAP,
+  EXEC,
+  STACK
 };
 
-struct spt_entry_file_info {
-  struct file *file; // file pointer
-  off_t ofs;  // offset
-  uint32_t read_bytes; // read bytes
-  uint32_t zero_bytes; // zero bytes
+enum page_location {
+  LOADED,
+  FILE,
+  SWAP,
+  ZERO
+};
+
+struct spt {
+  struct hash table;
+  void *pagedir;
+};
+
+struct file_info {
+  struct file *file;
+  off_t offset;
+  uint32_t read_bytes;
+  uint32_t zero_bytes;
 };
 
 struct spt_entry {
-  /* general info */
-  void *upage; // user page
-  void *kpage; // backed kernel page; NULL if frame not allocated, else frame->kpage.
-  bool is_loaded; // true if frame allocated, else false.
-  bool writable; // true if page is writable, else false.
-  bool is_file; // true if file-backed page(executable/memory map), else (stack, etc) false.
-  struct hash_elem elem; // hash element for spt.
+  void *upage;
+  void *kpage;
+  bool writable;
+  bool dirty;
 
-  /* file info */
-  struct spt_entry_file_info *file_info; // file info; NULL if not file-backed, else file_info.
+  enum spte_type type;
+  enum page_location location;
 
-  /* anon info */
-  bool is_swapped; // true if swapped, else false.
-  // Todo: change to swap_index_t, after implementing swap table.
-  unsigned swap_index; // swap index; 0 if not in swap, else swap->index.
+  struct file_info *file_info;
+  int swap_index;
+
+  struct lock lock;
+  struct hash_elem elem;
 };
 
-void spt_init(struct spt *);
-void spt_destroy(struct spt *);
-unsigned spt_hash(const struct hash_elem *, void * UNUSED);
-bool spt_less(const struct hash_elem *, const struct hash_elem *, void * UNUSED);
+void spt_init(struct spt *spt);
+void spt_destroy(struct spt *spt);
 
-struct spt_entry *spt_get_entry(struct spt *, void *);
-struct spt_entry *spt_add_file(struct spt *, void *, bool, struct file *, off_t, uint32_t, uint32_t);
-struct spt_entry *spt_add_anon(struct spt *, void *, bool);
-void spt_remove_by_upage(struct spt *, void *);
-void spt_remove_by_entry(struct spt *, struct spt_entry *);
-void spt_load_page_into_frame(struct spt_entry *);
-void spt_evict_page_from_frame(struct spt_entry *);
+struct spt_entry *spt_find(struct spt *spt, void *upage);
+
+struct spt_entry *spt_insert_mmap(struct spt *spt, void *upage, struct file *file, off_t offset, uint32_t read_bytes, uint32_t zero_bytes);
+struct spt_entry *spt_insert_exec(struct spt *spt, void *upage, bool writable, struct file *file, off_t offset, uint32_t read_bytes, uint32_t zero_bytes);
+struct spt_entry *spt_insert_stack(struct spt *spt, void *upage);
+
+void spt_remove(struct spt *spt, void *upage);
 
 #endif//PINTOS_SRC_VM_SPT_H_

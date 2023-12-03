@@ -4,6 +4,7 @@
 #include "threads/fixed-point.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "vm/mmap.h"
 #include "vm/spt.h"
 #include <debug.h>
 #include <list.h>
@@ -111,12 +112,14 @@ struct thread {
   /* Owned by userprog/process.c. */
   uint32_t *pagedir; /* Page directory. */
   struct pcb *pcb;
+  void *intr_esp;
+  void *unloading_addr;
 #endif
+
 #ifdef VM
   struct spt spt;
+  struct mmap_list mmap_list;
   int stack_pages;
-  void *intr_esp;
-  struct list mmap_list;
 #endif
 
   int original_priority;          /* Original priority of the thread */

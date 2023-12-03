@@ -1,95 +1,184 @@
 //
-// Created by 김치헌 on 2023/11/22.
+// Created by 김치헌 on 2023/11/30.
 //
 
 #include "vm/frame.h"
+#include "devices/timer.h"
+#include "page.h"
+#include "stdio.h"
+#include "string.h"
 #include "threads/malloc.h"
-#include "userprog/pagedir.h"
+#include "threads/thread.h"
 
-struct frame_table frame_table;
-struct lock frame_table_lock;
+static struct frame_table frame_table;
+
+static unsigned frame_table_hash(const struct hash_elem *elem, void *aux);
+static bool frame_table_less(const struct hash_elem *a, const struct hash_elem *b, void *aux);
+static struct frame *frame_to_evict(void);
+
 
 void frame_table_init(void) {
-    lock_init(&frame_table_lock);
-  hash_init(&frame_table.table, frame_table_hash, frame_table_less, NULL);
+  hash_init(&frame_table.frame_table, frame_table_hash, frame_table_less, NULL);
+  lock_init(&frame_table.frame_table_lock);
 }
 
-unsigned frame_table_hash(const struct hash_elem *elem, void *aux UNUSED) {
-  struct frame *f = hash_entry(elem, struct frame, elem);
-  return hash_bytes(&f->kpage, sizeof f->kpage);
+static unsigned frame_table_hash(const struct hash_elem *elem, void *aux) {
+  struct frame *fte = hash_entry(elem, struct frame, elem);
+  return hash_bytes(&fte->kpage, sizeof(fte->kpage));
 }
 
-bool frame_table_less(const struct hash_elem *a, const struct hash_elem *b, void *aux UNUSED) {
-  struct frame *f1 = hash_entry(a, struct frame, elem);
-  struct frame *f2 = hash_entry(b, struct frame, elem);
-  return f1->kpage < f2->kpage;
+static bool frame_table_less(const struct hash_elem *a, const struct hash_elem *b, void *aux) {
+  struct frame *fte_a = hash_entry(a, struct frame, elem);
+  struct frame *fte_b = hash_entry(b, struct frame, elem);
+  return fte_a->kpage < fte_b->kpage;
+}
+
+struct frame *frame_find(void *kpage) {
+  struct frame finder;
+  finder.kpage = kpage;
+  bool hold = lock_held_by_current_thread(&frame_table.frame_table_lock);
+  if (!hold)
+    lock_acquire(&frame_table.frame_table_lock);
+  struct hash_elem *e = hash_find(&frame_table.frame_table, &finder.elem);
+  if (!hold)
+    lock_release(&frame_table.frame_table_lock);
+  if (e == NULL) {
+    return NULL;
+  }
+  return hash_entry(e, struct frame, elem);
 }
 
 void *frame_alloc(void *upage, enum palloc_flags flags) {
   void *kpage = palloc_get_page(flags);
-  lock_acquire(&frame_table_lock);
+  
   if (kpage == NULL) {
-    struct frame *target = get_frame_to_evict(thread_current()->pagedir);
-    struct spt_entry *target_spte = spt_get_entry(&thread_current()->spt, target->upage);
-    spt_evict_page_from_frame(target_spte);
-    kpage = palloc_get_page(flags);
-    if (kpage == NULL) {
-      PANIC("frame_alloc: palloc_get_page failed");
-    }
+    kpage = frame_switch(upage, flags);
+    return kpage;
   }
-
+  
   struct frame *f = malloc(sizeof(struct frame));
   f->kpage = kpage;
   f->upage = upage;
   f->thread = thread_current();
+  f->timestamp = timer_ticks();
+  f->spte = NULL;
 
-  hash_insert(&frame_table.table, &f->elem);
-    lock_release(&frame_table_lock);
+  bool hold = lock_held_by_current_thread(&frame_table.frame_table_lock);
+  if (!hold)
+    lock_acquire(&frame_table.frame_table_lock);
+  hash_insert(&frame_table.frame_table, &f->elem);
+  frame_pin(f->kpage);
+  if (!hold)
+    lock_release(&frame_table.frame_table_lock);
   return kpage;
 }
 
 void frame_free(void *kpage) {
-  struct frame f;
-  f.kpage = kpage;
-  struct hash_elem *e = hash_find(&frame_table.table, &f.elem);
-  if (e != NULL) {
-    hash_delete(&frame_table.table, e);
-    palloc_free_page(kpage);
-    free(hash_entry(e, struct frame, elem));
-  }
+  bool hold = lock_held_by_current_thread(&frame_table.frame_table_lock);
+  if (!hold)
+    lock_acquire(&frame_table.frame_table_lock);
+  struct frame *f = frame_find(kpage);
+  hash_delete(&frame_table.frame_table, &f->elem);
+  palloc_free_page(kpage);
+  free(f);
+  if (!hold)
+    lock_release(&frame_table.frame_table_lock);
 }
 
-struct frame *get_frame_to_evict(uint32_t *pagedir) {
-  struct hash_iterator iter_hash;
-  int i;
-  for (i = 0; i < 2; i++) {
-    hash_first(&iter_hash, &frame_table.table);
-    do {
-      struct frame *f = hash_entry(hash_cur(&iter_hash), struct frame, elem);
+void *frame_switch(void *upage, enum palloc_flags flags) {
+  struct frame *target = frame_to_evict();
+  struct thread *target_thread = target->thread;
+  struct spt_entry *target_spte = target->spte;
+  bool zero = flags & PAL_ZERO;
+
+  if (target == NULL) {
+    PANIC("Cannot find frame to evict");
+  }
+
+  target->upage = upage;
+  target->thread = thread_current();
+  target->timestamp = timer_ticks();
+  target->spte = NULL;
+  unload_page_data(&target_thread->spt, target_spte);
+
+  if (zero)
+    memset(target->kpage, 0, PGSIZE);
+
+  return target->kpage;
+}
+
+static struct frame *frame_to_evict(void){
+  struct frame *target = NULL;
+  struct hash_iterator i;
+  int64_t min = INT64_MAX;
+
+  bool hold = lock_held_by_current_thread(&frame_table.frame_table_lock);
+  if (!hold)
+    lock_acquire(&frame_table.frame_table_lock);
+  hash_first(&i, &frame_table.frame_table);
+  while (hash_next(&i)) {
+      struct frame *f = hash_entry(hash_cur(&i), struct frame, elem);
       if (f->pinned)
-        continue;
-      if (pagedir_is_accessed(pagedir, f->upage)) {
-        pagedir_set_accessed(pagedir, f->upage, false);
-        continue;
+          continue;
+      if (f->timestamp < min) {
+          min = f->timestamp;
+          target = f;
       }
-      return f;
-    } while (hash_next(&iter_hash));
   }
-
-  return NULL;
+  frame_pin(target->kpage);
+  if (!hold)
+    lock_release(&frame_table.frame_table_lock);
+  return target;
 }
 
-void set_frame_pinning(void *kpage, bool pinned) {
-  struct frame f_tmp;
-  f_tmp.kpage = kpage;
-  struct hash_elem *h = hash_find(&frame_table.table, &(f_tmp.elem));
-  struct frame *f = hash_entry(h, struct frame, elem);
-  f->pinned = pinned;
+void frame_pin(void *kpage) {
+  bool hold = lock_held_by_current_thread(&frame_table.frame_table_lock);
+  if (!hold)
+    lock_acquire(&frame_table.frame_table_lock);
+  struct frame *f = frame_find(kpage);
+  if (f!=NULL)
+    f->pinned = true;
+  if (!hold)
+    lock_release(&frame_table.frame_table_lock);
 }
 
-void unpin_frame(void *kpage) {
-  set_frame_pinning(kpage, false);
+void frame_unpin(void *kpage) {
+  bool hold = lock_held_by_current_thread(&frame_table.frame_table_lock);
+  if (!hold)
+    lock_acquire(&frame_table.frame_table_lock);
+  struct frame *f = frame_find(kpage);
+  if (f!=NULL)
+    f->pinned = false;
+  if (!hold)
+    lock_release(&frame_table.frame_table_lock);
 }
-void pin_frame(void *kpage) {
-  set_frame_pinning(kpage, true);
+
+bool frame_pinned(void *kpage) {
+  struct frame *f = frame_find(kpage);
+  if (f == NULL)
+      return false;
+  return f->pinned;
+}
+
+bool frame_test_and_pin(void *kpage) {
+  bool result = true;
+  bool hold = lock_held_by_current_thread(&frame_table.frame_table_lock);
+  if (!hold)
+      lock_acquire(&frame_table.frame_table_lock);
+
+  if (frame_pinned(kpage))
+      result = false;
+  else
+      frame_pin(kpage);
+
+  if (!hold)
+      lock_release(&frame_table.frame_table_lock);
+
+  return result;
+}
+
+
+void frame_set_spte(void *kpage, struct spt_entry *spte) {
+  struct frame *f = frame_find(kpage);
+  f->spte = spte;
 }

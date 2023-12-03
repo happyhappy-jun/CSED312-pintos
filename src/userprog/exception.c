@@ -4,6 +4,7 @@
 #include "threads/vaddr.h"
 #include "userprog/gdt.h"
 #include "userprog/syscall.h"
+#include "vm/page.h"
 #include <inttypes.h>
 #include <stdio.h>
 
@@ -12,7 +13,7 @@ static long long page_fault_cnt;
 
 static void kill(struct intr_frame *);
 static void page_fault(struct intr_frame *);
-static bool is_stack_growth(void* esp, void *fault_addr);
+static bool stack_growth(void *fault_addr, void *esp);
 
 /* Registers handlers for interrupts that can be caused by user
    programs.
@@ -122,7 +123,6 @@ page_fault(struct intr_frame *f) {
   bool write;       /* True: access was write, false: access was read. */
   bool user;        /* True: access by user, false: access by kernel. */
   void *fault_addr; /* Fault address. */
-  struct thread* cur = thread_current();
 
   /* Obtain faulting address, the virtual address that was
      accessed to cause the fault.  It may point to code or to
@@ -146,47 +146,40 @@ page_fault(struct intr_frame *f) {
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
-  // fault under PHYS_BASE and not_present, check spt first
+  struct thread *cur = thread_current();
+  void *fault_page = pg_round_down(fault_addr);
+  void *esp = user ? f->esp : cur->intr_esp;
+  struct spt *spt = &cur->spt;
+
   if (fault_addr < PHYS_BASE && not_present) {
-    void *fault_page = pg_round_down(fault_addr);
-    struct spt_entry *spte = spt_get_entry(&cur->spt, fault_page);
+    if (stack_growth(fault_addr, esp)) {
+      spt_insert_stack(spt, fault_page);
+      cur->stack_pages++;
+    }
+    struct spt_entry *spte = spt_find(spt, fault_page);
     if (spte != NULL) {
-      // in spt => load from file or swap
-      spt_load_page_into_frame(spte);
-      install_page(spte->upage, spte->kpage, spte->writable);
-      return;
+      if (load_page(spte))
+        return;
+      else {
+        thread_current()->pcb->exit_code = -1;
+        thread_exit();
+      }
     }
   }
 
-  void *esp = user ? f->esp : cur->intr_esp;
-  if (is_stack_growth(esp, fault_addr) && not_present) {
-    void *new_stack_bottom = pg_round_down(fault_addr);
-    struct spt_entry *new_stack = spt_add_anon(&cur->spt, new_stack_bottom, true);
-    spt_load_page_into_frame(new_stack);
-    install_page(new_stack->upage, new_stack->kpage, new_stack->writable);
-    cur->stack_pages++;
-    return;
-  }
-
-
   // fault under PHYS_BASE access by kernel
   // => fault while accessing user memory
-  // Todo: adjust this 'accessing user memory' part referring to the pintos docs 4.3.5.
   if (fault_addr < PHYS_BASE && !user) {
     f->eip = (void (*)(void))(f->eax);
     f->eax = 0xffffffff;
     return;
   }
 
-
-  // page fault otherwise
   thread_current()->pcb->exit_code = -1;
   thread_exit();
 }
 
-
-static bool is_stack_growth(void *esp, void *fault_addr) {
-  struct thread *t = thread_current();
-  if (t->stack_pages >= STACK_MAX_PAGES) return false;
-  return esp - 32 <= fault_addr && fault_addr >= PHYS_BASE - STACK_MAX_PAGES * PGSIZE;
+static bool stack_growth(void *fault_addr, void *esp) {
+  if (thread_current()->stack_pages >= STACK_MAX_PAGES) return false;
+  return esp - 32 <= fault_addr && fault_addr >= PHYS_BASE - STACK_MAX_PAGES * PGSIZE && fault_addr <= PHYS_BASE;
 }

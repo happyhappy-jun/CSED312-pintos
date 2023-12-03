@@ -31,14 +31,12 @@
 #else
 #include "tests/threads/tests.h"
 #endif
-#ifdef VM
-#include "vm/frame.h"
-#endif
 #ifdef FILESYS
 #include "devices/block.h"
 #include "devices/ide.h"
 #include "filesys/filesys.h"
 #include "filesys/fsutil.h"
+#include "vm/frame.h"
 #include "vm/swap.h"
 #endif
 
@@ -131,11 +129,10 @@ int main(void) {
 #endif
 
 #ifdef VM
-  /* Frame Table Initialization */
   swap_init();
   frame_table_init();
-
 #endif
+
   printf("Boot complete.\n");
 
   /* Run actions specified on kernel command line. */

@@ -1,37 +1,40 @@
 //
-// Created by 김치헌 on 2023/11/22.
+// Created by 김치헌 on 2023/11/30.
 //
 
 #ifndef PINTOS_SRC_VM_FRAME_H_
 #define PINTOS_SRC_VM_FRAME_H_
 
+#include "hash.h"
+#include "threads/synch.h"
 #include "threads/palloc.h"
-#include "threads/thread.h"
-#include <hash.h>
 
 struct frame_table {
-  struct hash table;
+  struct hash frame_table;
+  struct lock frame_table_lock;
 };
 
 struct frame {
   void *kpage;
   void *upage;
+  int64_t timestamp;
+  bool pinned;
+  struct spt_entry *spte;
   struct thread *thread;
   struct hash_elem elem;
-  bool pinned;
 };
 
 void frame_table_init(void);
-unsigned frame_table_hash(const struct hash_elem *, void *UNUSED);
-bool frame_table_less(const struct hash_elem *, const struct hash_elem *, void *UNUSED);
 
-void *frame_alloc(void *, enum palloc_flags);
-void frame_free(void *);
+struct frame *frame_find(void *kpage);
+void *frame_alloc(void *upage, enum palloc_flags flags);
+void frame_free(void *kpage);
+void *frame_switch(void *upage, enum palloc_flags flags);
 
-struct frame *get_frame_to_evict(uint32_t *pagedir);
+void frame_pin(void *kpage);
+void frame_unpin(void *kpage);
+bool frame_pinned(void *kpage);
+bool frame_test_and_pin(void *kpage);
 
-void pin_frame(void *kpage);
-void unpin_frame(void *kpage);
-void set_frame_pinning(void *kpage, bool pinned);
-
+void frame_set_spte(void *kpage, struct spt_entry *spte);
 #endif//PINTOS_SRC_VM_FRAME_H_

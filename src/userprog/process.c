@@ -4,13 +4,20 @@
 #include "filesys/filesys.h"
 #include "syscall.h"
 #include "threads/flags.h"
+#include "threads/init.h"
+#include "threads/interrupt.h"
 #include "threads/palloc.h"
+#include "threads/thread.h"
+#include "threads/vaddr.h"
 #include "userprog/gdt.h"
 #include "userprog/pagedir.h"
 #include "userprog/tss.h"
+#include "vm/page.h"
 #include <debug.h>
+#include <inttypes.h>
 #include <round.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static thread_func start_process
@@ -45,7 +52,8 @@ tid_t process_execute(const char *file_name) {
   palloc_free_page(command);
   if (tid == TID_ERROR) {
     palloc_free_page(fn_copy);
-  } else {
+  }
+  else {
     // if the load() is not finished, wait for it
     // fn_copy will be freed in start_process()
     sema_down(&get_thread_by_tid(tid)->pcb->load_sema);
@@ -60,12 +68,12 @@ start_process(void *file_name_) {
   char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
+  struct thread *cur = thread_current();
 
-  /* Initialize spt */
-  struct thread *t = thread_current();
-  spt_init(&t->spt);
-  t->stack_pages = 0;
-  t->intr_esp = NULL;
+#ifdef VM
+  spt_init(&cur->spt);
+  mmap_init(&cur->mmap_list);
+#endif
 
   /* Initialize interrupt frame and load executable. */
   memset(&if_, 0, sizeof if_);
@@ -77,13 +85,13 @@ start_process(void *file_name_) {
 
   /* allocate pid when the load() succeed */
   if (success)
-    thread_current()->pcb->pid = allocate_pid();
+    cur->pcb->pid = allocate_pid();
   /* Let the parent thread/process know the load() is finished */
-  sema_up(&thread_current()->pcb->load_sema);
+  sema_up(&cur->pcb->load_sema);
 
   /* If load failed, quit. */
   if (!success) {
-    thread_current()->pcb->exit_code = -1;
+    cur->pcb->exit_code = -1;
     thread_exit();
   }
 
@@ -131,7 +139,10 @@ void process_exit(void) {
   struct thread *cur = thread_current();
   uint32_t *pd;
 
-  printf("%s: exit(%d)\n", cur->name, cur->pcb->exit_code);
+#ifdef VM
+  mmap_destroy(&cur->mmap_list);
+  spt_destroy(&cur->spt);
+#endif
 
   /* allow write and close the executable file */
   file_close(cur->pcb->file);
@@ -144,20 +155,6 @@ void process_exit(void) {
       free_fd(fd);
     }
   }
-
-#ifdef VM
-  struct list *mmap_list = &cur->mmap_list;
-  while (!list_empty(mmap_list)) {
-    struct list_elem *e = list_front(mmap_list);
-    struct mmap_entry *mme = list_entry(e, struct mmap_entry, elem);
-    sys_munmap(mme->id);
-  }
-
-  // Todo: 7. On process termination here
-
-sema_up(&cur->pcb->wait_sema);// sema up wait_sema for waiting parent
-  spt_destroy(&cur->spt);
-#endif
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -175,8 +172,9 @@ sema_up(&cur->pcb->wait_sema);// sema up wait_sema for waiting parent
     pagedir_destroy(pd);
   }
 
+  printf("%s: exit(%d)\n", cur->name, cur->pcb->exit_code);
 
-
+  sema_up(&cur->pcb->wait_sema);  // sema up wait_sema for waiting parent
   sig_children_parent_exit();     // sema up exit_sema for children to free their resources
   sema_down(&cur->pcb->exit_sema);// exit_sema up only when the parent exit
   free_pcb(cur->pcb);
@@ -324,6 +322,8 @@ bool load(const char *file_name, void (**eip)(void), void **esp) {
   if (t->pagedir == NULL)
     goto done;
   process_activate();
+
+  t->spt.pagedir = t->pagedir;
 
   /* Open executable file. */
   file = filesys_open(argv[0]);
@@ -482,7 +482,8 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
   ASSERT(ofs % PGSIZE == 0);
 
   file_seek(file, ofs);
-  int iter = 0;
+  int offset = 0;
+  struct thread *cur = thread_current();
   while (read_bytes > 0 || zero_bytes > 0) {
     /* Calculate how to fill this page.
        We will read PAGE_READ_BYTES bytes from FILE
@@ -490,15 +491,15 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
     size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
     size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-    struct spt_entry *page = spt_add_file(&thread_current()->spt, upage, writable, file, ofs + iter * PGSIZE, page_read_bytes, page_zero_bytes);
-    if (page == NULL)
+    struct spt_entry *spte = spt_insert_exec(&cur->spt, upage, writable, file, ofs + offset, page_read_bytes, page_zero_bytes);
+    if (spte == NULL)
       return false;
 
     /* Advance. */
     read_bytes -= page_read_bytes;
     zero_bytes -= page_zero_bytes;
     upage += PGSIZE;
-    iter++;
+    offset += PGSIZE;
   }
   return true;
 }
@@ -507,21 +508,19 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
    user virtual memory. */
 static bool
 setup_stack(void **esp) {
-  struct thread* cur = thread_current();
   bool success = false;
+  struct thread *cur = thread_current();
 
-  uint8_t *upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
-
-  struct spt_entry *stack_page = spt_add_anon(&cur->spt, upage, true);
-  if (stack_page != NULL) {
-    spt_load_page_into_frame(stack_page);
-    success = install_page(upage, stack_page->kpage, stack_page->writable);
-    if (success) {
-      cur->stack_pages++;
-      *esp = PHYS_BASE;
-    } else
-      spt_remove_by_upage(&cur->spt, upage);
+  void *upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
+  struct spt_entry *initial_stack = spt_insert_stack(&cur->spt, upage);
+  success = load_page(initial_stack);
+  if (success) {
+    *esp = PHYS_BASE;
+    cur->stack_pages = 1;
+  } else {
+    spt_remove(&cur->spt, initial_stack);
   }
+
   return success;
 }
 
@@ -534,7 +533,8 @@ setup_stack(void **esp) {
    with palloc_get_page().
    Returns true on success, false if UPAGE is already mapped or
    if memory allocation fails. */
-bool install_page(void *upage, void *kpage, bool writable) {
+bool
+install_page(void *upage, void *kpage, bool writable) {
   struct thread *t = thread_current();
 
   /* Verify that there's not already a page at that virtual
