@@ -553,6 +553,8 @@ struct spt_entry {
 - `table` : `spte`을 저장하는 `hash table`
 - `pagedir` : 현재 `spt`를 가지는 `thread`의 `pagedir`
 
+`spt`는 프로세스마다 하나씩 가지고 있으며, `thread` 구조체에 추가하여 관리한다.
+
 `spt_entry`의 멤버 변수는 다음과 같다.
 - `upage` : `user virtual address`
 - `kpage` : `kernel virtual address`
@@ -610,6 +612,7 @@ struct file_info {
 #### Supplemental Page Table Initialization
 
 Supplemental Page Table은 각 프로세스마다 하나씩 존재하기 때문에, `start_process()`에서 초기화한다.
+다만 `pagedir`은 `load()`에서 초기화되므로, 이후에 값을 적절히 초기화해야 한다.
 
 ```c
 void spt_init(struct spt *spt) {
