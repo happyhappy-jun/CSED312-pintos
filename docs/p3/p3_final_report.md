@@ -972,7 +972,7 @@ struct spt_entry *spt_insert_mmap(struct spt *spt, void *upage, struct file *fil
 munmap 은 mmap 을 해제하는 시스템 콜이다. `mmap_list` 에서 `mmap_entry` 를 찾아, `mmap_unmap_file` 을 호출해 해제한다.
 인자로 `mmapid_t id` 를 받아 해제하는 역할을 수행한다. 먼저, `mmap_list` 에서 `mmap_entry` 를 찾아 해제에 필요한 주소 정보등을 읽어온다. 
 `mmap_entry`의 적힌 주소를 페이지 단위로 순회하며, `spt` 에서 해당 엔트리를 찾아 해제한다. 해제는 `spt_remove` 를 통해
-spt 해시 테이블에서 삭제하고, `spte` 를 destroy 하며 수행된다.
+spt 해시 테이블에서 삭제하고, `spte` 를 destroy 하며 수행된다. `mmap` 된 페이지를 해제할 시 수행되는 write back 로직은 아래 후술한다. 
 ```c
 bool mmap_unmap_file(struct mmap_list *mmap_list, mmapid_t id) {
   struct mmap_entry *mmap_entry = mmap_find(mmap_list, id);
@@ -1092,7 +1092,7 @@ void spt_destroy(struct spt *spt) {
 자세한 `supplemental page table` 의 `entry` 의 정리는 다음과 같다. 
 먼저 엔트리가 로드되어있는 상태라면 다음 로직을 거친다. 
 동시성 문제를 위해 만약 엔트리가 `pin`이 되어있는지 체크하고, 안되어있다면, `pin` 을 함으로 eviction 을 막고, 만약, 
-메모리에 올라가있는 페이지라면, `thread_yield()`를 한다. TODO: 이부분 살짝 이해 안되는데 추가 설명 좀 부탁드립니다!
+메모리에 올라가있는 페이지라면, `thread_yield()`를 하여, 다른 스레드가 작업하도록 양보한다. 
 그 후, page 를 unload 한다. 이 때, page 가 dirty 하다면, `spte` 의 `type` 에 따라 파일에 변경 사항을 다시 쓰거나, 
 `EXEC, STACK` 일 경우, `swap_out` 한다.
 
@@ -1122,5 +1122,66 @@ static void spte_destroy(struct hash_elem *elem, void *aux) {
   }
   lock_release(&spte->lock);
   free(spte);
+}
+```
+
+또한 page data 를 unload 할 시에는 데이터가 변경되었는지 체크하고, 만약 그럴 시에 write back 해줘야한다. 
+이는 `spte` 의 `type` 에 따라 파일에 변경 사항을 다시 쓰거나, `EXEC, STACK` 일 경우, `swap_out` 한다.
+
+```c
+
+bool unload_page_data(struct spt *spt, struct spt_entry *spte) {
+  bool hold = lock_held_by_current_thread(&spte->lock);
+  if (!hold)
+      lock_acquire(&spte->lock);
+  ASSERT(spte->location == LOADED)
+  void *kpage = spte->kpage;
+  bool dirty = spte->dirty;
+  if (!dirty) {
+    dirty = pagedir_is_dirty(spt->pagedir, spte->upage);
+    spte->dirty = dirty;
+  }
+  spte->kpage = NULL;
+  pagedir_clear_page(spt->pagedir, spte->upage);
+
+  void *kbuffer = NULL;
+  if (dirty) {
+    kbuffer = palloc_get_page(PAL_ZERO);
+    memcpy(kbuffer, kpage, PGSIZE);
+  }
+
+  switch (spte->type) {
+  case MMAP:
+    if (dirty) {
+      unload_file(kbuffer, spte);
+      spte->dirty = false;
+    }
+    spte->location = FILE;
+    break;
+  case EXEC:
+    if (dirty) {
+      unload_swap(kbuffer, spte);
+      spte->location = SWAP;
+    } else {
+      spte->location = FILE;
+    }
+    break;
+  case STACK:
+    if (dirty) {
+      unload_swap(kbuffer, spte);
+      spte->location = SWAP;
+    } else {
+      spte->location = ZERO;
+    }
+    break;
+  default:
+    return false;
+  }
+  if (dirty)
+    palloc_free_page(kbuffer);
+  ASSERT(spte->location != LOADED)
+  if (!hold)
+      lock_release(&spte->lock);
+  return true;
 }
 ```
