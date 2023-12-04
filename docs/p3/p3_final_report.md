@@ -214,11 +214,10 @@ Frame unpin은 오로지 `load_page()`에서만 unpin이 된다.
 ## 2. Lazy Loading
 
 Lazy Loading을 위해서는 `load_segment()`와 `page_fault()`를 수정해야한다.
-`load_segment()`는 직접 `install_page()`를 호출하는 것이 아닌, 이후 설명할 Supplemental page table에 관련된 entry를 추가한다.
-`page_fault()`는 fault가 발생한 주소를 이용하여 Supplemental page table을 탐색하고 valid한 page라면 load한다.
-`load_segment()`에서 사용하는 `spt_insert_exec()`과 `page_fault()`에서 사용하는 `load_page()`는 이후 `Supplemental Page Table`에서 설명한다.
 
-수정된 `load_segment()`는 다음과 같다.
+### Algorithms and Implementation
+
+#### Load Segment
 ```c
 static bool
 load_segment(struct file *file, off_t ofs, uint8_t *upage,
@@ -250,6 +249,10 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
   return true;
 }
 ```
+`load_segment()`는 직접 `install_page()`를 호출하는 것이 아닌, 이후 설명할 Supplemental page table에 관련된 entry를 추가한다.
+`load_segment()`에서 사용하는 `spt_insert_exec()`은 이후 설명할 Supplemental page table에 실행파일 페이지 entry를 추가하는 함수이다.
+
+#### Page Fault Handler and loading page
 
 수정된 `page_fault()`는 다음과 같다.
 ```c
@@ -315,6 +318,100 @@ page_fault(struct intr_frame *f) {
   thread_exit();
 }
 ```
+`page_fault()`는 `fault_addr`를 이용하여 Supplemental page table을 탐색하고 valid한 page라면 load한다.
+`page_fault()`에서 `spt`를 탐색하고, valid한 page라면 load하기 위해 `load_page()`를 구현한다.
+
+```c
+bool load_page(struct spt_entry *spte) {
+  bool hold = lock_held_by_current_thread(&spte->lock);
+  if (!hold)
+    lock_acquire(&spte->lock);
+  void *kpage = frame_alloc(spte->upage, PAL_USER);
+  bool success = load_page_data(kpage, spte);
+  if (!hold)
+      lock_release(&spte->lock);
+  if (!success) {
+    frame_free(kpage);
+    return false;
+  }
+  frame_set_spte(kpage, spte);
+  frame_unpin(kpage);
+  return true;
+}
+
+bool load_page_data(void *kpage, struct spt_entry *spte) {
+  bool hold = lock_held_by_current_thread(&spte->lock);
+  if (!hold)
+    lock_acquire(&spte->lock);
+  ASSERT(spte->location != LOADED)
+  void *kbuffer = palloc_get_page(PAL_ZERO);
+  switch (spte->location) {
+  case LOADED:
+    PANIC("Page already loaded");
+  case FILE:
+    load_file(kbuffer, spte);
+    break;
+  case SWAP:
+    load_swap(kbuffer, spte);
+    break;
+  case ZERO:
+    memset(kbuffer, 0, PGSIZE);
+    break;
+  default:
+    return false;
+  }
+  memcpy(kpage, kbuffer, PGSIZE);
+  palloc_free_page(kbuffer);
+  spte->location = LOADED;
+  spte->kpage = kpage;
+  bool result = install_page(spte->upage, spte->kpage, spte->writable);
+  if (!hold)
+      lock_release(&spte->lock);
+  return result;
+}
+
+static void load_file(void *kbuffer, struct spt_entry *spte) {
+  ASSERT(kbuffer != NULL)
+  ASSERT(spte->location == FILE)
+  ASSERT(spte->file_info != NULL)
+  struct file_info *file_info = spte->file_info;
+
+  lock_acquire(&file_lock);
+  int read_bytes = file_read_at(file_info->file, kbuffer, (int) file_info->read_bytes, file_info->offset);
+  lock_release(&file_lock);
+  memset(kbuffer + read_bytes, 0, (int) file_info->zero_bytes);
+
+  if (read_bytes != (int) file_info->read_bytes) {
+    PANIC("Failed to read file");
+  }
+}
+
+static void load_swap(void *kbuffer, struct spt_entry *spte) {
+  ASSERT(kbuffer != NULL)
+  ASSERT(spte->location == SWAP)
+  ASSERT(spte->swap_index != -1)
+
+  swap_in(spte->swap_index, kbuffer);
+  spte->swap_index = -1;
+}
+```
+
+`load_page()`는 `frame_alloc()`을 통해 `frame`을 할당받고, `load_page_data()`를 통해 `frame`에 데이터를 로드한다.
+`frame`에 데이터를 로드한 후, `frame`에 `spte`를 설정하고, `frame`을 `unpin`한다.
+
+`load_page_data()`는 데이터 로드를 위해 `kbuffer`를 할당받고, `switch`문을 통해 `location`에 따라 데이터를 `kbuffer`에 로드한다.
+`location`이 `LOADED`라면, 이미 `frame`에 로드된 page이므로 PANIC한다.
+`location`이 `FILE`이라면, `load_file()`을 통해 `file`에서 데이터를 읽어온다.
+`location`이 `SWAP`이라면, `load_swap()`을 통해 `swap`에서 데이터를 읽어온다.
+`location`이 `ZERO`라면, `memset()`을 통해 `frame`을 0으로 초기화한다.
+
+kbuffer에 정상적으로 데이터를 로드한 후, `memcpy()`를 통해 `kbuffer`의 데이터를 `frame`에 복사한다.
+`frame`에 데이터를 로드한 후, `spte`의 `location`을 `LOADED`로 설정하고, `spte`의 `kpage`를 `frame`의 `kpage`로 설정한다.
+이후 `install_page()`를 통해 `frame`을 `upage`에 매핑한다.
+
+모든 과정은 `spte`의 정보를 수정하기 때문에 `spte`의 `lock`을 이용하여 동시성을 보장한다.
+
+`spte` 각각의 정보에 대한 내용은 이후 Supplemental Page에서 설명한다.
 
 ## 3. Supplemental Page Table
 
