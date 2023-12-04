@@ -857,14 +857,214 @@ page_fault(struct intr_frame *f) {
 
 ## 5. File Memory Mapping
 
+mmap 은 파일을 메모리에 매핑하는 기능이다. mmap 을 통해 매핑된 파일은, 파일에 접근을 할때 메모리에 직접 접근하여 데이터를 읽고 쓸 수 있다. 
+
+mmap 구현을 위해서 `mmap_entry` 라는 데이터 구조를 추가로 정의했다. `mmap_entry` 는 파일에 대한 정보, 매핑된 메모리의 주소, 크기 등을 저장한다.
+```c
+struct mmap_entry {
+  mmapid_t id;
+  struct file *file;
+  struct list_elem elem;
+  void *addr;
+  size_t size;
+};
+```
+
+프로세스는 mmap 된 파일, 영역등을 관리하기 위해 `mmap_list`를 정의해 관리한다. 이 리스트를 통해 현재 프로세스 내에서 mmap 된 파일들을 관리한다.
+```c
+struct mmap_list {
+  struct list list;
+  mmapid_t next_id;
+};
+
+struct thread {
+  /* ... */
+#ifdef VM
+  struct mmap_list mmap_list;
+#endif
+};
+```
+
+### mmap
+`mmap` 은 파일을 메모리에 매핑하는 시스템 콜이다. `mmap` 은 파일의 정보를 받아, `mmap_entry` 를 생성하고, `mmap_list` 에 추가한다.
+
+파일 포인터가 이미 열려 있을 케이스를 고려해, `file_reopen` 을 이용해 파일 포인터를 복사해준다. 이후, 파일의 크기를 확인해, 크기가 0이면, 실패를 반환한다.
+그 후, 파일의 크기를 페이지 크기 만큼 나눠, 페이지 단위로 읽어들인다. 이때, 페이지 단위로 읽어들이는 것은, `spt` 에 엔트리를 추가해주는 것을 의미한다.
+이 작업은 `spt_insert_mmap`을 통해 이루워지고, `spt_entry` 에 파일에 관한 entry 를 적절하게 만들어준다. (`type` 은 `MMAP`, `location` 은 `FILE`).
+마지막으로, `mmap_entry` 를 생성해 `mmap_list` 에 추가해준다. 
+
+```c
+mmapid_t mmap_map_file(struct mmap_list *mmap_list, struct file *file, void *addr) {
+  struct thread *cur = thread_current();
+  struct spt *spt = &cur->spt;
+  int fail_offset = -1;
+
+  lock_acquire(&file_lock);
+  struct file *file_copy = file_reopen(file);
+  lock_release(&file_lock);
+  if (file_copy == NULL) {
+    return MMAP_FAILED;
+  }
+
+  lock_acquire(&file_lock);
+  off_t size = file_length(file_copy);
+  lock_release(&file_lock);
+  if (size == 0) {
+    return MMAP_FAILED;
+  }
+
+  for (size_t offset=0; offset < size; offset += PGSIZE) {
+    size_t read_bytes = (offset + PGSIZE < size ? PGSIZE : size - offset);
+    size_t zero_bytes = PGSIZE - read_bytes;
+    struct spt_entry *spte = spt_insert_mmap(spt, addr + offset, file_copy, (off_t) offset, read_bytes, zero_bytes);
+    if (spte == NULL) {
+      fail_offset = (int)offset;
+      break;
+    }
+  }
+
+  if (fail_offset != -1) {
+    for (size_t offset=0; offset < (size_t)fail_offset; offset += PGSIZE) {
+      spt_remove(&cur->spt, addr + offset);
+    }
+    lock_acquire(&file_lock);
+    file_close(file_copy);
+    lock_release(&file_lock);
+    return MMAP_FAILED;
+  }
+
+  struct mmap_entry *mmap_entry = malloc(sizeof(struct mmap_entry));
+  mmap_entry->id = mmap_list->next_id++;
+  mmap_entry->file = file_copy;
+  mmap_entry->addr = addr;
+  mmap_entry->size = size;
+  list_push_back(&mmap_list->list, &mmap_entry->elem);
+  return mmap_entry->id;
+}
+
+struct spt_entry *spt_insert_mmap(struct spt *spt, void *upage, struct file *file, off_t offset, uint32_t read_bytes, uint32_t zero_bytes) {
+  struct spt_entry *spte = malloc(sizeof(struct spt_entry));
+  if (spte == NULL) {
+    return NULL;
+  }
+  spte->upage = upage;
+  spte->kpage = NULL;
+  spte->writable = true;
+  spte->dirty = false;
+  spte->type = MMAP;
+  spte->location = FILE;
+  spte->file_info = file_info_generator(file, offset, read_bytes, zero_bytes);
+  spte->swap_index = -1;
+  lock_init(&spte->lock);
+  struct hash_elem *e = hash_insert(&spt->table, &spte->elem);
+  if (e == NULL) {
+    return spte;
+  } else {
+    free(spte);
+    return NULL;
+  }
+}
+```
+
+
+### munmap
+
+munmap 은 mmap 을 해제하는 시스템 콜이다. `mmap_list` 에서 `mmap_entry` 를 찾아, `mmap_unmap_file` 을 호출해 해제한다.
+인자로 `mmapid_t id` 를 받아 해제하는 역할을 수행한다. 먼저, `mmap_list` 에서 `mmap_entry` 를 찾아 해제에 필요한 주소 정보등을 읽어온다. 
+`mmap_entry`의 적힌 주소를 페이지 단위로 순회하며, `spt` 에서 해당 엔트리를 찾아 해제한다. 해제는 `spt_remove` 를 통해
+spt 해시 테이블에서 삭제하고, `spte` 를 destroy 하며 수행된다. `mmap` 된 페이지를 해제할 시 수행되는 write back 로직은 아래 후술한다. 
+```c
+bool mmap_unmap_file(struct mmap_list *mmap_list, mmapid_t id) {
+  struct mmap_entry *mmap_entry = mmap_find(mmap_list, id);
+  if (mmap_entry == NULL) {
+    return false;
+  }
+
+  if (mmap_entry->file != NULL) {
+    struct thread *cur = thread_current();
+    struct spt *spt = &cur->spt;
+    void *addr = mmap_entry->addr;
+    size_t size = mmap_entry->size;
+    for (size_t offset=0; offset < size; offset += PGSIZE) {
+      struct spt_entry *spte = spt_find(spt, addr + offset);
+      ASSERT(spte != NULL)
+      ASSERT(spte->type == MMAP)
+//      if (spte->location == LOADED)
+//        unload_page(spt, addr + offset);
+      spt_remove(spt, addr + offset);
+    }
+    lock_acquire(&file_lock);
+    file_close(mmap_entry->file);
+    lock_release(&file_lock);
+    mmap_entry->file = NULL;
+  }
+  list_remove(&mmap_entry->elem);
+  return true;
+}
+```
+
+파일을 munmap 시 주의 해야할 점은, 만약에 mmap 된 상태에서 데이터가 수정이 되었다면, 이를 파일에 반영해줘야한다. 이 과정을 write back 이라 한다. 
+이 write back logic 을 `spte_destory()`에서 진행된다. 
+
 ## 6. Swap Table
+swap 은 `block` 을 이용해 구현했다. 스왑 영역으로 쓰기 위해 생성한 
+`block` 은 `block_read`, `block_write` 를 이용해 읽고 쓸 수 있다.
+필요했던 데이터 구조는 다음과 같다. 
+
+```c
+static struct block *swap_block;
+static struct bitmap *swap_table;
+static struct lock swap_lock;
+```
+swap 용 공간을 비트맵 형식으로 관리하기 위핸 데이터 구조인 `swap_table` 과 블록 포인터 형식으로 `swap_table` 을 정의한다. 
+swapping 이 여러 프로세스에 의해 동시 다발적으로 발생할 수 있고, 하나의 블럭에 쓰기 때문에, 동시성 문제를 관리하기 위해 
+락을 추가로 도입했다. 
+
+
+```c
+static const size_t SECTORS_NUM = PGSIZE / BLOCK_SECTOR_SIZE;
+```
+페이지 크기를 블럭 크기로 나눈 값을 `SECTORS_NUM` 로 정의하고, 페이지 내에서 섹터의 인덱스 만큼 반복하며 읽고 쓰기를 해주면 된다.
+
+- `swap_in()` 은 디스크로부터 페이지를 읽어오는 함수다. `spte` 에 저장해둔, `swap_index` 를 이용해 `swap_block` 에서 데이터를 읽어와
+page 에 쓴다. 추가로, 스왑 테이블 비트맵에 해당 엔트리가 사용가능하게 바뀌었을음 알리도록 값을 true 로 수정한다. 
+
+```c
+void swap_in(swap_index_t index, void *page) {
+  lock_acquire(&swap_lock);
+  bitmap_set(swap_table, index, true);
+
+  for (size_t i = 0; i < SECTORS_NUM; i++) {
+    block_read(swap_block, index * SECTORS_NUM + i, page + i * BLOCK_SECTOR_SIZE);
+  }
+  lock_release(&swap_lock);
+}
+```
+
+- `swap_out()`은 페이지를 디스크에 쓰는 함수다. `swap_table` 에서 비어있는 공간을 찾아, `index` 를 얻어온다. 그 후, 
+블록에 해당 인덱스를 사용하여 값을 적어준다. 
+
+```c
+swap_index_t swap_out(void *page) {
+  lock_acquire(&swap_lock);
+  size_t index = bitmap_scan_and_flip(swap_table, 0, 1, true);
+
+  for (size_t i = 0; i < SECTORS_NUM; i++) {
+    block_write(swap_block, index * SECTORS_NUM + i, page + i * BLOCK_SECTOR_SIZE);
+  }
+
+  bitmap_set(swap_table, index, false);
+  lock_release(&swap_lock);
+  return index;
+}
+```
 
 ## 7. On Process Termination
 VM 관련 기능 구현을 위해 새로 추가한 데이터 구조들을 프로세스 종료시 정리해줘야한다. 
 
-### Algorithms and Implementation
-
-`process_exit()`에서 mmap_destroy()와 spt_destroy()를 호출하여 정리한다.
+첫번째로, `process_exit()` 시에 `mmap` 해준 항목들과 `supplemental page table`을 정리해준다.
+현재 스레드의 `mmap` 리스트를 참고하여, `mmap` 해준 파일들을 `munmap` 해준다. `supplemental_page_table` 은 
+`hash_destory()` 를 이용해 정리한다. 이때 `spte_destroy()` 함수를 정의해 각 테이블의 엔트리에 대해 정리해준다. 
 ```c
 void process_exit(void) {
 #ifdef VM
@@ -873,11 +1073,7 @@ void process_exit(void) {
 #endif
   /* ... */
 }
-```
-
-#### Memory map destroy
-`process_exit()`시에 현재 스레드의 `mmap` 리스트를 참고하여, `mmap` 해준 파일들을 `munmap` 해준다. 
-```c
+  
 void mmap_destroy(struct mmap_list *mmap_list) {
     struct list_elem *e;
     while (!list_empty(&mmap_list->list)) {
@@ -888,17 +1084,20 @@ void mmap_destroy(struct mmap_list *mmap_list) {
     }
 }
 
-```
-
-`spt`는 `spt_destroy()`를 이용해 정리한다.
-
-```c
 void spt_destroy(struct spt *spt) {
   hash_destroy(&spt->table, spte_destroy);
 }
 ```
 
-`spt`의 각 `elem`의 정리를 위해 사용하는 destructor인 `spte_destroy()`을 다음과 같이 구현하여 사용한다.
+자세한 `supplemental page table` 의 `entry` 의 정리는 다음과 같다. 
+먼저 엔트리가 로드되어있는 상태라면 다음 로직을 거친다. 
+동시성 문제를 위해 만약 엔트리가 `pin`이 되어있는지 체크하고, 안되어있다면, `pin` 을 함으로 eviction 을 막고, 만약, 
+메모리에 올라가있는 페이지라면, `thread_yield()`를 하여, 다른 스레드가 작업하도록 양보한다. 
+그 후, page 를 unload 한다. 이 때, page 가 dirty 하다면, `spte` 의 `type` 에 따라 파일에 변경 사항을 다시 쓰거나, 
+`EXEC, STACK` 일 경우, `swap_out` 한다.
+
+이후, `spte` 가 스왑에 으면, `swap_free` 를 이용해 스왑을 해제한다.
+마지막으로, `spte` 의 `type` 이 `EXEC, MMAP` 일 경우, `file_info` 를 해제한다.
 
 ```c
 static void spte_destroy(struct hash_elem *elem, void *aux) {
@@ -926,60 +1125,63 @@ static void spte_destroy(struct hash_elem *elem, void *aux) {
 }
 ```
 
-`spte_destroy()`가 호출되면 우선 `spte`의 `lock`을 획득한다.
-이후, `spte`의 `location`이 `LOADED`인 경우, `frame`에 로드된 상태이므로 `frame`을 `unload`해준다.
-이때 연결된 frame의 pin 여부를 `frame_test_and_pin()`을 통해 확인한다. 
-pin 여부를 확인했을 때 이미 pin된 frame이라면 이것은 다른 프로세스가 해당 frame을 점유하기 위해 `frame_switch()` 에서 pin을 걸어둔 것이다.
-이런 경우라면 해당 process가 연결된 spte의 data를 unload 해줄 것이기 때문에 이를 busy waiting 방식으로 기다린다.
-이때 busy waiting 동안에는 lock을 release 해준다.
-
-`frame_test_and_pin()`은 `frame_table_lock`을 사용하여 frame table 접근에 대해 atomic하기 때문에 동시성 문제가 발생하지 않는다.
-`frame_test_and_pin()`을 사용하여 pin을 성공적으로 진행했다면, `unload_page()`를 통해 직접 unload를 해준다.
+또한 page data 를 unload 할 시에는 데이터가 변경되었는지 체크하고, 만약 그럴 시에 write back 해줘야한다. 
+이는 `spte` 의 `type` 에 따라 파일에 변경 사항을 다시 쓰거나, `EXEC, STACK` 일 경우, `swap_out` 한다.
 
 ```c
-bool unload_page(struct spt *spt, struct spt_entry *spte) {
+
+bool unload_page_data(struct spt *spt, struct spt_entry *spte) {
   bool hold = lock_held_by_current_thread(&spte->lock);
   if (!hold)
-    lock_acquire(&spte->lock);
+      lock_acquire(&spte->lock);
+  ASSERT(spte->location == LOADED)
   void *kpage = spte->kpage;
-  bool success = unload_page_data(spt, spte);
-  if (!hold)
-      lock_release(&spte->lock);
-  if (!success) {
+  bool dirty = spte->dirty;
+  if (!dirty) {
+    dirty = pagedir_is_dirty(spt->pagedir, spte->upage);
+    spte->dirty = dirty;
+  }
+  spte->kpage = NULL;
+  pagedir_clear_page(spt->pagedir, spte->upage);
+
+  void *kbuffer = NULL;
+  if (dirty) {
+    kbuffer = palloc_get_page(PAL_ZERO);
+    memcpy(kbuffer, kpage, PGSIZE);
+  }
+
+  switch (spte->type) {
+  case MMAP:
+    if (dirty) {
+      unload_file(kbuffer, spte);
+      spte->dirty = false;
+    }
+    spte->location = FILE;
+    break;
+  case EXEC:
+    if (dirty) {
+      unload_swap(kbuffer, spte);
+      spte->location = SWAP;
+    } else {
+      spte->location = FILE;
+    }
+    break;
+  case STACK:
+    if (dirty) {
+      unload_swap(kbuffer, spte);
+      spte->location = SWAP;
+    } else {
+      spte->location = ZERO;
+    }
+    break;
+  default:
     return false;
   }
-  frame_free(kpage);
+  if (dirty)
+    palloc_free_page(kbuffer);
+  ASSERT(spte->location != LOADED)
+  if (!hold)
+      lock_release(&spte->lock);
   return true;
 }
 ```
-
-`unload_page()`는 `unload_page_data()`를 통해 `frame`에 저장된 데이터를 unload한다. 
-사용하는 `unload_page_data()`는 Frame Table에서 설명한 내용이다.
-`unload_page()`는 이후 추가로 `frame_free()`를 통해 frame을 해제한다.
-
-`frame` 자체가 해제되기 때문에 unpin을 따로 해줄 필요는 없다.
-
-`unload_page()` 과정이 끝나면 `spte->location`이 `SWAP`인지 확인하고 맞다면 연결된 swap slot을 해제해준다.
-swap에 저장된 데이터는 `spte`가 프로세스로 부터 제거된다면 휘발되어도 상관이 없는 데이터이기 때문에 따로 다른 곳에 저장해줄 필요는 없다.
-
-이후, `spte`의 `type`이 `EXEC`나 `MMAP`인 경우, `malloc()`으로 할당받았던 `file_info`를 해제해준다.
-마지막으로 `spte` 자체를 해제해준다.
-
-주의해야하는 점은 destructor인 `spte_destroy()`가 호출되는 시점에 `spte`는 이미 `spt`에서 제거된 상태이다.
-따라서 `spte_destroy()`에서 호출하는 함수가 `upage`등을 이용해 `spt`에서 현재 제거 중인 `spte`를 찾으려고 하면 정의되지 않은 동작을 하게되니 주의해야한다.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
