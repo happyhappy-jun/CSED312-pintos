@@ -213,6 +213,109 @@ Frame unpin은 오로지 `load_page()`에서만 unpin이 된다.
 
 ## 2. Lazy Loading
 
+Lazy Loading을 위해서는 `load_segment()`와 `page_fault()`를 수정해야한다.
+`load_segment()`는 직접 `install_page()`를 호출하는 것이 아닌, 이후 설명할 Supplemental page table에 관련된 entry를 추가한다.
+`page_fault()`는 fault가 발생한 주소를 이용하여 Supplemental page table을 탐색하고 valid한 page라면 load한다.
+`load_segment()`에서 사용하는 `spt_insert_exec()`과 `page_fault()`에서 사용하는 `load_page()`는 이후 `Supplemental Page Table`에서 설명한다.
+
+수정된 `load_segment()`는 다음과 같다.
+```c
+static bool
+load_segment(struct file *file, off_t ofs, uint8_t *upage,
+             uint32_t read_bytes, uint32_t zero_bytes, bool writable) {
+  ASSERT((read_bytes + zero_bytes) % PGSIZE == 0);
+  ASSERT(pg_ofs(upage) == 0);
+  ASSERT(ofs % PGSIZE == 0);
+
+  file_seek(file, ofs);
+  int offset = 0;
+  struct thread *cur = thread_current();
+  while (read_bytes > 0 || zero_bytes > 0) {
+    /* Calculate how to fill this page.
+       We will read PAGE_READ_BYTES bytes from FILE
+       and zero the final PAGE_ZERO_BYTES bytes. */
+    size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
+    size_t page_zero_bytes = PGSIZE - page_read_bytes;
+
+    struct spt_entry *spte = spt_insert_exec(&cur->spt, upage, writable, file, ofs + offset, page_read_bytes, page_zero_bytes);
+    if (spte == NULL)
+      return false;
+
+    /* Advance. */
+    read_bytes -= page_read_bytes;
+    zero_bytes -= page_zero_bytes;
+    upage += PGSIZE;
+    offset += PGSIZE;
+  }
+  return true;
+}
+```
+
+수정된 `page_fault()`는 다음과 같다.
+```c
+static void
+page_fault(struct intr_frame *f) {
+  bool not_present; /* True: not-present page, false: writing r/o page. */
+  bool write;       /* True: access was write, false: access was read. */
+  bool user;        /* True: access by user, false: access by kernel. */
+  void *fault_addr; /* Fault address. */
+
+  /* Obtain faulting address, the virtual address that was
+     accessed to cause the fault.  It may point to code or to
+     data.  It is not necessarily the address of the instruction
+     that caused the fault (that's f->eip).
+     See [IA32-v2a] "MOV--Move to/from Control Registers" and
+     [IA32-v3a] 5.15 "Interrupt 14--Page Fault Exception
+     (#PF)". */
+  asm("movl %%cr2, %0"
+      : "=r"(fault_addr));
+
+  /* Turn interrupts back on (they were only off so that we could
+     be assured of reading CR2 before it changed). */
+  intr_enable();
+
+  /* Count page faults. */
+  page_fault_cnt++;
+
+  /* Determine cause. */
+  not_present = (f->error_code & PF_P) == 0;
+  write = (f->error_code & PF_W) != 0;
+  user = (f->error_code & PF_U) != 0;
+
+  struct thread *cur = thread_current();
+  void *fault_page = pg_round_down(fault_addr);
+  void *esp = user ? f->esp : cur->intr_esp;
+  struct spt *spt = &cur->spt;
+
+  if (fault_addr < PHYS_BASE && not_present) {
+    if (stack_growth(fault_addr, esp)) {
+      spt_insert_stack(spt, fault_page);
+      cur->stack_pages++;
+    }
+    struct spt_entry *spte = spt_find(spt, fault_page);
+    if (spte != NULL) {
+      if (load_page(spte))
+        return;
+      else {
+        thread_current()->pcb->exit_code = -1;
+        thread_exit();
+      }
+    }
+  }
+
+  // fault under PHYS_BASE access by kernel
+  // => fault while accessing user memory
+  if (fault_addr < PHYS_BASE && !user) {
+    f->eip = (void (*)(void))(f->eax);
+    f->eax = 0xffffffff;
+    return;
+  }
+
+  thread_current()->pcb->exit_code = -1;
+  thread_exit();
+}
+```
+
 ## 3. Supplemental Page Table
 
 ## 4. Stack Growth
