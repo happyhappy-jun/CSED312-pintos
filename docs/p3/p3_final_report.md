@@ -318,6 +318,227 @@ page_fault(struct intr_frame *f) {
 
 ## 3. Supplemental Page Table
 
+현재 Process의 valid한 page들과 현재 각 page의 위치 등을 관리하기 위해 `Supplemental Page Table`을 구현한다.
+
+### Data Structure
+
+Supplemental Page Table 구현을 위해 사용한 자료 구조는 다음과 같다.
+
+```c
+struct spt {
+  struct hash table;
+  void *pagedir;
+};
+
+struct spt_entry {
+  void *upage;
+  void *kpage;
+  bool writable;
+  bool dirty;
+
+  enum spte_type type;
+  enum page_location location;
+
+  struct file_info *file_info;
+  int swap_index;
+
+  struct lock lock;
+  struct hash_elem elem;
+};
+```
+
+`spt`의 멤버 변수는 다음과 같다.
+- `table` : `spte`을 저장하는 `hash table`
+- `pagedir` : 현재 `spt`를 가지는 `thread`의 `pagedir`
+
+`spt_entry`의 멤버 변수는 다음과 같다.
+- `upage` : `user virtual address`
+- `kpage` : `kernel virtual address`
+- `writable` : `writable` 여부
+- `dirty` : `dirty` 여부
+- `type` : `spte`의 종류
+- `location` : `spte`의 위치
+- `file_info` : `spte`의 종류가 `EXEC`이나 `MMAP`일 경우, `file`에 대한 정보
+- `swap_index` : `spte`의 위치가 `SWAP`일 경우, `swap`에 저장된 위치
+- `lock` : `spte`에 대한 동시성 제어를 위한 `lock`
+- `elem` : `spt`에 저장하기 위한 `hash_elem`
+
+이중 `type`과 `location`은 다음과 같은 `enum`으로 정의된다.
+```c
+enum spte_type {
+  MMAP,
+  EXEC,
+  STACK
+};
+
+enum page_location {
+  LOADED,
+  FILE,
+  SWAP,
+  ZERO
+};
+```
+
+`spte_type` 각각의 의미는 다음과 같다.
+- `MMAP` : mmap을 통해 연결된 page
+- `EXEC` : 실행 파일에서 불러온 page
+- `STACK` : stack page
+
+`page_location` 각각의 의미는 다음과 같다.
+- `LOADED` : `frame`에 로드된 page
+- `FILE` : `file`에 저장된 page
+- `SWAP` : `swap`에 저장된 page
+- `ZERO` : 빈 페이지
+
+`file_info`는 `spte`의 `type`이 `EXEC`나 `MMAP`일 경우, `file`에 대한 정보를 저장하기 위해 사용된다.
+
+```c
+struct file_info {
+  struct file *file;
+  off_t offset;
+  uint32_t read_bytes;
+  uint32_t zero_bytes;
+};
+```
+
+파일에서 page를 load하기 위한 정보를 저장한다.
+
+### Algorithms and Implementation
+
+#### Supplemental Page Table Initialization
+
+Supplemental Page Table은 각 프로세스마다 하나씩 존재하기 때문에, `start_process()`에서 초기화한다.
+
+```c
+void spt_init(struct spt *spt) {
+  spt->pagedir = thread_current()->pagedir;
+  hash_init(&spt->table, spt_hash, spt_less, NULL);
+}
+
+static unsigned spt_hash(const struct hash_elem *elem, void *aux) {
+  struct spt_entry *spte = hash_entry(elem, struct spt_entry, elem);
+  return hash_bytes(&spte->upage, sizeof(spte->upage));
+}
+
+static bool spt_less(const struct hash_elem *a, const struct hash_elem *b, void *aux) {
+  struct spt_entry *spte_a = hash_entry(a, struct spt_entry, elem);
+  struct spt_entry *spte_b = hash_entry(b, struct spt_entry, elem);
+  return spte_a->upage < spte_b->upage;
+}
+```
+
+#### Supplemental Page Table Destruction and Supplemental Table Entry Destruction
+
+spt를 해제하기 위해 `spt_destroy()`를 구현한다.
+`hash_destroy()`를 이용하여 spt를 해제하고, spte를 해제하기 위해 destructor `spte_destroy()`를 구현한다.
+
+spt에서 page를 제거하기 위해 `spt_remove()`를 구현한다.
+`spt_remove()`도 destructor `spte_destroy()`를 이용한다.
+
+```c
+void spt_destroy(struct spt *spt) {
+  hash_destroy(&spt->table, spte_destroy);
+}
+
+void spt_remove(struct spt *spt, void *upage) {
+  struct spt_entry *spte = spt_find(spt, upage);
+  hash_delete(&spt->table, &spte->elem);
+  spte_destroy(&spte->elem, NULL);
+}
+```
+
+핵심 기능인 `spte_destroy()`는 이후 `On Process Termination`에서 설명한다.
+
+#### Supplemental Page Table Insertion
+
+`spt_entry`의 설명에서 살펴봤듯이 `spt`에 추가가능한 page의 종류는 3가지이다.
+각각에 대해 `spt_insert_exec()`, `spt_insert_mmap()`, `spt_insert_stack()`을 구현한다.
+
+```c
+struct spt_entry *spt_insert_mmap(struct spt *spt, void *upage, struct file *file, off_t offset, uint32_t read_bytes, uint32_t zero_bytes) {
+  struct spt_entry *spte = malloc(sizeof(struct spt_entry));
+  if (spte == NULL) {
+    return NULL;
+  }
+  spte->upage = upage;
+  spte->kpage = NULL;
+  spte->writable = true;
+  spte->dirty = false;
+  spte->type = MMAP;
+  spte->location = FILE;
+  spte->file_info = file_info_generator(file, offset, read_bytes, zero_bytes);
+  spte->swap_index = -1;
+  lock_init(&spte->lock);
+  struct hash_elem *e = hash_insert(&spt->table, &spte->elem);
+  if (e == NULL) {
+    return spte;
+  } else {
+    free(spte);
+    return NULL;
+  }
+}
+
+struct spt_entry *spt_insert_exec(struct spt *spt, void *upage, bool writable, struct file *file, off_t offset, uint32_t read_bytes, uint32_t zero_bytes) {
+  struct spt_entry *spte = malloc(sizeof(struct spt_entry));
+  if (spte == NULL) {
+    return NULL;
+  }
+  spte->upage = upage;
+  spte->kpage = NULL;
+  spte->writable = writable;
+  spte->dirty = false;
+  spte->type = EXEC;
+  spte->location = FILE;
+  spte->file_info = file_info_generator(file, offset, read_bytes, zero_bytes);
+  spte->swap_index = -1;
+  lock_init(&spte->lock);
+  struct hash_elem *e = hash_insert(&spt->table, &spte->elem);
+  if (e == NULL) {
+    return spte;
+  } else {
+    free(spte);
+    return NULL;
+  }
+}
+
+struct spt_entry *spt_insert_stack(struct spt *spt, void *upage) {
+  struct spt_entry *spte = malloc(sizeof(struct spt_entry));
+  if (spte == NULL) {
+    return NULL;
+  }
+  spte->upage = upage;
+  spte->kpage = NULL;
+  spte->writable = true;
+  spte->dirty = false;
+  spte->type = STACK;
+  spte->location = ZERO;
+  spte->file_info = NULL;
+  spte->swap_index = -1;
+  lock_init(&spte->lock);
+  struct hash_elem *e = hash_insert(&spt->table, &spte->elem);
+  if (e == NULL) {
+      return spte;
+  } else {
+      free(spte);
+      return NULL;
+  }
+}
+
+static struct file_info *file_info_generator(struct file *file, off_t offset, uint32_t read_bytes, uint32_t zero_bytes) {
+  struct file_info *file_info = malloc(sizeof(struct file_info));
+  file_info->file = file;
+  file_info->offset = offset;
+  file_info->read_bytes = read_bytes;
+  file_info->zero_bytes = zero_bytes;
+  return file_info;
+}
+```
+
+각각의 함수는 `spt_entry`를 생성하고, `spt`에 추가한다.
+생성하는 `spt_entry`의 `type`에 맞게 각각의 멤버 변수를 초기화해준다.
+`file_info`는 `file`에 대한 정보를 저장하기 위해 `file_info_generator()`를 통해 생성한다.
+
+
 ## 4. Stack Growth
 
 ## 5. File Memory Mapping
