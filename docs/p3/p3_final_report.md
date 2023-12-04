@@ -10,6 +10,207 @@ Team Number: 20
 
 ## 1. Frame Table
 
+물리 메모리를 관리하기 위해 `frame table`을 구현한다.
+
+### Data Structure
+
+Frame Table 구현을 위해 사용한 자료 구조는 다음과 같다.
+
+```c
+struct frame_table {
+  struct hash frame_table;
+  struct lock frame_table_lock;
+};
+
+struct frame {
+  void *kpage;
+  void *upage;
+  int64_t timestamp;
+  bool pinned;
+  struct spt_entry *spte;
+  struct thread *thread;
+  struct hash_elem elem;
+};
+```
+
+`frame_table`의 멤버 변수는 다음과 같다.
+- `frame_table` : `frame`을 저장하는 `hash table`
+- `frame_table_lock` : `frame_table`에 대한 동시성 제어를 위한 `lock`
+
+`frame`의 멤버 변수는 다음과 같다.
+- `kpage` : `frame`에 할당된 `kernel virtual address`. `palloc_get_page()`를 통해 받은 값을 저장한다.
+- `upage` : `frame`에 매핑된 `user virtual address`
+- `timestamp` : `frame`이 할당된 시간
+- `pinned` : `frame`이 `pinned`되어 있는지 여부
+- `spte` : `frame`에 매핑된 `spte`
+- `thread` : `frame`을 할당받은 `thread`
+- `elem` : `frame_table`에 저장하기 위한 `hash_elem`
+
+### Algorithms and Implementation
+
+#### Frame Table Initialization
+
+Frame Table은 전역적으로 하나만 존재하기 때문에, threads/init.c에서 초기화한다.
+
+```c
+void frame_table_init(void) {
+  hash_init(&frame_table.frame_table, frame_table_hash, frame_table_less, NULL);
+  lock_init(&frame_table.frame_table_lock);
+}
+
+static unsigned frame_table_hash(const struct hash_elem *elem, void *aux) {
+  struct frame *fte = hash_entry(elem, struct frame, elem);
+  return hash_bytes(&fte->kpage, sizeof(fte->kpage));
+}
+
+static bool frame_table_less(const struct hash_elem *a, const struct hash_elem *b, void *aux) {
+  struct frame *fte_a = hash_entry(a, struct frame, elem);
+  struct frame *fte_b = hash_entry(b, struct frame, elem);
+  return fte_a->kpage < fte_b->kpage;
+}
+```
+
+`frame_table`의 hash table인 `frame_table`을 초기화하고, `frame_table_lock`을 초기화한다.
+
+#### Frame Allocation
+
+Frame Table에 새로운 `frame`을 할당하기 위해 `frame_alloc()` 함수를 구현한다.
+
+```c
+void *frame_alloc(void *upage, enum palloc_flags flags) {
+  void *kpage = palloc_get_page(flags);
+  
+  if (kpage == NULL) {
+    kpage = frame_switch(upage, flags);
+    return kpage;
+  }
+  
+  struct frame *f = malloc(sizeof(struct frame));
+  f->kpage = kpage;
+  f->upage = upage;
+  f->thread = thread_current();
+  f->timestamp = timer_ticks();
+  f->spte = NULL;
+
+  bool hold = lock_held_by_current_thread(&frame_table.frame_table_lock);
+  if (!hold)
+    lock_acquire(&frame_table.frame_table_lock);
+  hash_insert(&frame_table.frame_table, &f->elem);
+  frame_pin(f->kpage);
+  if (!hold)
+    lock_release(&frame_table.frame_table_lock);
+  return kpage;
+}
+```
+
+`palloc_get_page()`를 통해 `kpage`을 할당받는다. 
+할당받은 `kpage`을 가지고 `frame`을 생성한다.
+`malloc()`을 통해 `frame`을 할당받고, `frame`의 멤버 변수들을 초기화한다.
+이후 `frame_table`에 `frame`을 추가한다. 이때 `frame_table`에 대한 접근은 critical section으로, `frame_table_lock`을 이용하여 보호한다.
+`frame_table`에 추가한 후 critical section을 벗어나기 전에 `frame`을 `frame_pin()`을 이용하여 `pin`한다.
+`frame`의 pinning은 이후에 따로 설명한다.
+
+만약 `palloc_get_page()`로 `frame`을 할당받지 못했다면, `frame_switch()`를 통해 `frame`을 할당받는다.
+`frame_switch()`에 대한 내용은 이후에 설명한다.
+
+#### Frame Deallocation
+
+`frame`을 해제하기 위해 `frame_free()` 함수를 구현한다.
+
+```c
+void frame_free(void *kpage) {
+  bool hold = lock_held_by_current_thread(&frame_table.frame_table_lock);
+  if (!hold)
+    lock_acquire(&frame_table.frame_table_lock);
+  struct frame *f = frame_find(kpage);
+  hash_delete(&frame_table.frame_table, &f->elem);
+  palloc_free_page(kpage);
+  free(f);
+  if (!hold)
+    lock_release(&frame_table.frame_table_lock);
+}
+```
+
+`frame_free()`의 호출은 `frame`이 가지고 있던 정보가 적절한 backing store에 저장되었음을 가정한다.
+`frame_table`에 대한 접근은 critical section으로, `frame_table_lock`을 이용하여 보호한다.
+이후 `frame_table`에서 `frame`을 제거하고, `palloc_free_page()`를 통해 `kpage`을 해제한다.
+마지막으로 `malloc()`으로 할당받았던 `frame`을 `free()`를 통해 해제한다.
+
+#### Frame Switch
+
+`palloc_get_page()`를 통해 `frame`을 할당받지 못했을 때, `frame_switch()`를 통해 `frame`을 할당받는다.
+
+```c
+void *frame_switch(void *upage, enum palloc_flags flags) {
+  struct frame *target = frame_to_evict();
+  struct thread *target_thread = target->thread;
+  struct spt_entry *target_spte = target->spte;
+  bool zero = flags & PAL_ZERO;
+
+  if (target == NULL) {
+    PANIC("Cannot find frame to evict");
+  }
+
+  target->upage = upage;
+  target->thread = thread_current();
+  target->timestamp = timer_ticks();
+  target->spte = NULL;
+  unload_page_data(&target_thread->spt, target_spte);
+
+  if (zero)
+    memset(target->kpage, 0, PGSIZE);
+
+  return target->kpage;
+}
+
+static struct frame *frame_to_evict(void){
+  struct frame *target = NULL;
+  struct hash_iterator i;
+  int64_t min = INT64_MAX;
+
+  bool hold = lock_held_by_current_thread(&frame_table.frame_table_lock);
+  if (!hold)
+    lock_acquire(&frame_table.frame_table_lock);
+  hash_first(&i, &frame_table.frame_table);
+  while (hash_next(&i)) {
+      struct frame *f = hash_entry(hash_cur(&i), struct frame, elem);
+      if (f->pinned)
+          continue;
+      if (f->timestamp < min) {
+          min = f->timestamp;
+          target = f;
+      }
+  }
+  frame_pin(target->kpage);
+  if (!hold)
+    lock_release(&frame_table.frame_table_lock);
+  return target;
+}
+```
+
+우선 `frame_switch()`는 `frame_to_evict()`를 통해 교체할 `frame`을 선택한다.
+교체할 `frame`을 선택한 후, `frame`의 멤버 변수들을 새로운 `frame`에 맞게 수정한다.
+기존의 `frame`에 매핑된 `spte`를 적절한 backing store에 저장하기 위해 `unload_page_data()`를 사용한다.
+`unload_page_data()`에 대한 내용은 이후에 설명한다.
+만약 `frame_alloc()`을 호출할 때 zero flag가 설정되어 있다면, `memset()`을 통해 `kpage`을 0으로 초기화한다.
+마지막으로 `frame`의 `kpage`을 반환한다.
+
+`frame_to_evict()`는 `frame`의 `timestamp`를 기준으로 가장 오래된 `frame`을 선택한다. (LRU)
+`frame_table`에 대한 접근은 critical section으로, `frame_table_lock`을 이용하여 보호한다.
+이때 `frame`의 `pinned` 여부를 확인하여 `pinned`된 `frame`은 선택하지 않는다.
+`frame`이 결정되었다면 `frame_pin()`을 통해 `pin`한다.
+
+#### Frame Pinning
+
+Frame Pinning을 Synchronization을 위해 구현하였다.
+Pin이 되어있는 Frame은 Eviction이 되지 않는다.
+ 
+Frame은 오로지 `frame_alloc()`에서만 pin이 된다.
+Frame unpin은 오로지 `load_page()`에서만 unpin이 된다.
+
+따라서 frame이 pin이 되어있다는 것은 frame이 `frame_alloc()`에서 할당되었고, 아직 `load_page()`이 완료되지 않았음을 의미한다.
+또한, `load_page()`가 완료되면 frame은 반드시 unpin이 되고, eviction의 대상이 될 수 있다.
+
 ## 2. Lazy Loading
 
 ## 3. Supplemental Page Table
