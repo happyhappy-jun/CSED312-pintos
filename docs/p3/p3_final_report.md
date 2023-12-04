@@ -743,8 +743,117 @@ static struct file_info *file_info_generator(struct file *file, off_t offset, ui
 생성하는 `spt_entry`의 `type`에 맞게 각각의 멤버 변수를 초기화해준다.
 `file_info`는 `file`에 대한 정보를 저장하기 위해 `file_info_generator()`를 통해 생성한다.
 
-
 ## 4. Stack Growth
+
+`stack`의 크기를 늘리기 위해 `stack_growth()`를 구현한다.
+
+### Data Structure
+
+현재 프로세스가 몇 개의 stack page를 가지고 있는지 알기 위해 `stack_pages`를 `thread` 구조체에 추가한다.
+또한, stack growth 상황을 판단하기 위해 `intr_esp`를 `thread` 구조체에 추가한다.
+
+### Algorithms and Implementation
+
+#### Setup Stack
+
+최초의 stack은 lazy loading이 아니라 바로 load가 되어야하지만, evict 대상이 될 수 있기 때문에 여전히 spt에 추가될 필요가 있다.
+따라서, `setup_stack()`을 다음과 같이 수정한다.
+
+```c
+static bool
+setup_stack(void **esp) {
+  bool success = false;
+  struct thread *cur = thread_current();
+
+  void *upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
+  struct spt_entry *initial_stack = spt_insert_stack(&cur->spt, upage);
+  success = load_page(initial_stack);
+  if (success) {
+    *esp = PHYS_BASE;
+    cur->stack_pages = 1;
+  } else {
+    spt_remove(&cur->spt, initial_stack);
+  }
+
+  return success;
+}
+```
+
+#### Stack Growth
+
+우선, stack growth 상황에 대한 판단은 `stack_growth()`를 통해 한다. 구현은 다음과 같다.
+```c
+static bool stack_growth(void *fault_addr, void *esp) {
+  if (thread_current()->stack_pages >= STACK_MAX_PAGES) return false;
+  return esp - 32 <= fault_addr && fault_addr >= PHYS_BASE - STACK_MAX_PAGES * PGSIZE && fault_addr <= PHYS_BASE;
+}
+```
+
+STACK_MAX_PAGES는 2048로 이는 stack size인 8MB를 PGSIZE로 나눈 값이다.
+
+이때 사용하는 esp는
+```c
+void *esp = user ? f->esp : cur->intr_esp;
+```
+와 같이 계산된다. `cur->intr_esp`는 thread 구조체 추가한 멤버 변수이다. 
+이런 계산이 필요한 이유는, kernel context인 syscall handler 도중에 page fault가 발생할 때 유저 프로세스의 esp가 intr_frame에 제대로 저장되지 않기 때문이다.
+따라서, syscall handler가 불릴 때 cur->intr_esp에 esp를 저장해두고, page fault handler에서는 kernel context이라면 이를 사용한다.
+
+
+stack growth 상황인지 판단한 후 spt에 새로운 stack page를 추가하고 Load한다.
+```c
+
+static void
+page_fault(struct intr_frame *f) {
+  bool not_present; /* True: not-present page, false: writing r/o page. */
+  bool write;       /* True: access was write, false: access was read. */
+  bool user;        /* True: access by user, false: access by kernel. */
+  void *fault_addr; /* Fault address. */
+
+  /* Obtain faulting address, the virtual address that was
+     accessed to cause the fault.  It may point to code or to
+     data.  It is not necessarily the address of the instruction
+     that caused the fault (that's f->eip).
+     See [IA32-v2a] "MOV--Move to/from Control Registers" and
+     [IA32-v3a] 5.15 "Interrupt 14--Page Fault Exception
+     (#PF)". */
+  asm("movl %%cr2, %0"
+      : "=r"(fault_addr));
+
+  /* Turn interrupts back on (they were only off so that we could
+     be assured of reading CR2 before it changed). */
+  intr_enable();
+
+  /* Count page faults. */
+  page_fault_cnt++;
+
+  /* Determine cause. */
+  not_present = (f->error_code & PF_P) == 0;
+  write = (f->error_code & PF_W) != 0;
+  user = (f->error_code & PF_U) != 0;
+
+  struct thread *cur = thread_current();
+  void *fault_page = pg_round_down(fault_addr);
+  void *esp = user ? f->esp : cur->intr_esp;
+  struct spt *spt = &cur->spt;
+
+  if (fault_addr < PHYS_BASE && not_present) {
+    if (stack_growth(fault_addr, esp)) {
+      spt_insert_stack(spt, fault_page);
+      cur->stack_pages++;
+    }
+    // lazy loading
+    ...
+  }
+
+  // user memory access control
+  ...
+
+  thread_current()->pcb->exit_code = -1;
+  thread_exit();
+}
+```
+
 
 ## 5. File Memory Mapping
 
