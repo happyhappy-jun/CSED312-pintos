@@ -1060,11 +1060,11 @@ swap_index_t swap_out(void *page) {
 ```
 
 ## 7. On Process Termination
-VM 관련 기능 구현을 위해 새로 추가한 데이터 구조들을 프로세스 종료시 정리해줘야한다. 
+VM 관련 기능 구현을 위해 새로 추가한 데이터 구조들을 프로세스 종료시 정리해줘야한다.
 
-첫번째로, `process_exit()` 시에 `mmap` 해준 항목들과 `supplemental page table`을 정리해준다.
-현재 스레드의 `mmap` 리스트를 참고하여, `mmap` 해준 파일들을 `munmap` 해준다. `supplemental_page_table` 은 
-`hash_destory()` 를 이용해 정리한다. 이때 `spte_destroy()` 함수를 정의해 각 테이블의 엔트리에 대해 정리해준다. 
+### Algorithms and Implementation
+
+`process_exit()`에서 mmap_destroy()와 spt_destroy()를 호출하여 정리한다.
 ```c
 void process_exit(void) {
 #ifdef VM
@@ -1073,7 +1073,11 @@ void process_exit(void) {
 #endif
   /* ... */
 }
-  
+```
+
+#### Memory map destroy
+`process_exit()`시에 현재 스레드의 `mmap` 리스트를 참고하여, `mmap` 해준 파일들을 `munmap` 해준다.
+```c
 void mmap_destroy(struct mmap_list *mmap_list) {
     struct list_elem *e;
     while (!list_empty(&mmap_list->list)) {
@@ -1083,21 +1087,19 @@ void mmap_destroy(struct mmap_list *mmap_list) {
         free(mmap_entry);
     }
 }
+```
 
+#### Supplemental Page Table destroy
+
+`spt`는 `spt_destroy()`를 이용해 정리한다.
+
+```c
 void spt_destroy(struct spt *spt) {
   hash_destroy(&spt->table, spte_destroy);
 }
 ```
 
-자세한 `supplemental page table` 의 `entry` 의 정리는 다음과 같다. 
-먼저 엔트리가 로드되어있는 상태라면 다음 로직을 거친다. 
-동시성 문제를 위해 만약 엔트리가 `pin`이 되어있는지 체크하고, 안되어있다면, `pin` 을 함으로 eviction 을 막고, 만약, 
-메모리에 올라가있는 페이지라면, `thread_yield()`를 하여, 다른 스레드가 작업하도록 양보한다. 
-그 후, page 를 unload 한다. 이 때, page 가 dirty 하다면, `spte` 의 `type` 에 따라 파일에 변경 사항을 다시 쓰거나, 
-`EXEC, STACK` 일 경우, `swap_out` 한다.
-
-이후, `spte` 가 스왑에 으면, `swap_free` 를 이용해 스왑을 해제한다.
-마지막으로, `spte` 의 `type` 이 `EXEC, MMAP` 일 경우, `file_info` 를 해제한다.
+`spt`의 각 `elem`의 정리를 위해 사용하는 destructor인 `spte_destroy()`을 다음과 같이 구현하여 사용한다.
 
 ```c
 static void spte_destroy(struct hash_elem *elem, void *aux) {
@@ -1125,63 +1127,45 @@ static void spte_destroy(struct hash_elem *elem, void *aux) {
 }
 ```
 
-또한 page data 를 unload 할 시에는 데이터가 변경되었는지 체크하고, 만약 그럴 시에 write back 해줘야한다. 
-이는 `spte` 의 `type` 에 따라 파일에 변경 사항을 다시 쓰거나, `EXEC, STACK` 일 경우, `swap_out` 한다.
+`spte_destroy()`가 호출되면 우선 `spte`의 `lock`을 획득한다.
+이후, `spte`의 `location`이 `LOADED`인 경우, `frame`에 로드된 상태이므로 `frame`을 `unload`해준다.
+이때 연결된 frame의 pin 여부를 `frame_test_and_pin()`을 통해 확인한다.
+pin 여부를 확인했을 때 이미 pin된 frame이라면 이것은 다른 프로세스가 해당 frame을 점유하기 위해 `frame_switch()` 에서 pin을 걸어둔 것이다.
+이런 경우라면 해당 process가 연결된 spte의 data를 unload 해줄 것이기 때문에 이를 busy waiting 방식으로 기다린다.
+이때 busy waiting 동안에는 lock을 release 해준다.
+
+`frame_test_and_pin()`은 `frame_table_lock`을 사용하여 frame table 접근에 대해 atomic하기 때문에 동시성 문제가 발생하지 않는다.
+`frame_test_and_pin()`을 사용하여 pin을 성공적으로 진행했다면, `unload_page()`를 통해 직접 unload를 해준다.
 
 ```c
-
-bool unload_page_data(struct spt *spt, struct spt_entry *spte) {
+bool unload_page(struct spt *spt, struct spt_entry *spte) {
   bool hold = lock_held_by_current_thread(&spte->lock);
   if (!hold)
-      lock_acquire(&spte->lock);
-  ASSERT(spte->location == LOADED)
+    lock_acquire(&spte->lock);
   void *kpage = spte->kpage;
-  bool dirty = spte->dirty;
-  if (!dirty) {
-    dirty = pagedir_is_dirty(spt->pagedir, spte->upage);
-    spte->dirty = dirty;
-  }
-  spte->kpage = NULL;
-  pagedir_clear_page(spt->pagedir, spte->upage);
-
-  void *kbuffer = NULL;
-  if (dirty) {
-    kbuffer = palloc_get_page(PAL_ZERO);
-    memcpy(kbuffer, kpage, PGSIZE);
-  }
-
-  switch (spte->type) {
-  case MMAP:
-    if (dirty) {
-      unload_file(kbuffer, spte);
-      spte->dirty = false;
-    }
-    spte->location = FILE;
-    break;
-  case EXEC:
-    if (dirty) {
-      unload_swap(kbuffer, spte);
-      spte->location = SWAP;
-    } else {
-      spte->location = FILE;
-    }
-    break;
-  case STACK:
-    if (dirty) {
-      unload_swap(kbuffer, spte);
-      spte->location = SWAP;
-    } else {
-      spte->location = ZERO;
-    }
-    break;
-  default:
-    return false;
-  }
-  if (dirty)
-    palloc_free_page(kbuffer);
-  ASSERT(spte->location != LOADED)
+  bool success = unload_page_data(spt, spte);
   if (!hold)
       lock_release(&spte->lock);
+  if (!success) {
+    return false;
+  }
+  frame_free(kpage);
   return true;
 }
 ```
+
+`unload_page()`는 `unload_page_data()`를 통해 `frame`에 저장된 데이터를 unload한다.
+사용하는 `unload_page_data()`는 Frame Table에서 설명한 내용이다.
+`unload_page()`는 이후 추가로 `frame_free()`를 통해 frame을 해제한다.
+
+`frame` 자체가 해제되기 때문에 unpin을 따로 해줄 필요는 없다.
+
+`unload_page()` 과정이 끝나면 `spte->location`이 `SWAP`인지 확인하고 맞다면 연결된 swap slot을 해제해준다.
+swap에 저장된 데이터는 `spte`가 프로세스로 부터 제거된다면 휘발되어도 상관이 없는 데이터이기 때문에 따로 다른 곳에 저장해줄 필요는 없다.
+
+이후, `spte`의 `type`이 `EXEC`나 `MMAP`인 경우, `malloc()`으로 할당받았던 `file_info`를 해제해준다.
+마지막으로 `spte` 자체를 해제해준다.
+
+주의해야하는 점은 destructor인 `spte_destroy()`가 호출되는 시점에 `spte`는 이미 `spt`에서 제거된 상태이다.
+따라서 `spte_destroy()`에서 호출하는 함수가 `upage`등을 이용해 `spt`에서 현재 제거 중인 `spte`를 찾으려고 하면 정의되지 않은 동작을 하게되니 주의해야한다.
+
