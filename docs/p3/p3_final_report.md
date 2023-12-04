@@ -857,7 +857,207 @@ page_fault(struct intr_frame *f) {
 
 ## 5. File Memory Mapping
 
+mmap 은 파일을 메모리에 매핑하는 기능이다. mmap 을 통해 매핑된 파일은, 파일에 접근을 할때 메모리에 직접 접근하여 데이터를 읽고 쓸 수 있다. 
+
+mmap 구현을 위해서 `mmap_entry` 라는 데이터 구조를 추가로 정의했다. `mmap_entry` 는 파일에 대한 정보, 매핑된 메모리의 주소, 크기 등을 저장한다.
+```c
+struct mmap_entry {
+  mmapid_t id;
+  struct file *file;
+  struct list_elem elem;
+  void *addr;
+  size_t size;
+};
+```
+
+프로세스는 mmap 된 파일, 영역등을 관리하기 위해 `mmap_list`를 정의해 관리한다. 이 리스트를 통해 현재 프로세스 내에서 mmap 된 파일들을 관리한다.
+```c
+struct mmap_list {
+  struct list list;
+  mmapid_t next_id;
+};
+
+struct thread {
+  /* ... */
+#ifdef VM
+  struct mmap_list mmap_list;
+#endif
+};
+```
+
+### mmap
+`mmap` 은 파일을 메모리에 매핑하는 시스템 콜이다. `mmap` 은 파일의 정보를 받아, `mmap_entry` 를 생성하고, `mmap_list` 에 추가한다.
+
+파일 포인터가 이미 열려 있을 케이스를 고려해, `file_reopen` 을 이용해 파일 포인터를 복사해준다. 이후, 파일의 크기를 확인해, 크기가 0이면, 실패를 반환한다.
+그 후, 파일의 크기를 페이지 크기 만큼 나눠, 페이지 단위로 읽어들인다. 이때, 페이지 단위로 읽어들이는 것은, `spt` 에 엔트리를 추가해주는 것을 의미한다.
+이 작업은 `spt_insert_mmap`을 통해 이루워지고, `spt_entry` 에 파일에 관한 entry 를 적절하게 만들어준다. (`type` 은 `MMAP`, `location` 은 `FILE`).
+마지막으로, `mmap_entry` 를 생성해 `mmap_list` 에 추가해준다. 
+
+```c
+mmapid_t mmap_map_file(struct mmap_list *mmap_list, struct file *file, void *addr) {
+  struct thread *cur = thread_current();
+  struct spt *spt = &cur->spt;
+  int fail_offset = -1;
+
+  lock_acquire(&file_lock);
+  struct file *file_copy = file_reopen(file);
+  lock_release(&file_lock);
+  if (file_copy == NULL) {
+    return MMAP_FAILED;
+  }
+
+  lock_acquire(&file_lock);
+  off_t size = file_length(file_copy);
+  lock_release(&file_lock);
+  if (size == 0) {
+    return MMAP_FAILED;
+  }
+
+  for (size_t offset=0; offset < size; offset += PGSIZE) {
+    size_t read_bytes = (offset + PGSIZE < size ? PGSIZE : size - offset);
+    size_t zero_bytes = PGSIZE - read_bytes;
+    struct spt_entry *spte = spt_insert_mmap(spt, addr + offset, file_copy, (off_t) offset, read_bytes, zero_bytes);
+    if (spte == NULL) {
+      fail_offset = (int)offset;
+      break;
+    }
+  }
+
+  if (fail_offset != -1) {
+    for (size_t offset=0; offset < (size_t)fail_offset; offset += PGSIZE) {
+      spt_remove(&cur->spt, addr + offset);
+    }
+    lock_acquire(&file_lock);
+    file_close(file_copy);
+    lock_release(&file_lock);
+    return MMAP_FAILED;
+  }
+
+  struct mmap_entry *mmap_entry = malloc(sizeof(struct mmap_entry));
+  mmap_entry->id = mmap_list->next_id++;
+  mmap_entry->file = file_copy;
+  mmap_entry->addr = addr;
+  mmap_entry->size = size;
+  list_push_back(&mmap_list->list, &mmap_entry->elem);
+  return mmap_entry->id;
+}
+
+struct spt_entry *spt_insert_mmap(struct spt *spt, void *upage, struct file *file, off_t offset, uint32_t read_bytes, uint32_t zero_bytes) {
+  struct spt_entry *spte = malloc(sizeof(struct spt_entry));
+  if (spte == NULL) {
+    return NULL;
+  }
+  spte->upage = upage;
+  spte->kpage = NULL;
+  spte->writable = true;
+  spte->dirty = false;
+  spte->type = MMAP;
+  spte->location = FILE;
+  spte->file_info = file_info_generator(file, offset, read_bytes, zero_bytes);
+  spte->swap_index = -1;
+  lock_init(&spte->lock);
+  struct hash_elem *e = hash_insert(&spt->table, &spte->elem);
+  if (e == NULL) {
+    return spte;
+  } else {
+    free(spte);
+    return NULL;
+  }
+}
+```
+
+
+### munmap
+
+munmap 은 mmap 을 해제하는 시스템 콜이다. `mmap_list` 에서 `mmap_entry` 를 찾아, `mmap_unmap_file` 을 호출해 해제한다.
+인자로 `mmapid_t id` 를 받아 해제하는 역할을 수행한다. 먼저, `mmap_list` 에서 `mmap_entry` 를 찾아 해제에 필요한 주소 정보등을 읽어온다. 
+`mmap_entry`의 적힌 주소를 페이지 단위로 순회하며, `spt` 에서 해당 엔트리를 찾아 해제한다. 해제는 `spt_remove` 를 통해
+spt 해시 테이블에서 삭제하고, `spte` 를 destroy 하며 수행된다.
+```c
+bool mmap_unmap_file(struct mmap_list *mmap_list, mmapid_t id) {
+  struct mmap_entry *mmap_entry = mmap_find(mmap_list, id);
+  if (mmap_entry == NULL) {
+    return false;
+  }
+
+  if (mmap_entry->file != NULL) {
+    struct thread *cur = thread_current();
+    struct spt *spt = &cur->spt;
+    void *addr = mmap_entry->addr;
+    size_t size = mmap_entry->size;
+    for (size_t offset=0; offset < size; offset += PGSIZE) {
+      struct spt_entry *spte = spt_find(spt, addr + offset);
+      ASSERT(spte != NULL)
+      ASSERT(spte->type == MMAP)
+//      if (spte->location == LOADED)
+//        unload_page(spt, addr + offset);
+      spt_remove(spt, addr + offset);
+    }
+    lock_acquire(&file_lock);
+    file_close(mmap_entry->file);
+    lock_release(&file_lock);
+    mmap_entry->file = NULL;
+  }
+  list_remove(&mmap_entry->elem);
+  return true;
+}
+```
+
+파일을 munmap 시 주의 해야할 점은, 만약에 mmap 된 상태에서 데이터가 수정이 되었다면, 이를 파일에 반영해줘야한다. 이 과정을 write back 이라 한다. 
+이 write back logic 을 `spte_destory()`에서 진행된다. 
+
 ## 6. Swap Table
+swap 은 `block` 을 이용해 구현했다. 스왑 영역으로 쓰기 위해 생성한 
+`block` 은 `block_read`, `block_write` 를 이용해 읽고 쓸 수 있다.
+필요했던 데이터 구조는 다음과 같다. 
+
+```c
+static struct block *swap_block;
+static struct bitmap *swap_table;
+static struct lock swap_lock;
+```
+swap 용 공간을 비트맵 형식으로 관리하기 위핸 데이터 구조인 `swap_table` 과 블록 포인터 형식으로 `swap_table` 을 정의한다. 
+swapping 이 여러 프로세스에 의해 동시 다발적으로 발생할 수 있고, 하나의 블럭에 쓰기 때문에, 동시성 문제를 관리하기 위해 
+락을 추가로 도입했다. 
+
+
+```c
+static const size_t SECTORS_NUM = PGSIZE / BLOCK_SECTOR_SIZE;
+```
+페이지 크기를 블럭 크기로 나눈 값을 `SECTORS_NUM` 로 정의하고, 페이지 내에서 섹터의 인덱스 만큼 반복하며 읽고 쓰기를 해주면 된다.
+
+- `swap_in()` 은 디스크로부터 페이지를 읽어오는 함수다. `spte` 에 저장해둔, `swap_index` 를 이용해 `swap_block` 에서 데이터를 읽어와
+page 에 쓴다. 추가로, 스왑 테이블 비트맵에 해당 엔트리가 사용가능하게 바뀌었을음 알리도록 값을 true 로 수정한다. 
+
+```c
+void swap_in(swap_index_t index, void *page) {
+  lock_acquire(&swap_lock);
+  bitmap_set(swap_table, index, true);
+
+  for (size_t i = 0; i < SECTORS_NUM; i++) {
+    block_read(swap_block, index * SECTORS_NUM + i, page + i * BLOCK_SECTOR_SIZE);
+  }
+  lock_release(&swap_lock);
+}
+```
+
+- `swap_out()`은 페이지를 디스크에 쓰는 함수다. `swap_table` 에서 비어있는 공간을 찾아, `index` 를 얻어온다. 그 후, 
+블록에 해당 인덱스를 사용하여 값을 적어준다. 
+
+```c
+swap_index_t swap_out(void *page) {
+  lock_acquire(&swap_lock);
+  size_t index = bitmap_scan_and_flip(swap_table, 0, 1, true);
+
+  for (size_t i = 0; i < SECTORS_NUM; i++) {
+    block_write(swap_block, index * SECTORS_NUM + i, page + i * BLOCK_SECTOR_SIZE);
+  }
+
+  bitmap_set(swap_table, index, false);
+  lock_release(&swap_lock);
+  return index;
+}
+```
 
 ## 7. On Process Termination
 VM 관련 기능 구현을 위해 새로 추가한 데이터 구조들을 프로세스 종료시 정리해줘야한다. 
