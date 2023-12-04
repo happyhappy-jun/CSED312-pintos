@@ -211,6 +211,111 @@ Frame unpin은 오로지 `load_page()`에서만 unpin이 된다.
 따라서 frame이 pin이 되어있다는 것은 frame이 `frame_alloc()`에서 할당되었고, 아직 `load_page()`이 완료되지 않았음을 의미한다.
 또한, `load_page()`가 완료되면 frame은 반드시 unpin이 되고, eviction의 대상이 될 수 있다.
 
+#### Unload Page Data
+
+`frame`에 저장된 데이터를 적절한 backing store에 저장하기 위해 `unload_page_data()`를 구현한다.
+
+```c
+bool unload_page_data(struct spt *spt, struct spt_entry *spte) {
+  bool hold = lock_held_by_current_thread(&spte->lock);
+  if (!hold)
+      lock_acquire(&spte->lock);
+  ASSERT(spte->location == LOADED)
+  void *kpage = spte->kpage;
+  bool dirty = spte->dirty;
+  if (!dirty) {
+    dirty = pagedir_is_dirty(spt->pagedir, spte->upage);
+    spte->dirty = dirty;
+  }
+  spte->kpage = NULL;
+  pagedir_clear_page(spt->pagedir, spte->upage);
+
+  void *kbuffer = NULL;
+  if (dirty) {
+    kbuffer = palloc_get_page(PAL_ZERO);
+    memcpy(kbuffer, kpage, PGSIZE);
+  }
+
+  switch (spte->type) {
+  case MMAP:
+    if (dirty) {
+      unload_file(kbuffer, spte);
+      spte->dirty = false;
+    }
+    spte->location = FILE;
+    break;
+  case EXEC:
+    if (dirty) {
+      unload_swap(kbuffer, spte);
+      spte->location = SWAP;
+    } else {
+      spte->location = FILE;
+    }
+    break;
+  case STACK:
+    if (dirty) {
+      unload_swap(kbuffer, spte);
+      spte->location = SWAP;
+    } else {
+      spte->location = ZERO;
+    }
+    break;
+  default:
+    return false;
+  }
+  if (dirty)
+    palloc_free_page(kbuffer);
+  ASSERT(spte->location != LOADED)
+  if (!hold)
+      lock_release(&spte->lock);
+  return true;
+}
+
+static void unload_file(void *kbuffer, struct spt_entry *spte) {
+  ASSERT(kbuffer != NULL)
+  ASSERT(spte->file_info != NULL)
+
+  struct file_info *file_info = spte->file_info;
+
+  lock_acquire(&file_lock);
+  int write_bytes = file_write_at(file_info->file, kbuffer, (int) file_info->read_bytes, file_info->offset);
+  lock_release(&file_lock);
+  if (write_bytes != (int) file_info->read_bytes) {
+    PANIC("Failed to write file");
+  }
+}
+
+static void unload_swap(void *kbuffer, struct spt_entry *spte) {
+  ASSERT(kbuffer != NULL)
+  ASSERT(spte->swap_index == -1)
+
+  spte->swap_index = (int) swap_out(kbuffer);
+}
+```
+
+`unload_page_data()`는 우선 load된 data의 dirty 여부를 확인한다.
+dirty 여부는 `spte`의 `dirty`와 `pagedir_is_dirty()`를 통해 확인한다.
+이후, `spte`의 `kpage`를 `NULL`로 설정하고, `pagedir_clear_page()`를 통해 `pagedir`에서 `upage`를 제거한다.
+이는 frame에서 unload 과정이 진행되는 동안 원래 주인 프로세스가 upage에 접근하여 내용을 읽거나 수정하는 것을 막기 위해서이다.
+원래 주인 프로세스는 이 시점부터 upage 접근 시 page fault가 발생하고 이후 설명할 page fault handler에서 적절한 동작을 수행하여 다시 load한다.
+
+만약 `dirty`라면, `kbuffer`를 할당받고, `memcpy()`를 통해 `kpage`의 데이터를 `kbuffer`에 복사한다.
+`dirty`인 경우에만 `kbuffer`를 할당받는 이유는, `dirty`가 아닌 경우에는 `kpage`의 데이터가 `spte`에 원래 지정된 backing store에 저장되어 있기 때문이다.
+
+`switch`문을 통해 `type`에 따라 `dirty`인 경우 데이터를 backing store에 저장한다.
+`type`이 `EXEC`이라면, `unload_swap()`을 통해 `swap`에 데이터를 저장한다.
+`type`이 `MMAP`이라면, `unload_file()`을 통해 `file`에 데이터를 저장한다.
+`type`이 `STACK`이라면, `unload_swap()`을 통해 `swap`에 데이터를 저장한다.
+
+저장을 완료한 후 저장한 위치에 맞게 `spte`의 `location`을 수정한다.
+`dirty`가 아니라서 저장하지 않은 경우라면 `type`이 `EXEC`이나 `MMAP`이라면 `location`을 `FILE`로, `STACK`이라면 `location`을 `ZERO`로 수정한다.
+
+이후, `kbuffer`를 해제하고, `spte`의 `location`이 `LOADED`가 아님을 확인한다.
+
+모든 과정은 `spte`의 정보를 수정하기 때문에 `spte`의 `lock`을 이용하여 동시성을 보장한다.
+`spte` 각각의 정보에 대한 내용은 이후 Supplemental Page에서 설명한다.
+
+
 ## 2. Lazy Loading
 
 Lazy Loading을 위해서는 `load_segment()`와 `page_fault()`를 수정해야한다.
