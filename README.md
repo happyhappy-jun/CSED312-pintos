@@ -1,25 +1,37 @@
 # Pintos - CSED312 Operating Systems (Fall 2023)
+Archive repo for POSTECH CSED312 Operating Systems Proejct PintOS
+í¬ìŠ¤í… ìš´ì˜ì²´ì œ í”„ë¡œì íŠ¸ í•€í† ìŠ¤ ë ˆí¬ì§€í† ë¦¬
+
 ## Team member 
 Team number: 20
-À±º´ÁØ (20190766)
-±èÄ¡Çå (20190806)
 
-## °³¹ß °¡ÀÌµå
+ìœ¤ë³‘ì¤€ (20190766)
+
+ê¹€ì¹˜í—Œ (20190806)
+
+## ë³´ê³ ì„œ
+| í”„ë¡œì íŠ¸ | ë””ìì¸ ë¦¬í¬íŠ¸ | ìµœì¢… ë³´ê³ ì„œ | 
+| - | - | - | 
+| Threads | [ë§í¬](docs/p1/p1.md) | [ë§í¬](docs/p1/p1_final_report.md) | 
+| User Programs | [ë§í¬](docs/p2/p2.md)| [ë§í¬](docs/p2/p2_final_report.md) |
+| Virtual Memory | [ë§í¬](docs/p3/p3.md) | [ë§í¬](docs/p3/p3_final_report.md) |
+
+## ê°œë°œ ê°€ì´ë“œ
 [CONTRIBUTE.md](CONTRIBUTE.md)
 
 [DEVELOPMENT.md](DEVELOPMENT.md)
 
-## ÀÚÁÖ °¡´Â ¸µÅ©
-[plms ¹Ù·Î°¡±â](https://plms.postech.ac.kr/course/view.php?id=8979)
+## ìì£¼ ê°€ëŠ” ë§í¬
+[plms ë°”ë¡œê°€ê¸°](https://plms.postech.ac.kr/course/view.php?id=8979)
 
-[plms °øÁö»çÇ× ¹Ù·Î °¡±â](https://plms.postech.ac.kr/mod/ubboard/view.php?id=122920)
+[plms ê³µì§€ì‚¬í•­ ë°”ë¡œ ê°€ê¸°](https://plms.postech.ac.kr/mod/ubboard/view.php?id=122920)
 
-## µµ¿òÀÌ µÉ ¸¸ÇÑ ¸µÅ©
-| ÀÌ¸§                   | ¸µÅ©                                                                               | 
+## ë„ì›€ì´ ë  ë§Œí•œ ë§í¬
+| ì´ë¦„                   | ë§í¬                                                                               | 
 |----------------------|----------------------------------------------------------------------------------|
 | Stanford Pintos Docs | [Link](https://web.stanford.edu/class/cs140/projects/pintos/pintos.html#SEC_Top) |
 | PKU Pintos Gitbook   | [Link](https://pkuflyingpig.gitbook.io/pintos/)                                  |
 | Kaist Pintos Gitbook | [Link](https://casys-kaist.github.io/pintos-kaist/)                              |
-| ÇÑ±¹¾î ¹ø¿ª ¹®¼­            | [Link](https://github.com/yuhodots/pintos/tree/master/manual_kor)                |
+| í•œêµ­ì–´ ë²ˆì—­ ë¬¸ì„œ            | [Link](https://github.com/yuhodots/pintos/tree/master/manual_kor)                |
 
 
